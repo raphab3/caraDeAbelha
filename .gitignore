@@ -3,5 +3,8 @@
 
 client/dist/
 client/node_modules/
+client/.vite/
+client/.cache/
+client/.pnpm-store/
 
 coverage/

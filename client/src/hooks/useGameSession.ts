@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from "react";
 
 import { WS_URL } from "../game/env";
 import { WSClient } from "../game/WSClient";
-import type { GameSessionState, MoveDirection, SessionMessage, WorldStateMessage } from "../types/game";
+import type {
+  GameSessionController,
+  GameSessionState,
+  MoveDirection,
+  SessionMessage,
+  WorldStateMessage,
+} from "../types/game";
 
 function createInitialState(
   connectionState: GameSessionState["connectionState"],
@@ -43,7 +49,16 @@ function isSessionMessage(message: unknown): message is SessionMessage {
   return "type" in message && message.type === "session";
 }
 
-export function useGameSession(username?: string): GameSessionState {
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+  return target.isContentEditable || tagName === "input" || tagName === "textarea" || tagName === "select";
+}
+
+export function useGameSession(username?: string): GameSessionController {
   const [gameSession, setGameSession] = useState<GameSessionState>(createInitialState("idle"));
   const clientRef = useRef<WSClient | null>(null);
   const pressedDirectionsRef = useRef<MoveDirection[]>([]);
@@ -154,6 +169,10 @@ export function useGameSession(username?: string): GameSessionState {
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
       const direction = KEY_TO_DIRECTION[event.key.toLowerCase()];
       if (!direction) {
         return;
@@ -164,6 +183,10 @@ export function useGameSession(username?: string): GameSessionState {
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
       const direction = KEY_TO_DIRECTION[event.key.toLowerCase()];
       if (!direction) {
         return;
@@ -200,5 +223,16 @@ export function useGameSession(username?: string): GameSessionState {
     };
   }, []);
 
-  return gameSession;
+  const moveToTarget = (x: number, z: number) => {
+    clientRef.current?.send({
+      type: "move_to",
+      x,
+      z,
+    });
+  };
+
+  return {
+    ...gameSession,
+    moveToTarget,
+  };
 }

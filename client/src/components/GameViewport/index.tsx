@@ -1,17 +1,37 @@
-import { Canvas, useFrame } from "@react-three/fiber";
-import { useRef } from "react";
-import { MathUtils } from "three";
+import { Html, OrbitControls } from "@react-three/drei";
+import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
+import { type ElementRef, useEffect, useMemo, useRef, useState } from "react";
+import { DoubleSide, MOUSE, MathUtils, Vector3 } from "three";
 import type { Group, Mesh } from "three";
 
 import type { GameSessionState, WorldPlayerState } from "../../types/game";
+
+const WORLD_TO_SCENE_SCALE = 1.35;
+const WORLD_LIMIT = 6;
+const TARGET_REACHED_DISTANCE = 0.22;
+
+interface MoveTargetMarkerState {
+  sceneX: number;
+  sceneZ: number;
+}
+
+function toSceneAxis(value: number): number {
+  return value * WORLD_TO_SCENE_SCALE;
+}
+
+function toWorldAxis(value: number): number {
+  return MathUtils.clamp(value / WORLD_TO_SCENE_SCALE, -WORLD_LIMIT, WORLD_LIMIT);
+}
 
 interface BeeActorProps {
   player: WorldPlayerState;
   drift: number;
   accentColor: string;
+  isLocal: boolean;
+  trackedPositionRef?: React.MutableRefObject<Vector3>;
 }
 
-function BeeActor({ player, drift, accentColor }: BeeActorProps) {
+function BeeActor({ player, drift, accentColor, isLocal, trackedPositionRef }: BeeActorProps) {
   const groupRef = useRef<Group>(null);
   const leftWingRef = useRef<Mesh>(null);
   const rightWingRef = useRef<Mesh>(null);
@@ -45,16 +65,26 @@ function BeeActor({ player, drift, accentColor }: BeeActorProps) {
       targetX - groupRef.current.position.x,
       targetZ - groupRef.current.position.z,
     );
+    trackedPositionRef?.current.copy(groupRef.current.position);
     leftWingRef.current.rotation.z = Math.sin(time * 18) * 0.3;
     rightWingRef.current.rotation.z = -Math.sin(time * 18) * 0.3;
   });
 
   return (
     <group ref={groupRef} position={[player.x * 1.35, 0.48, player.y * 1.35]}>
+      {isLocal ? (
+        <mesh position={[0, -0.56, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.78, 1.04, 40]} />
+          <meshBasicMaterial color="#fff1a8" opacity={0.92} side={DoubleSide} transparent />
+        </mesh>
+      ) : null}
+
       <mesh castShadow>
         <sphereGeometry args={[0.62, 32, 32]} />
         <meshStandardMaterial
           color={accentColor}
+          emissive={isLocal ? "#ffd15c" : "#000000"}
+          emissiveIntensity={isLocal ? 0.38 : 0}
           metalness={0.05}
           roughness={0.72}
         />
@@ -107,17 +137,108 @@ function BeeActor({ player, drift, accentColor }: BeeActorProps) {
           roughness={0.18}
         />
       </mesh>
+
+      <Html center distanceFactor={8} position={[0, 1.42, 0]} sprite transform>
+        <div className={`bee-nameplate${isLocal ? " bee-nameplate--local" : ""}`}>
+          {player.username}
+        </div>
+      </Html>
     </group>
+  );
+}
+
+function MoveTargetMarker({ target }: { target: MoveTargetMarkerState }) {
+  const markerRef = useRef<Group>(null);
+
+  useFrame((state) => {
+    if (!markerRef.current) {
+      return;
+    }
+
+    markerRef.current.rotation.y = state.clock.elapsedTime * 1.8;
+    markerRef.current.position.y = -1.02 + Math.sin(state.clock.elapsedTime * 3.4) * 0.04;
+  });
+
+  return (
+    <group ref={markerRef} position={[target.sceneX, -1.02, target.sceneZ]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.22, 0.38, 36]} />
+        <meshBasicMaterial color="#fff7bb" opacity={0.95} side={DoubleSide} transparent />
+      </mesh>
+
+      <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.1, 24]} />
+        <meshBasicMaterial color="#ffcb4c" opacity={0.92} transparent />
+      </mesh>
+    </group>
+  );
+}
+
+function CameraRig({ focusPlayer }: { focusPlayer?: WorldPlayerState }) {
+  const controlsRef = useRef<ElementRef<typeof OrbitControls>>(null);
+  const smoothedTargetRef = useRef(new Vector3(0, 0.45, 0));
+  const { gl } = useThree();
+
+  useEffect(() => {
+    const handleContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+    };
+
+    gl.domElement.addEventListener("contextmenu", handleContextMenu);
+
+    return () => {
+      gl.domElement.removeEventListener("contextmenu", handleContextMenu);
+    };
+  }, [gl]);
+
+  useFrame((_, delta) => {
+    const nextX = focusPlayer ? toSceneAxis(focusPlayer.x) : 0;
+    const nextZ = focusPlayer ? toSceneAxis(focusPlayer.y) : 0;
+    const desiredTarget = new Vector3(nextX, 0.42, nextZ);
+
+    smoothedTargetRef.current.lerp(desiredTarget, 1 - Math.exp(-delta * 6));
+    controlsRef.current?.target.copy(smoothedTargetRef.current);
+    controlsRef.current?.update();
+  });
+
+  return (
+    <OrbitControls
+      ref={controlsRef}
+      dampingFactor={0.08}
+      enableDamping
+      enablePan={false}
+      makeDefault
+      maxDistance={11.5}
+      maxPolarAngle={Math.PI / 2.1}
+      minDistance={4.4}
+      minPolarAngle={0.45}
+      mouseButtons={{
+        MIDDLE: MOUSE.DOLLY,
+        RIGHT: MOUSE.ROTATE,
+      }}
+      target={[0, 0.42, 0]}
+    />
   );
 }
 
 interface HiveCoreProps {
   players: WorldPlayerState[];
   connectionState: GameSessionState["connectionState"];
+  localPlayerId?: string;
+  onMoveToTarget: (x: number, z: number) => void;
 }
 
-function HiveCore({ players, connectionState }: HiveCoreProps) {
+function HiveCore({ players, connectionState, localPlayerId, onMoveToTarget }: HiveCoreProps) {
   const hiveRef = useRef<Group>(null);
+  const localPlayerPositionRef = useRef(new Vector3(Number.NaN, Number.NaN, Number.NaN));
+  const [moveTargetMarker, setMoveTargetMarker] = useState<MoveTargetMarkerState | null>(null);
+
+  useEffect(() => {
+    if (connectionState !== "connected" || !localPlayerId) {
+      setMoveTargetMarker(null);
+      localPlayerPositionRef.current.set(Number.NaN, Number.NaN, Number.NaN);
+    }
+  }, [connectionState, localPlayerId]);
 
   useFrame((state) => {
     if (!hiveRef.current) {
@@ -126,7 +247,38 @@ function HiveCore({ players, connectionState }: HiveCoreProps) {
 
     hiveRef.current.rotation.y =
       Math.sin(state.clock.elapsedTime * 0.25) * 0.25;
+
+    if (!moveTargetMarker || !Number.isFinite(localPlayerPositionRef.current.x)) {
+      return;
+    }
+
+    const distanceToTarget = Math.hypot(
+      localPlayerPositionRef.current.x - moveTargetMarker.sceneX,
+      localPlayerPositionRef.current.z - moveTargetMarker.sceneZ,
+    );
+
+    if (distanceToTarget < TARGET_REACHED_DISTANCE) {
+      setMoveTargetMarker(null);
+    }
   });
+
+  const handleGroundPointerDown = (event: ThreeEvent<PointerEvent>) => {
+    if (event.button !== 0 || connectionState !== "connected" || !localPlayerId) {
+      return;
+    }
+
+    event.stopPropagation();
+
+    const worldX = toWorldAxis(event.point.x);
+    const worldZ = toWorldAxis(event.point.z);
+
+    setMoveTargetMarker({
+      sceneX: toSceneAxis(worldX),
+      sceneZ: toSceneAxis(worldZ),
+    });
+
+    onMoveToTarget(worldX, worldZ);
+  };
 
   return (
     <group>
@@ -148,6 +300,7 @@ function HiveCore({ players, connectionState }: HiveCoreProps) {
 
       <mesh
         receiveShadow
+        onPointerDown={handleGroundPointerDown}
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -1.15, 0]}
       >
@@ -176,12 +329,16 @@ function HiveCore({ players, connectionState }: HiveCoreProps) {
         </mesh>
       </group>
 
+      {moveTargetMarker ? <MoveTargetMarker target={moveTargetMarker} /> : null}
+
       {players.map((player, index) => (
         <BeeActor
           key={player.id}
+          accentColor={player.id === localPlayerId ? "#f8c537" : "#ffd86f"}
           player={player}
           drift={index * 0.9}
-          accentColor={index === 0 ? "#f8c537" : "#ffd86f"}
+          isLocal={player.id === localPlayerId}
+          trackedPositionRef={player.id === localPlayerId ? localPlayerPositionRef : undefined}
         />
       ))}
 
@@ -207,9 +364,16 @@ function HiveCore({ players, connectionState }: HiveCoreProps) {
 interface GameViewportProps {
   players: WorldPlayerState[];
   connectionState: GameSessionState["connectionState"];
+  localPlayerId?: string;
+  onMoveToTarget: (x: number, z: number) => void;
 }
 
-export function GameViewport({ players, connectionState }: GameViewportProps) {
+export function GameViewport({ players, connectionState, localPlayerId, onMoveToTarget }: GameViewportProps) {
+  const localPlayer = useMemo(
+    () => players.find((player) => player.id === localPlayerId),
+    [localPlayerId, players],
+  );
+
   return (
     <Canvas
       camera={{ position: [6.6, 4.2, 7.4], fov: 42 }}
@@ -218,7 +382,13 @@ export function GameViewport({ players, connectionState }: GameViewportProps) {
       gl={{ antialias: true }}
     >
       <color attach="background" args={["#f7cd4a"]} />
-      <HiveCore players={players} connectionState={connectionState} />
+      <CameraRig focusPlayer={localPlayer} />
+      <HiveCore
+        connectionState={connectionState}
+        localPlayerId={localPlayerId}
+        onMoveToTarget={onMoveToTarget}
+        players={players}
+      />
     </Canvas>
   );
 }

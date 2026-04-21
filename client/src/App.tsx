@@ -65,7 +65,12 @@ export function App() {
       <section className="experience-card" aria-label="Viewport 3D inicial">
         <div className="experience-stage">
           <div className="viewport-shell">
-            <GameViewport players={gameSession.players} connectionState={gameSession.connectionState} />
+            <GameViewport
+              connectionState={gameSession.connectionState}
+              localPlayerId={gameSession.localPlayerId}
+              onMoveToTarget={gameSession.moveToTarget}
+              players={gameSession.players}
+            />
           </div>
 
           {showLoginGate ? (

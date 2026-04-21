@@ -37,7 +37,13 @@ export interface MoveAction {
   dir: MoveDirection;
 }
 
-export type ClientMessage = MoveAction;
+export interface MoveToAction {
+  type: "move_to";
+  x: number;
+  z: number;
+}
+
+export type ClientMessage = MoveAction | MoveToAction;
 export type ServerMessage = SessionMessage | WorldStateMessage;
 
 export interface GameSessionState {
@@ -47,4 +53,8 @@ export interface GameSessionState {
   players: WorldPlayerState[];
   tick: number;
   error?: string;
+}
+
+export interface GameSessionController extends GameSessionState {
+  moveToTarget: (x: number, z: number) => void;
 }

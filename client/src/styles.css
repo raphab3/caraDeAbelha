@@ -112,6 +112,27 @@ body::after {
   height: 100% !important;
 }
 
+.bee-nameplate {
+  min-width: 72px;
+  padding: 6px 10px;
+  border: 1px solid rgba(81, 52, 14, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 249, 228, 0.9);
+  color: #392108;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 10px 18px rgba(51, 31, 8, 0.18);
+  pointer-events: none;
+}
+
+.bee-nameplate--local {
+  background: rgba(255, 238, 171, 0.96);
+  color: #2f1a03;
+}
+
 .login-gate {
   position: absolute;
   inset: 0;
