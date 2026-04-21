@@ -319,8 +319,8 @@ go run ./cmd/server
 
 # Cliente React + Three Fiber
 cd client
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 
 # Acessar
 open http://localhost:3000

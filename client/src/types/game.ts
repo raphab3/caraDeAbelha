@@ -13,6 +13,7 @@ export interface HealthStatusState {
 
 export interface WorldPlayerState {
   id: string;
+  username: string;
   x: number;
   y: number;
 }
@@ -26,6 +27,7 @@ export interface WorldStateMessage {
 export interface SessionMessage {
   type: "session";
   playerId: string;
+  username: string;
 }
 
 export type MoveDirection = "up" | "down" | "left" | "right";
@@ -39,8 +41,9 @@ export type ClientMessage = MoveAction;
 export type ServerMessage = SessionMessage | WorldStateMessage;
 
 export interface GameSessionState {
-  connectionState: "connecting" | "connected" | "disconnected";
+  connectionState: "idle" | "connecting" | "connected" | "disconnected";
   localPlayerId?: string;
+  localUsername?: string;
   players: WorldPlayerState[];
   tick: number;
   error?: string;

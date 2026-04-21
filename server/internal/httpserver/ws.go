@@ -1,16 +1,24 @@
 package httpserver
 
 import (
-	"fmt"
+	"errors"
 	"log"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
+	"time"
+	"unicode/utf8"
 
 	"github.com/gorilla/websocket"
 )
 
 const worldLimit = 6
+
+const maxUsernameLength = 24
+
+var errInvalidUsername = errors.New("username invalido")
+var errUsernameInUse = errors.New("username em uso")
 
 type playerAction struct {
 	Type string `json:"type"`
@@ -18,14 +26,16 @@ type playerAction struct {
 }
 
 type playerState struct {
-	ID string `json:"id"`
-	X  int    `json:"x"`
-	Y  int    `json:"y"`
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	X        int    `json:"x"`
+	Y        int    `json:"y"`
 }
 
 type sessionMessage struct {
 	Type     string `json:"type"`
 	PlayerID string `json:"playerId"`
+	Username string `json:"username"`
 }
 
 type worldStateMessage struct {
@@ -35,9 +45,10 @@ type worldStateMessage struct {
 }
 
 type clientSession struct {
-	id      string
-	conn    *websocket.Conn
-	writeMu sync.Mutex
+	id         string
+	profileKey string
+	conn       *websocket.Conn
+	writeMu    sync.Mutex
 }
 
 type gameHub struct {
@@ -45,7 +56,7 @@ type gameHub struct {
 	upgrader websocket.Upgrader
 	clients  map[string]*clientSession
 	players  map[string]*playerState
-	nextID   uint64
+	profiles map[string]*playerState
 	tick     uint64
 }
 
@@ -58,20 +69,38 @@ func newGameHub() *gameHub {
 		},
 		clients: make(map[string]*clientSession),
 		players: make(map[string]*playerState),
+		profiles: make(map[string]*playerState),
 	}
 }
 
 func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	profileKey, username, err := parseUsername(r.URL.Query().Get("username"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if !hub.isUsernameAvailable(profileKey) {
+		http.Error(w, errUsernameInUse.Error(), http.StatusConflict)
+		return
+	}
+
 	connection, err := hub.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("websocket upgrade failed: %v", err)
 		return
 	}
 
-	client, initialState := hub.register(connection)
+	client, initialState, err := hub.register(connection, profileKey, username)
+	if err != nil {
+		writeCloseMessage(connection, err.Error())
+		return
+	}
+
 	hub.sendToClient(client, sessionMessage{
 		Type:     "session",
 		PlayerID: client.id,
+		Username: username,
 	})
 	hub.broadcast(initialState)
 
@@ -105,22 +134,38 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (hub *gameHub) register(connection *websocket.Conn) (*clientSession, worldStateMessage) {
+func (hub *gameHub) register(connection *websocket.Conn, profileKey string, username string) (*clientSession, worldStateMessage, error) {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
-	hub.nextID++
-	clientID := fmt.Sprintf("p%d", hub.nextID)
-	client := &clientSession{
-		id:   clientID,
-		conn: connection,
+	profile, ok := hub.profiles[profileKey]
+	if !ok {
+		profile = &playerState{
+			ID:       buildPlayerID(profileKey),
+			Username: username,
+			X:        0,
+			Y:        0,
+		}
+		hub.profiles[profileKey] = profile
 	}
 
-	hub.clients[clientID] = client
-	hub.players[clientID] = &playerState{ID: clientID, X: 0, Y: 0}
+	if _, active := hub.players[profile.ID]; active {
+		return nil, worldStateMessage{}, errUsernameInUse
+	}
+
+	profile.Username = username
+
+	client := &clientSession{
+		id:         profile.ID,
+		profileKey: profileKey,
+		conn:       connection,
+	}
+
+	hub.clients[profile.ID] = client
+	hub.players[profile.ID] = profile
 	hub.tick++
 
-	return client, hub.snapshotLocked()
+	return client, hub.snapshotLocked(), nil
 }
 
 func (hub *gameHub) unregister(clientID string) (worldStateMessage, bool) {
@@ -217,6 +262,42 @@ func (hub *gameHub) writeJSON(client *clientSession, message any) error {
 	defer client.writeMu.Unlock()
 
 	return client.conn.WriteJSON(message)
+}
+
+func (hub *gameHub) isUsernameAvailable(profileKey string) bool {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	profileID := buildPlayerID(profileKey)
+	_, active := hub.players[profileID]
+	return !active
+}
+
+func buildPlayerID(profileKey string) string {
+	return "player:" + profileKey
+}
+
+func parseUsername(rawUsername string) (string, string, error) {
+	username := strings.Join(strings.Fields(strings.TrimSpace(rawUsername)), " ")
+	if username == "" {
+		return "", "", errInvalidUsername
+	}
+
+	if utf8.RuneCountInString(username) > maxUsernameLength {
+		return "", "", errInvalidUsername
+	}
+
+	return strings.ToLower(username), username, nil
+}
+
+func writeCloseMessage(connection *websocket.Conn, message string) {
+	deadline := time.Now().Add(time.Second)
+	_ = connection.WriteControl(
+		websocket.CloseMessage,
+		websocket.FormatCloseMessage(websocket.ClosePolicyViolation, message),
+		deadline,
+	)
+	_ = connection.Close()
 }
 
 func clampToWorld(value int) int {

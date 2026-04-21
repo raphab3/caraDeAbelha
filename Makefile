@@ -30,10 +30,10 @@ server-test:
 	cd server && go test ./...
 
 setup-client:
-	cd client && npm install
+	cd client && pnpm install
 
 client:
-	cd client && npm run dev
+	cd client && pnpm run dev
 
 client-build:
-	cd client && npm run build
+	cd client && pnpm run build

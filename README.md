@@ -15,6 +15,7 @@ Base inicial do projeto para estudar Go e React Three Fiber construindo um jogo 
 
 - Go 1.22+
 - Node.js 20+
+- pnpm 10+
 - Docker + Docker Compose
 
 ## Subir o ambiente
@@ -46,6 +47,8 @@ make client-build
 docker compose config
 docker compose ps
 ```
+
+Para instalar as dependencias do client fora do Docker, use `make setup-client` ou rode `cd client && pnpm install`.
 
 ## Proxima fase sugerida
 

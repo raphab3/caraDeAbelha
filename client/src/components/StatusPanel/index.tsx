@@ -20,6 +20,10 @@ function getStatusLabel(backendHealth: HealthStatusState): string {
 }
 
 function getConnectionLabel(gameSession: GameSessionState): string {
+  if (gameSession.connectionState === "idle") {
+    return "aguardando username";
+  }
+
   if (gameSession.connectionState === "connecting") {
     return "conectando no websocket";
   }
@@ -61,6 +65,7 @@ export function StatusPanel({ backendHealth, gameSession, apiUrl, wsUrl }: Statu
 
         <article className="status-card">
           <h2>Jogador local</h2>
+          <p>{gameSession.localUsername ?? "username ainda nao escolhido"}</p>
           <p>{gameSession.localPlayerId ?? "aguardando session do servidor"}</p>
         </article>
 

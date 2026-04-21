@@ -4,11 +4,17 @@ import { WS_URL } from "../game/env";
 import { WSClient } from "../game/WSClient";
 import type { GameSessionState, MoveDirection, SessionMessage, WorldStateMessage } from "../types/game";
 
-const INITIAL_STATE: GameSessionState = {
-  connectionState: "connecting",
-  players: [],
-  tick: 0,
-};
+function createInitialState(
+  connectionState: GameSessionState["connectionState"],
+  localUsername?: string,
+): GameSessionState {
+  return {
+    connectionState,
+    localUsername,
+    players: [],
+    tick: 0,
+  };
+}
 
 const KEY_TO_DIRECTION: Record<string, MoveDirection> = {
   arrowup: "up",
@@ -37,17 +43,35 @@ function isSessionMessage(message: unknown): message is SessionMessage {
   return "type" in message && message.type === "session";
 }
 
-export function useGameSession(): GameSessionState {
-  const [gameSession, setGameSession] = useState<GameSessionState>(INITIAL_STATE);
+export function useGameSession(username?: string): GameSessionState {
+  const [gameSession, setGameSession] = useState<GameSessionState>(createInitialState("idle"));
   const clientRef = useRef<WSClient | null>(null);
   const pressedDirectionsRef = useRef<MoveDirection[]>([]);
 
   useEffect(() => {
-    const client = new WSClient(WS_URL);
+    if (!username) {
+      pressedDirectionsRef.current = [];
+      clientRef.current?.disconnect();
+      clientRef.current = null;
+      setGameSession(createInitialState("idle"));
+      return;
+    }
+
+    const socketUrl = new URL(WS_URL);
+    socketUrl.searchParams.set("username", username);
+
+    const client = new WSClient(socketUrl.toString());
+    let active = true;
+
     clientRef.current = client;
+    setGameSession(createInitialState("connecting", username));
 
     client.connect({
       onOpen: () => {
+        if (!active) {
+          return;
+        }
+
         setGameSession((current) => ({
           ...current,
           connectionState: "connected",
@@ -55,10 +79,15 @@ export function useGameSession(): GameSessionState {
         }));
       },
       onMessage: (message) => {
+        if (!active) {
+          return;
+        }
+
         if (isSessionMessage(message)) {
           setGameSession((current) => ({
             ...current,
             localPlayerId: message.playerId,
+            localUsername: message.username,
           }));
           return;
         }
@@ -75,30 +104,44 @@ export function useGameSession(): GameSessionState {
           error: undefined,
         }));
       },
-      onClose: () => {
-        setGameSession({
+      onClose: (event) => {
+        if (!active) {
+          return;
+        }
+
+        setGameSession((current) => ({
           connectionState: "disconnected",
           players: [],
           tick: 0,
-          error: undefined,
-        });
+          localUsername: current.localUsername ?? username,
+          error: current.error ?? (event.reason || undefined),
+        }));
       },
       onError: () => {
+        if (!active) {
+          return;
+        }
+
         setGameSession((current) => ({
           ...current,
           connectionState: "disconnected",
           localPlayerId: undefined,
+          localUsername: current.localUsername ?? username,
           error: "falha ao conectar no websocket do jogo",
         }));
       },
     });
 
     return () => {
+      active = false;
       pressedDirectionsRef.current = [];
       client.disconnect();
-      clientRef.current = null;
+
+      if (clientRef.current === client) {
+        clientRef.current = null;
+      }
     };
-  }, []);
+  }, [username]);
 
   useEffect(() => {
     const syncPressedDirection = (direction: MoveDirection, pressed: boolean) => {

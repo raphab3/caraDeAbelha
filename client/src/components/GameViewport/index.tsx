@@ -26,10 +26,25 @@ function BeeActor({ player, drift, accentColor }: BeeActorProps) {
     const targetZ = player.y * 1.35;
     const hoverHeight = 0.48 + Math.sin(time * 2.4) * 0.18;
 
-    groupRef.current.position.x = MathUtils.lerp(groupRef.current.position.x, targetX, 0.16);
-    groupRef.current.position.y = MathUtils.lerp(groupRef.current.position.y, hoverHeight, 0.18);
-    groupRef.current.position.z = MathUtils.lerp(groupRef.current.position.z, targetZ, 0.16);
-    groupRef.current.rotation.y = Math.atan2(targetX - groupRef.current.position.x, targetZ - groupRef.current.position.z);
+    groupRef.current.position.x = MathUtils.lerp(
+      groupRef.current.position.x,
+      targetX,
+      0.16,
+    );
+    groupRef.current.position.y = MathUtils.lerp(
+      groupRef.current.position.y,
+      hoverHeight,
+      0.18,
+    );
+    groupRef.current.position.z = MathUtils.lerp(
+      groupRef.current.position.z,
+      targetZ,
+      0.16,
+    );
+    groupRef.current.rotation.y = Math.atan2(
+      targetX - groupRef.current.position.x,
+      targetZ - groupRef.current.position.z,
+    );
     leftWingRef.current.rotation.z = Math.sin(time * 18) * 0.3;
     rightWingRef.current.rotation.z = -Math.sin(time * 18) * 0.3;
   });
@@ -38,7 +53,11 @@ function BeeActor({ player, drift, accentColor }: BeeActorProps) {
     <group ref={groupRef} position={[player.x * 1.35, 0.48, player.y * 1.35]}>
       <mesh castShadow>
         <sphereGeometry args={[0.62, 32, 32]} />
-        <meshStandardMaterial color={accentColor} metalness={0.05} roughness={0.72} />
+        <meshStandardMaterial
+          color={accentColor}
+          metalness={0.05}
+          roughness={0.72}
+        />
       </mesh>
 
       <mesh castShadow position={[-0.35, 0, 0]}>
@@ -61,14 +80,32 @@ function BeeActor({ player, drift, accentColor }: BeeActorProps) {
         <meshStandardMaterial color="#23150d" roughness={0.84} />
       </mesh>
 
-      <mesh ref={leftWingRef} position={[-0.08, 0.44, -0.3]} rotation={[0.2, 0, 0.15]}>
+      <mesh
+        ref={leftWingRef}
+        position={[-0.08, 0.44, -0.3]}
+        rotation={[0.2, 0, 0.15]}
+      >
         <sphereGeometry args={[0.26, 24, 24]} />
-        <meshStandardMaterial color="#d9f3ff" transparent opacity={0.74} roughness={0.18} />
+        <meshStandardMaterial
+          color="#d9f3ff"
+          transparent
+          opacity={0.74}
+          roughness={0.18}
+        />
       </mesh>
 
-      <mesh ref={rightWingRef} position={[-0.08, 0.44, 0.3]} rotation={[-0.2, 0, -0.15]}>
+      <mesh
+        ref={rightWingRef}
+        position={[-0.08, 0.44, 0.3]}
+        rotation={[-0.2, 0, -0.15]}
+      >
         <sphereGeometry args={[0.26, 24, 24]} />
-        <meshStandardMaterial color="#d9f3ff" transparent opacity={0.74} roughness={0.18} />
+        <meshStandardMaterial
+          color="#d9f3ff"
+          transparent
+          opacity={0.74}
+          roughness={0.18}
+        />
       </mesh>
     </group>
   );
@@ -87,7 +124,8 @@ function HiveCore({ players, connectionState }: HiveCoreProps) {
       return;
     }
 
-    hiveRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.25) * 0.25;
+    hiveRef.current.rotation.y =
+      Math.sin(state.clock.elapsedTime * 0.25) * 0.25;
   });
 
   return (
@@ -101,9 +139,18 @@ function HiveCore({ players, connectionState }: HiveCoreProps) {
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
       />
-      <pointLight intensity={24} color="#ffbf45" distance={12} position={[0, 1.6, 0]} />
+      <pointLight
+        intensity={24}
+        color="#ffbf45"
+        distance={12}
+        position={[0, 1.6, 0]}
+      />
 
-      <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.15, 0]}>
+      <mesh
+        receiveShadow
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, -1.15, 0]}
+      >
         <circleGeometry args={[10, 64]} />
         <meshStandardMaterial color="#5b742d" roughness={0.98} />
       </mesh>
@@ -121,7 +168,11 @@ function HiveCore({ players, connectionState }: HiveCoreProps) {
 
         <mesh position={[0, 1.7, 0]}>
           <icosahedronGeometry args={[0.48, 0]} />
-          <meshStandardMaterial color="#ffd36a" emissive="#ffae00" emissiveIntensity={0.8} />
+          <meshStandardMaterial
+            color="#ffd36a"
+            emissive="#ffae00"
+            emissiveIntensity={0.8}
+          />
         </mesh>
       </group>
 
@@ -137,11 +188,18 @@ function HiveCore({ players, connectionState }: HiveCoreProps) {
       {connectionState === "disconnected" ? (
         <mesh position={[0, 2.1, 0]}>
           <icosahedronGeometry args={[0.38, 0]} />
-          <meshStandardMaterial color="#b24a32" emissive="#ff6b3d" emissiveIntensity={0.8} />
+          <meshStandardMaterial
+            color="#b24a32"
+            emissive="#ff6b3d"
+            emissiveIntensity={0.8}
+          />
         </mesh>
       ) : null}
 
-      <gridHelper args={[18, 18, "#7e601f", "#cfa33f"]} position={[0, -1.14, 0]} />
+      <gridHelper
+        args={[18, 18, "#7e601f", "#cfa33f"]}
+        position={[0, -1.14, 0]}
+      />
     </group>
   );
 }
