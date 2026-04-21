@@ -19,7 +19,7 @@ const maxUsernameLength = 24
 const defaultPlayerSpeed = 3.0
 const movementStopDistance = 0.08
 const worldChunkSize = 4.0
-const worldRenderDistance = 3
+const worldRenderDistance = 5
 const worldTickInterval = 120 * time.Millisecond
 const worldDecorationPadding = 0.55
 

@@ -1,4 +1,4 @@
-import { Html, OrbitControls } from "@react-three/drei";
+import { Html, OrbitControls, Sky } from "@react-three/drei";
 import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, type ElementRef, type MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -32,13 +32,12 @@ const TARGET_REACHED_DISTANCE = 0.22;
 const BEE_HEIGHT = 0.48;
 const RENDER_CORRECTION_DISTANCE = WORLD_TO_SCENE_SCALE * 0.9;
 const SKY_COLOR = "#dff4ff";
-const FOG_COLOR = "#cddfb1";
-const FOG_NEAR = 34;
-const FOG_FAR = 92;
+const FOG_COLOR = "#d6e7c4";
+const FOG_NEAR = 58;
+const FOG_FAR = 176;
 const GROUND_HEIGHT = -1.15;
-const GROUND_INPUT_SIZE = 520;
-const DEFAULT_CAMERA_POSITION = [14, 10.5, 15.5] as const;
-const DEFAULT_CAMERA_FOV = 50;
+const DEFAULT_CAMERA_FOV = 56;
+const MIN_CAMERA_DISTANCE = 6;
 
 const beeBodyGeometry = new SphereGeometry(0.62, 32, 32);
 const beeStripeGeometry = new BoxGeometry(0.12, 0.9, 1.18);
@@ -111,6 +110,29 @@ function toSceneAxis(value: number): number {
 
 function toWorldAxis(value: number): number {
   return value / WORLD_TO_SCENE_SCALE;
+}
+
+function resolveViewportScale(chunkSize: number, renderDistance: number): {
+  cameraDistance: number;
+  groundInputSize: number;
+  maxCameraDistance: number;
+} {
+  if (chunkSize <= 0 || renderDistance <= 0) {
+    return {
+      cameraDistance: 38,
+      groundInputSize: 960,
+      maxCameraDistance: 180,
+    };
+  }
+
+  const chunkSpan = chunkSize * (renderDistance * 2 + 1);
+  const sceneSpan = toSceneAxis(chunkSpan);
+
+  return {
+    cameraDistance: Math.max(38, sceneSpan * 0.72),
+    groundInputSize: Math.max(960, sceneSpan * 4.2),
+    maxCameraDistance: Math.max(180, sceneSpan * 3.2),
+  };
 }
 
 function resolveAnchorScenePosition(
@@ -514,9 +536,11 @@ function MoveTargetMarker({ target }: { target: MoveTargetMarkerState }) {
 function CameraRig({
   focusPlayer,
   trackedPositionRef,
+  maxCameraDistance,
 }: {
   focusPlayer?: WorldPlayerState;
   trackedPositionRef: MutableRefObject<Vector3>;
+  maxCameraDistance: number;
 }) {
   const controlsRef = useRef<ElementRef<typeof OrbitControls>>(null);
   const smoothedTargetRef = useRef(new Vector3(0, 0.45, 0));
@@ -550,10 +574,10 @@ function CameraRig({
       enableDamping
       enablePan={false}
       makeDefault
-      maxDistance={78}
-      maxPolarAngle={Math.PI / 2.1}
-      minDistance={6}
-      minPolarAngle={0.45}
+      maxDistance={maxCameraDistance}
+      maxPolarAngle={Math.PI / 2.2}
+      minDistance={MIN_CAMERA_DISTANCE}
+      minPolarAngle={0.32}
       zoomSpeed={1.35}
       mouseButtons={{
         MIDDLE: MOUSE.DOLLY,
@@ -620,10 +644,12 @@ function InfiniteGround({
   focusPlayer,
   trackedPositionRef,
   onPointerDown,
+  size,
 }: {
   focusPlayer?: WorldPlayerState;
   trackedPositionRef: MutableRefObject<Vector3>;
   onPointerDown: (event: ThreeEvent<PointerEvent>) => void;
+  size: number;
 }) {
   const groundRef = useRef<Mesh>(null);
 
@@ -645,7 +671,7 @@ function InfiniteGround({
       rotation={[-Math.PI / 2, 0, 0]}
       position={[0, GROUND_HEIGHT, 0]}
     >
-      <planeGeometry args={[GROUND_INPUT_SIZE, GROUND_INPUT_SIZE]} />
+      <planeGeometry args={[size, size]} />
       <meshBasicMaterial opacity={0} side={DoubleSide} transparent />
     </mesh>
   );
@@ -656,6 +682,7 @@ interface HiveCoreProps {
   chunks: WorldChunkState[];
   chunkSize: number;
   connectionState: GameSessionState["connectionState"];
+  groundInputSize: number;
   localPlayerId?: string;
   localPlayerPositionRef: MutableRefObject<Vector3>;
   onMoveToTarget: (x: number, z: number) => void;
@@ -666,6 +693,7 @@ function HiveCore({
   chunks,
   chunkSize,
   connectionState,
+  groundInputSize,
   localPlayerId,
   localPlayerPositionRef,
   onMoveToTarget,
@@ -738,6 +766,16 @@ function HiveCore({
 
   return (
     <group>
+      <Sky
+        azimuth={0.18}
+        distance={450000}
+        inclination={0.53}
+        mieCoefficient={0.006}
+        mieDirectionalG={0.82}
+        rayleigh={1.35}
+        sunPosition={[120, 28, -80]}
+        turbidity={7}
+      />
       <fog attach="fog" args={[FOG_COLOR, FOG_NEAR, FOG_FAR]} />
       <ambientLight intensity={1} />
       <hemisphereLight color="#fff8d4" groundColor="#6b9035" intensity={0.64} />
@@ -756,6 +794,7 @@ function HiveCore({
       <InfiniteGround
         focusPlayer={localPlayer}
         onPointerDown={handleGroundPointerDown}
+        size={groundInputSize}
         trackedPositionRef={localPlayerPositionRef}
       />
       <Suspense fallback={null}>
@@ -821,6 +860,14 @@ export function GameViewport({
     [localPlayerId, players],
   );
   const localPlayerPositionRef = useRef(new Vector3(Number.NaN, Number.NaN, Number.NaN));
+  const viewportScale = useMemo(
+    () => resolveViewportScale(chunkSize, renderDistance),
+    [chunkSize, renderDistance],
+  );
+  const defaultCameraPosition = useMemo(
+    () => [viewportScale.cameraDistance, viewportScale.cameraDistance * 0.34, viewportScale.cameraDistance * 1.08] as const,
+    [viewportScale.cameraDistance],
+  );
 
   // Jogadores visíveis no 3D — mesma lógica de chunk do servidor
   const nearbyPlayers = useMemo(() => {
@@ -837,18 +884,23 @@ export function GameViewport({
   return (
     <div className="viewport-canvas-shell">
       <Canvas
-        camera={{ position: DEFAULT_CAMERA_POSITION, fov: DEFAULT_CAMERA_FOV }}
+        camera={{ position: defaultCameraPosition, fov: DEFAULT_CAMERA_FOV }}
         dpr={[1, 1.6]}
         shadows
         gl={{ antialias: true }}
       >
         <color attach="background" args={[SKY_COLOR]} />
         <RendererMetricsReporter onChange={onPerformanceChange} />
-        <CameraRig focusPlayer={localPlayer} trackedPositionRef={localPlayerPositionRef} />
+        <CameraRig
+          focusPlayer={localPlayer}
+          maxCameraDistance={viewportScale.maxCameraDistance}
+          trackedPositionRef={localPlayerPositionRef}
+        />
         <HiveCore
           chunks={chunks}
           chunkSize={chunkSize}
           connectionState={connectionState}
+          groundInputSize={viewportScale.groundInputSize}
           localPlayerId={localPlayerId}
           localPlayerPositionRef={localPlayerPositionRef}
           onMoveToTarget={onMoveToTarget}
