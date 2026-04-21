@@ -35,6 +35,7 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 		id:         profile.ID,
 		profileKey: profileKey,
 		conn:       connection,
+		lastSeenAt: hub.now(),
 	}
 
 	hub.clients[profile.ID] = client
@@ -42,6 +43,19 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 	hub.tick++
 
 	return client, replacedClient, nil
+}
+
+func (hub *gameHub) touchClient(clientID string) bool {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	client, ok := hub.clients[clientID]
+	if !ok || client == nil {
+		return false
+	}
+
+	client.lastSeenAt = hub.now()
+	return true
 }
 
 func (hub *gameHub) unregister(client *clientSession) bool {

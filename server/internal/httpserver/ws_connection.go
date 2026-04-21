@@ -57,9 +57,15 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if !hub.touchClient(client.id) {
+			return
+		}
+
 		var ok bool
 
 		switch action.Type {
+		case "heartbeat":
+			continue
 		case "move":
 			ok = hub.movePlayer(client.id, action.Dir)
 		case "move_to":
@@ -117,6 +123,10 @@ func (hub *gameHub) collectClientSnapshots() []clientSnapshot {
 func (hub *gameHub) writeJSON(client *clientSession, message any) error {
 	client.writeMu.Lock()
 	defer client.writeMu.Unlock()
+
+	if err := client.conn.SetWriteDeadline(hub.now().Add(websocketWriteTimeout)); err != nil {
+		return err
+	}
 
 	return client.conn.WriteJSON(message)
 }

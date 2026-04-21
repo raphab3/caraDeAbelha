@@ -768,6 +768,105 @@ body::after {
   color: #fff4d6;
 }
 
+.disconnect-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: linear-gradient(180deg, rgba(15, 8, 2, 0.28), rgba(15, 8, 2, 0.62));
+  backdrop-filter: blur(10px);
+}
+
+.disconnect-modal__card {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 14px;
+  padding: 28px;
+  border: 1px solid rgba(255, 233, 177, 0.24);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top, rgba(255, 214, 110, 0.18), transparent 40%),
+    linear-gradient(180deg, rgba(54, 28, 5, 0.94), rgba(31, 17, 5, 0.96));
+  box-shadow: 0 26px 58px rgba(16, 8, 2, 0.38);
+  color: #fff4d6;
+}
+
+.disconnect-modal__eyebrow {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 216, 145, 0.8);
+}
+
+.disconnect-modal__card h2 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.25rem);
+  line-height: 1;
+}
+
+.disconnect-modal__copy,
+.disconnect-modal__meta {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.6;
+  color: rgba(255, 239, 210, 0.92);
+}
+
+.disconnect-modal__meta {
+  color: rgba(255, 217, 145, 0.92);
+  font-weight: 700;
+}
+
+.disconnect-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.disconnect-modal__primary,
+.disconnect-modal__secondary {
+  flex: 1 1 160px;
+  min-height: 48px;
+  border-radius: 16px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease;
+}
+
+.disconnect-modal__primary:hover,
+.disconnect-modal__secondary:hover {
+  transform: translateY(-1px);
+}
+
+.disconnect-modal__primary:focus-visible,
+.disconnect-modal__secondary:focus-visible {
+  outline: 2px solid #fff0a4;
+  outline-offset: 3px;
+}
+
+.disconnect-modal__primary {
+  border: 0;
+  background: linear-gradient(135deg, #ffe28c, #ffb733);
+  color: #392108;
+  box-shadow: 0 14px 28px rgba(112, 62, 8, 0.22);
+}
+
+.disconnect-modal__secondary {
+  border: 1px solid rgba(255, 225, 168, 0.24);
+  background: rgba(255, 245, 219, 0.08);
+  color: #fff4d6;
+}
+
 .login-eyebrow {
   margin: 0;
   font-size: 0.76rem;
@@ -1023,6 +1122,18 @@ body::after {
 
   .login-card {
     padding: 22px;
+  }
+
+  .disconnect-modal {
+    padding: 16px;
+  }
+
+  .disconnect-modal__card {
+    padding: 22px;
+  }
+
+  .disconnect-modal__actions {
+    flex-direction: column-reverse;
   }
 
   .status-grid {

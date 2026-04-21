@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { DisconnectModal } from "../DisconnectModal";
 import { GameViewport } from "../GameViewport";
 import { LoginGate } from "../LoginGate";
 import { PwaInstallPrompt } from "../PwaInstallPrompt";
@@ -19,6 +20,7 @@ export default function PlayerExperience() {
   const [activeUsername, setActiveUsername] = useState<string>();
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [formError, setFormError] = useState<string>();
+  const [hasJoinedSession, setHasJoinedSession] = useState(false);
   const { targetRef, isFullscreen, isSupported, requestFullscreen, toggleFullscreen } =
     useFullscreenTarget<HTMLDivElement>();
   const gameSession = useGameSession(activeUsername, connectionAttempt);
@@ -31,12 +33,24 @@ export default function PlayerExperience() {
     window.localStorage.setItem(USERNAME_STORAGE_KEY, gameSession.localUsername);
   }, [gameSession.connectionState, gameSession.localUsername]);
 
+  useEffect(() => {
+    if (!activeUsername) {
+      setHasJoinedSession(false);
+      return;
+    }
+
+    if (gameSession.localPlayerId) {
+      setHasJoinedSession(true);
+    }
+  }, [activeUsername, gameSession.localPlayerId]);
+
   const loginError =
     formError ??
-    (activeUsername && gameSession.connectionState === "disconnected" ? gameSession.error : undefined);
+    (activeUsername && gameSession.connectionState === "disconnected" && !hasJoinedSession ? gameSession.error : undefined);
 
   const hasStartedAdventure = Boolean(activeUsername);
-  const showLoginGate = !gameSession.localPlayerId;
+  const showDisconnectModal = hasJoinedSession && gameSession.connectionState === "disconnected";
+  const showLoginGate = !showDisconnectModal && !gameSession.localPlayerId && !hasJoinedSession;
   const shellClassName = [
     "app-shell player-experience",
     hasStartedAdventure ? "player-experience--started" : "",
@@ -86,6 +100,15 @@ export default function PlayerExperience() {
           />
         ) : null}
 
+        {showDisconnectModal ? (
+          <DisconnectModal
+            error={gameSession.error}
+            onExit={handleExit}
+            onReconnect={handleReconnect}
+            username={gameSession.localUsername ?? activeUsername}
+          />
+        ) : null}
+
         {hasStartedAdventure && isSupported ? (
           <button
             aria-label={isFullscreen ? "Sair da tela cheia" : "Entrar em tela cheia"}
@@ -122,6 +145,25 @@ export default function PlayerExperience() {
     }
     setConnectionAttempt((current) => current + 1);
     setActiveUsername(normalizedUsername);
+  }
+
+  function handleReconnect() {
+    if (!activeUsername) {
+      return;
+    }
+
+    setFormError(undefined);
+    if (isSupported && !isFullscreen) {
+      void requestFullscreen();
+    }
+
+    setConnectionAttempt((current) => current + 1);
+  }
+
+  function handleExit() {
+    setFormError(undefined);
+    setHasJoinedSession(false);
+    setActiveUsername(undefined);
   }
 
   return (

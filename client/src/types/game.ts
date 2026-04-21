@@ -102,6 +102,11 @@ export interface SessionMessage {
   username: string;
 }
 
+export interface HeartbeatMessage {
+  type: "heartbeat";
+  timestamp: string;
+}
+
 export type MoveDirection = "up" | "down" | "left" | "right";
 
 export interface MoveAction {
@@ -119,8 +124,12 @@ export interface RespawnAction {
   type: "respawn";
 }
 
-export type ClientMessage = MoveAction | MoveToAction | RespawnAction;
-export type ServerMessage = SessionMessage | WorldStateMessage;
+export interface HeartbeatAction {
+  type: "heartbeat";
+}
+
+export type ClientMessage = MoveAction | MoveToAction | RespawnAction | HeartbeatAction;
+export type ServerMessage = SessionMessage | WorldStateMessage | HeartbeatMessage;
 
 export interface GameSessionState {
   connectionState: "idle" | "connecting" | "connected" | "disconnected";
