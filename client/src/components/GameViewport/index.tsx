@@ -1,13 +1,29 @@
 import { Html, OrbitControls } from "@react-three/drei";
 import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
-import { type ElementRef, type MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
-import { CanvasTexture, DoubleSide, MOUSE, MathUtils, RepeatWrapping, SRGBColorSpace, Vector3 } from "three";
+import { Suspense, type ElementRef, type MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
+import {
+  BoxGeometry,
+  CanvasTexture,
+  CircleGeometry,
+  DoubleSide,
+  IcosahedronGeometry,
+  MOUSE,
+  MathUtils,
+  MeshBasicMaterial,
+  MeshStandardMaterial,
+  RepeatWrapping,
+  RingGeometry,
+  SRGBColorSpace,
+  SphereGeometry,
+  Vector3,
+} from "three";
 import type { Group, Mesh } from "three";
 
 import { InstancedWorldField } from "./InstancedWorldField";
 import { MiniMap } from "./MiniMap";
 import type {
   GameSessionState,
+  RenderPerformanceSnapshot,
   WorldChunkState,
   WorldPlayerState,
 } from "../../types/game";
@@ -22,8 +38,68 @@ const FOG_FAR = 42;
 const GROUND_HEIGHT = -1.15;
 const GROUND_SIZE = 260;
 const GROUND_TILE_WORLD_SIZE = 2.5;
-const DEFAULT_CAMERA_POSITION = [5.8, 3.9, 6.6] as const;
-const DEFAULT_CAMERA_FOV = 34;
+const DEFAULT_CAMERA_POSITION = [7.2, 5.2, 8.4] as const;
+const DEFAULT_CAMERA_FOV = 42;
+
+const beeBodyGeometry = new SphereGeometry(0.62, 32, 32);
+const beeStripeGeometry = new BoxGeometry(0.12, 0.9, 1.18);
+const beeHeadGeometry = new SphereGeometry(0.28, 24, 24);
+const beeWingGeometry = new SphereGeometry(0.26, 24, 24);
+const localMarkerGeometry = new RingGeometry(0.78, 1.04, 40);
+const moveTargetRingGeometry = new RingGeometry(0.22, 0.38, 36);
+const moveTargetCoreGeometry = new CircleGeometry(0.1, 24);
+const disconnectedBeaconGeometry = new IcosahedronGeometry(0.38, 0);
+
+const localMarkerMaterial = new MeshBasicMaterial({
+  color: "#fff1a8",
+  opacity: 0.92,
+  side: DoubleSide,
+  transparent: true,
+});
+const beeStripeMaterial = new MeshStandardMaterial({ color: "#23150d", roughness: 0.84 });
+const beeWingMaterial = new MeshStandardMaterial({
+  color: "#d9f3ff",
+  opacity: 0.74,
+  roughness: 0.18,
+  transparent: true,
+});
+const moveTargetRingMaterial = new MeshBasicMaterial({
+  color: "#fff7bb",
+  opacity: 0.95,
+  side: DoubleSide,
+  transparent: true,
+});
+const moveTargetCoreMaterial = new MeshBasicMaterial({
+  color: "#ffcb4c",
+  opacity: 0.92,
+  transparent: true,
+});
+const disconnectedBeaconMaterial = new MeshStandardMaterial({
+  color: "#b24a32",
+  emissive: "#ff6b3d",
+  emissiveIntensity: 0.8,
+});
+
+const beeBodyMaterialCache = new Map<string, MeshStandardMaterial>();
+
+function getBeeBodyMaterial(accentColor: string, isLocal: boolean): MeshStandardMaterial {
+  const cacheKey = `${accentColor}:${isLocal ? "local" : "remote"}`;
+  const cached = beeBodyMaterialCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const material = new MeshStandardMaterial({
+    color: accentColor,
+    emissive: isLocal ? "#ffd15c" : "#000000",
+    emissiveIntensity: isLocal ? 0.38 : 0,
+    metalness: 0.05,
+    roughness: 0.72,
+  });
+
+  beeBodyMaterialCache.set(cacheKey, material);
+  return material;
+}
 
 interface MoveTargetMarkerState {
   sceneX: number;
@@ -145,6 +221,7 @@ function BeeActor({ player, drift, accentColor, isLocal, trackedPositionRef }: B
     () => [toSceneAxis(player.x), BEE_HEIGHT, toSceneAxis(player.y)] as const,
     [player.id],
   );
+  const beeBodyMaterial = useMemo(() => getBeeBodyMaterial(accentColor, isLocal), [accentColor, isLocal]);
 
   useEffect(() => {
     if (!groupRef.current) {
@@ -209,69 +286,36 @@ function BeeActor({ player, drift, accentColor, isLocal, trackedPositionRef }: B
     <group ref={groupRef} position={initialPosition}>
       {isLocal ? (
         <mesh position={[0, -0.56, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.78, 1.04, 40]} />
-          <meshBasicMaterial color="#fff1a8" opacity={0.92} side={DoubleSide} transparent />
+          <primitive attach="geometry" object={localMarkerGeometry} />
+          <primitive attach="material" object={localMarkerMaterial} />
         </mesh>
       ) : null}
 
-      <mesh castShadow>
-        <sphereGeometry args={[0.62, 32, 32]} />
-        <meshStandardMaterial
-          color={accentColor}
-          emissive={isLocal ? "#ffd15c" : "#000000"}
-          emissiveIntensity={isLocal ? 0.38 : 0}
-          metalness={0.05}
-          roughness={0.72}
-        />
-      </mesh>
+      <mesh castShadow geometry={beeBodyGeometry} material={beeBodyMaterial} />
 
-      <mesh castShadow position={[-0.35, 0, 0]}>
-        <boxGeometry args={[0.12, 0.9, 1.18]} />
-        <meshStandardMaterial color="#23150d" roughness={0.84} />
-      </mesh>
+      <mesh castShadow geometry={beeStripeGeometry} material={beeStripeMaterial} position={[-0.35, 0, 0]} />
 
-      <mesh castShadow position={[0, 0, 0]}>
-        <boxGeometry args={[0.12, 0.9, 1.18]} />
-        <meshStandardMaterial color="#23150d" roughness={0.84} />
-      </mesh>
+      <mesh castShadow geometry={beeStripeGeometry} material={beeStripeMaterial} position={[0, 0, 0]} />
 
-      <mesh castShadow position={[0.35, 0, 0]}>
-        <boxGeometry args={[0.12, 0.9, 1.18]} />
-        <meshStandardMaterial color="#23150d" roughness={0.84} />
-      </mesh>
+      <mesh castShadow geometry={beeStripeGeometry} material={beeStripeMaterial} position={[0.35, 0, 0]} />
 
-      <mesh castShadow position={[0.7, 0, 0]}>
-        <sphereGeometry args={[0.28, 24, 24]} />
-        <meshStandardMaterial color="#23150d" roughness={0.84} />
-      </mesh>
+      <mesh castShadow geometry={beeHeadGeometry} material={beeStripeMaterial} position={[0.7, 0, 0]} />
 
       <mesh
         ref={leftWingRef}
+        geometry={beeWingGeometry}
+        material={beeWingMaterial}
         position={[-0.08, 0.44, -0.3]}
         rotation={[0.2, 0, 0.15]}
-      >
-        <sphereGeometry args={[0.26, 24, 24]} />
-        <meshStandardMaterial
-          color="#d9f3ff"
-          transparent
-          opacity={0.74}
-          roughness={0.18}
-        />
-      </mesh>
+      />
 
       <mesh
         ref={rightWingRef}
+        geometry={beeWingGeometry}
+        material={beeWingMaterial}
         position={[-0.08, 0.44, 0.3]}
         rotation={[-0.2, 0, -0.15]}
-      >
-        <sphereGeometry args={[0.26, 24, 24]} />
-        <meshStandardMaterial
-          color="#d9f3ff"
-          transparent
-          opacity={0.74}
-          roughness={0.18}
-        />
-      </mesh>
+      />
 
       <Html center distanceFactor={8} position={[0, 1.42, 0]} sprite transform>
         <div className={`bee-nameplate${isLocal ? " bee-nameplate--local" : ""}`}>
@@ -297,13 +341,13 @@ function MoveTargetMarker({ target }: { target: MoveTargetMarkerState }) {
   return (
     <group ref={markerRef} position={[target.sceneX, -1.02, target.sceneZ]}>
       <mesh rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.22, 0.38, 36]} />
-        <meshBasicMaterial color="#fff7bb" opacity={0.95} side={DoubleSide} transparent />
+        <primitive attach="geometry" object={moveTargetRingGeometry} />
+        <primitive attach="material" object={moveTargetRingMaterial} />
       </mesh>
 
       <mesh position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.1, 24]} />
-        <meshBasicMaterial color="#ffcb4c" opacity={0.92} transparent />
+        <primitive attach="geometry" object={moveTargetCoreGeometry} />
+        <primitive attach="material" object={moveTargetCoreMaterial} />
       </mesh>
     </group>
   );
@@ -348,10 +392,11 @@ function CameraRig({
       enableDamping
       enablePan={false}
       makeDefault
-      maxDistance={18}
+      maxDistance={38}
       maxPolarAngle={Math.PI / 2.1}
       minDistance={3.4}
       minPolarAngle={0.45}
+      zoomSpeed={1.35}
       mouseButtons={{
         MIDDLE: MOUSE.DOLLY,
         RIGHT: MOUSE.ROTATE,
@@ -359,6 +404,58 @@ function CameraRig({
       target={[0, 0.42, 0]}
     />
   );
+}
+
+function RendererMetricsReporter({ onChange }: { onChange: (snapshot: RenderPerformanceSnapshot) => void }) {
+  const { gl } = useThree();
+  const lastSnapshotRef = useRef<RenderPerformanceSnapshot | null>(null);
+
+  useEffect(() => {
+    let animationFrameId = 0;
+    let lastSampleAt = performance.now();
+    let frameCount = 0;
+
+    const sample = (now: number) => {
+      frameCount += 1;
+
+      const elapsed = now - lastSampleAt;
+      if (elapsed >= 500) {
+        const nextSnapshot: RenderPerformanceSnapshot = {
+          fps: Math.round((frameCount * 1000) / elapsed),
+          drawCalls: gl.info.render.calls,
+          triangles: gl.info.render.triangles,
+          geometries: gl.info.memory.geometries,
+          textures: gl.info.memory.textures,
+        };
+
+        const previousSnapshot = lastSnapshotRef.current;
+        if (
+          !previousSnapshot ||
+          previousSnapshot.fps !== nextSnapshot.fps ||
+          previousSnapshot.drawCalls !== nextSnapshot.drawCalls ||
+          previousSnapshot.triangles !== nextSnapshot.triangles ||
+          previousSnapshot.geometries !== nextSnapshot.geometries ||
+          previousSnapshot.textures !== nextSnapshot.textures
+        ) {
+          lastSnapshotRef.current = nextSnapshot;
+          onChange(nextSnapshot);
+        }
+
+        frameCount = 0;
+        lastSampleAt = now;
+      }
+
+      animationFrameId = window.requestAnimationFrame(sample);
+    };
+
+    animationFrameId = window.requestAnimationFrame(sample);
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+    };
+  }, [gl, onChange]);
+
+  return null;
 }
 
 function InfiniteGround({
@@ -502,7 +599,9 @@ function HiveCore({
         onPointerDown={handleGroundPointerDown}
         trackedPositionRef={localPlayerPositionRef}
       />
-      <InstancedWorldField chunkSize={chunkSize} chunks={chunks} />
+      <Suspense fallback={null}>
+        <InstancedWorldField chunkSize={chunkSize} chunks={chunks} />
+      </Suspense>
 
       {moveTargetMarker ? <MoveTargetMarker target={moveTargetMarker} /> : null}
 
@@ -518,14 +617,11 @@ function HiveCore({
       ))}
 
       {connectionState === "disconnected" ? (
-        <mesh position={[localPlayer ? toSceneAxis(localPlayer.x) : 0, 2.1, localPlayer ? toSceneAxis(localPlayer.y) : 0]}>
-          <icosahedronGeometry args={[0.38, 0]} />
-          <meshStandardMaterial
-            color="#b24a32"
-            emissive="#ff6b3d"
-            emissiveIntensity={0.8}
-          />
-        </mesh>
+        <mesh
+          geometry={disconnectedBeaconGeometry}
+          material={disconnectedBeaconMaterial}
+          position={[localPlayer ? toSceneAxis(localPlayer.x) : 0, 2.1, localPlayer ? toSceneAxis(localPlayer.y) : 0]}
+        />
       ) : null}
     </group>
   );
@@ -537,6 +633,7 @@ interface GameViewportProps {
   chunkSize: number;
   connectionState: GameSessionState["connectionState"];
   localPlayerId?: string;
+  onPerformanceChange: (snapshot: RenderPerformanceSnapshot) => void;
   onMoveToTarget: (x: number, z: number) => void;
 }
 
@@ -546,6 +643,7 @@ export function GameViewport({
   chunkSize,
   connectionState,
   localPlayerId,
+  onPerformanceChange,
   onMoveToTarget,
 }: GameViewportProps) {
   const localPlayer = useMemo(
@@ -563,6 +661,7 @@ export function GameViewport({
         gl={{ antialias: true }}
       >
         <color attach="background" args={[SKY_COLOR]} />
+        <RendererMetricsReporter onChange={onPerformanceChange} />
         <CameraRig focusPlayer={localPlayer} trackedPositionRef={localPlayerPositionRef} />
         <HiveCore
           chunks={chunks}

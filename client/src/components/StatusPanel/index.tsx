@@ -1,9 +1,10 @@
-import type { GameSessionState, HealthStatusState } from "../../types/game";
+import type { GameSessionState, HealthStatusState, RenderPerformanceSnapshot } from "../../types/game";
 
 interface StatusPanelProps {
   backendHealth: HealthStatusState;
   gameSession: GameSessionState;
   apiUrl: string;
+  renderPerformance: RenderPerformanceSnapshot;
   wsUrl: string;
 }
 
@@ -35,7 +36,7 @@ function getConnectionLabel(gameSession: GameSessionState): string {
   return gameSession.error ?? "websocket desconectado";
 }
 
-export function StatusPanel({ backendHealth, gameSession, apiUrl, wsUrl }: StatusPanelProps) {
+export function StatusPanel({ backendHealth, gameSession, apiUrl, renderPerformance, wsUrl }: StatusPanelProps) {
   const statusClassName = `status-pill status-pill--${backendHealth.state}`;
   const activeWorldObjects = gameSession.chunks.reduce(
     (total, chunk) => total + chunk.flowers.length + chunk.hives.length,
@@ -77,6 +78,16 @@ export function StatusPanel({ backendHealth, gameSession, apiUrl, wsUrl }: Statu
         <article className="status-card">
           <h2>Mundo visivel</h2>
           <p>{activeWorldObjects} flores e colmeias renderizadas agora</p>
+        </article>
+
+        <article className="status-card">
+          <h2>Renderer</h2>
+          <p>{renderPerformance.drawCalls} draw calls e {renderPerformance.triangles.toLocaleString("pt-BR")} triangulos</p>
+        </article>
+
+        <article className="status-card">
+          <h2>FPS</h2>
+          <p>{renderPerformance.fps} fps com {renderPerformance.geometries} geometrias e {renderPerformance.textures} texturas</p>
         </article>
 
         <article className="status-card">

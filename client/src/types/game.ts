@@ -97,3 +97,11 @@ export interface GameSessionState {
 export interface GameSessionController extends GameSessionState {
   moveToTarget: (x: number, z: number) => void;
 }
+
+export interface RenderPerformanceSnapshot {
+  fps: number;
+  drawCalls: number;
+  triangles: number;
+  geometries: number;
+  textures: number;
+}

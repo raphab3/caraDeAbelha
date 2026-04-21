@@ -7,6 +7,7 @@ import { API_URL, WS_URL } from "./game/env";
 import { useFullscreenTarget } from "./hooks/useFullscreenTarget";
 import { useBackendHealth } from "./hooks/useBackendHealth";
 import { useGameSession } from "./hooks/useGameSession";
+import type { RenderPerformanceSnapshot } from "./types/game";
 
 const USERNAME_STORAGE_KEY = "cara-de-abelha.username";
 
@@ -18,6 +19,13 @@ export function App() {
   const [draftUsername, setDraftUsername] = useState(readStoredUsername);
   const [activeUsername, setActiveUsername] = useState<string>();
   const [formError, setFormError] = useState<string>();
+  const [renderPerformance, setRenderPerformance] = useState<RenderPerformanceSnapshot>({
+    fps: 0,
+    drawCalls: 0,
+    triangles: 0,
+    geometries: 0,
+    textures: 0,
+  });
   const backendHealth = useBackendHealth();
   const gameSession = useGameSession(activeUsername);
   const { targetRef, isFullscreen, isSupported, toggleFullscreen } =
@@ -57,12 +65,7 @@ export function App() {
   return (
     <main className="app-shell">
       <section className="hero-copy" aria-label="Resumo do projeto">
-        <p className="eyebrow">Fase 1</p>
-        <h1>Cara de Abelha</h1>
-        <p className="hero-text">
-          Entre com um username local para puxar o estado da sua abelha, seguir sua camera e
-          aparecer para os outros jogadores no jardim.
-        </p>
+        <h1>Sem Cara de Abelha</h1>
       </section>
 
       <section className="experience-card" aria-label="Viewport 3D inicial">
@@ -73,6 +76,7 @@ export function App() {
               chunkSize={gameSession.chunkSize}
               connectionState={gameSession.connectionState}
               localPlayerId={gameSession.localPlayerId}
+              onPerformanceChange={setRenderPerformance}
               onMoveToTarget={gameSession.moveToTarget}
               players={gameSession.players}
             />
@@ -110,6 +114,7 @@ export function App() {
           backendHealth={backendHealth}
           gameSession={gameSession}
           apiUrl={API_URL}
+          renderPerformance={renderPerformance}
           wsUrl={WS_URL}
         />
       </section>
