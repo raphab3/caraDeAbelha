@@ -4,12 +4,11 @@ import { type ElementRef, type MutableRefObject, useEffect, useMemo, useRef, use
 import { CanvasTexture, DoubleSide, MOUSE, MathUtils, RepeatWrapping, SRGBColorSpace, Vector3 } from "three";
 import type { Group, Mesh } from "three";
 
+import { InstancedWorldField } from "./InstancedWorldField";
 import { MiniMap } from "./MiniMap";
 import type {
   GameSessionState,
   WorldChunkState,
-  WorldFlowerState,
-  WorldHiveState,
   WorldPlayerState,
 } from "../../types/game";
 
@@ -23,15 +22,6 @@ const FOG_FAR = 42;
 const GROUND_HEIGHT = -1.15;
 const GROUND_SIZE = 260;
 const GROUND_TILE_WORLD_SIZE = 2.5;
-const CHUNK_OVERLAY_HEIGHT = GROUND_HEIGHT + 0.02;
-
-const FLOWER_PETAL_OFFSETS: [number, number, number][] = [
-  [0.18, 0.56, 0],
-  [-0.18, 0.56, 0],
-  [0, 0.56, 0.18],
-  [0, 0.56, -0.18],
-  [0, 0.7, 0],
-];
 const DEFAULT_CAMERA_POSITION = [5.8, 3.9, 6.6] as const;
 const DEFAULT_CAMERA_FOV = 34;
 
@@ -409,85 +399,6 @@ function InfiniteGround({
   );
 }
 
-function FlowerDecoration({ flower }: { flower: WorldFlowerState }) {
-  return (
-    <group position={[toSceneAxis(flower.x), GROUND_HEIGHT + 0.02, toSceneAxis(flower.y)]} scale={flower.scale}>
-      <mesh castShadow position={[0, 0.24, 0]}>
-        <cylinderGeometry args={[0.03, 0.04, 0.52, 10]} />
-        <meshStandardMaterial color="#648a34" roughness={0.92} />
-      </mesh>
-
-      {FLOWER_PETAL_OFFSETS.map((offset, index) => (
-        <mesh key={`${flower.id}:petal:${index}`} castShadow position={offset}>
-          <sphereGeometry args={[0.11, 14, 14]} />
-          <meshStandardMaterial color={flower.petalColor} roughness={0.74} />
-        </mesh>
-      ))}
-
-      <mesh castShadow position={[0, 0.58, 0]}>
-        <sphereGeometry args={[0.13, 18, 18]} />
-        <meshStandardMaterial color={flower.coreColor} roughness={0.6} />
-      </mesh>
-    </group>
-  );
-}
-
-function HiveDecoration({ hive }: { hive: WorldHiveState }) {
-  return (
-    <group position={[toSceneAxis(hive.x), GROUND_HEIGHT + 0.12, toSceneAxis(hive.y)]} scale={hive.scale}>
-      <mesh castShadow receiveShadow>
-        <cylinderGeometry args={[0.34, 0.48, 0.92, 10]} />
-        <meshStandardMaterial color={hive.toneColor} roughness={0.84} />
-      </mesh>
-
-      <mesh castShadow position={[0, 0.04, 0.34]}>
-        <cylinderGeometry args={[0.08, 0.08, 0.12, 18]} />
-        <meshStandardMaterial color="#2f1b10" roughness={0.92} />
-      </mesh>
-
-      <mesh position={[0, 0.72, 0]}>
-        <icosahedronGeometry args={[0.18, 0]} />
-        <meshStandardMaterial color={hive.glowColor} emissive={hive.glowColor} emissiveIntensity={0.72} />
-      </mesh>
-    </group>
-  );
-}
-
-function ChunkField({ chunks, chunkSize }: { chunks: WorldChunkState[]; chunkSize: number }) {
-  if (chunkSize <= 0) {
-    return null;
-  }
-
-  const chunkSceneSize = toSceneAxis(chunkSize);
-
-  return (
-    <group>
-      {chunks.map((chunk) => {
-        const chunkCenterX = toSceneAxis((chunk.x + 0.5) * chunkSize);
-        const chunkCenterZ = toSceneAxis((chunk.y + 0.5) * chunkSize);
-        const overlayColor = Math.abs(chunk.x+chunk.y) % 2 === 0 ? "#88b44d" : "#7eaa45";
-
-        return (
-          <group key={chunk.key}>
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[chunkCenterX, CHUNK_OVERLAY_HEIGHT, chunkCenterZ]}>
-              <planeGeometry args={[chunkSceneSize - 0.12, chunkSceneSize - 0.12]} />
-              <meshBasicMaterial color={overlayColor} opacity={0.18} transparent />
-            </mesh>
-
-            {chunk.flowers.map((flower) => (
-              <FlowerDecoration key={flower.id} flower={flower} />
-            ))}
-
-            {chunk.hives.map((hive) => (
-              <HiveDecoration key={hive.id} hive={hive} />
-            ))}
-          </group>
-        );
-      })}
-    </group>
-  );
-}
-
 interface HiveCoreProps {
   players: WorldPlayerState[];
   chunks: WorldChunkState[];
@@ -591,7 +502,7 @@ function HiveCore({
         onPointerDown={handleGroundPointerDown}
         trackedPositionRef={localPlayerPositionRef}
       />
-      <ChunkField chunkSize={chunkSize} chunks={chunks} />
+      <InstancedWorldField chunkSize={chunkSize} chunks={chunks} />
 
       {moveTargetMarker ? <MoveTargetMarker target={moveTargetMarker} /> : null}
 
