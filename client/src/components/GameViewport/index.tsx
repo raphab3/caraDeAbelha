@@ -11,6 +11,8 @@ const WORLD_LIMIT = 6;
 const TARGET_REACHED_DISTANCE = 0.22;
 const BEE_HEIGHT = 0.48;
 const RENDER_CORRECTION_DISTANCE = WORLD_TO_SCENE_SCALE * 0.9;
+const DEFAULT_CAMERA_POSITION = [4.9, 3.4, 5.6] as const;
+const DEFAULT_CAMERA_FOV = 34;
 
 interface MoveTargetMarkerState {
   sceneX: number;
@@ -60,6 +62,10 @@ function BeeActor({ player, drift, accentColor, isLocal, trackedPositionRef }: B
   const rightWingRef = useRef<Mesh>(null);
   const authoritativePositionRef = useRef(new Vector3());
   const desiredTargetPositionRef = useRef(new Vector3());
+  const initialPosition = useMemo(
+    () => [toSceneAxis(player.x), BEE_HEIGHT, toSceneAxis(player.y)] as const,
+    [player.id],
+  );
 
   useEffect(() => {
     if (!groupRef.current) {
@@ -68,7 +74,7 @@ function BeeActor({ player, drift, accentColor, isLocal, trackedPositionRef }: B
 
     groupRef.current.position.set(toSceneAxis(player.x), BEE_HEIGHT, toSceneAxis(player.y));
     trackedPositionRef?.current.copy(groupRef.current.position);
-  }, [player.id, player.x, player.y, trackedPositionRef]);
+  }, [player.id, trackedPositionRef]);
 
   useFrame((state, delta) => {
     if (!groupRef.current || !leftWingRef.current || !rightWingRef.current) {
@@ -121,7 +127,7 @@ function BeeActor({ player, drift, accentColor, isLocal, trackedPositionRef }: B
   });
 
   return (
-    <group ref={groupRef} position={[toSceneAxis(player.x), BEE_HEIGHT, toSceneAxis(player.y)]}>
+    <group ref={groupRef} position={initialPosition}>
       {isLocal ? (
         <mesh position={[0, -0.56, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.78, 1.04, 40]} />
@@ -267,7 +273,7 @@ function CameraRig({
       makeDefault
       maxDistance={11.5}
       maxPolarAngle={Math.PI / 2.1}
-      minDistance={4.4}
+      minDistance={3.4}
       minPolarAngle={0.45}
       mouseButtons={{
         MIDDLE: MOUSE.DOLLY,
@@ -454,7 +460,7 @@ export function GameViewport({ players, connectionState, localPlayerId, onMoveTo
 
   return (
     <Canvas
-      camera={{ position: [6.6, 4.2, 7.4], fov: 42 }}
+      camera={{ position: DEFAULT_CAMERA_POSITION, fov: DEFAULT_CAMERA_FOV }}
       dpr={[1, 1.6]}
       shadows
       gl={{ antialias: true }}

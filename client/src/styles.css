@@ -95,6 +95,36 @@ body::after {
   position: relative;
 }
 
+.viewport-fullscreen-toggle {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(63, 41, 11, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 249, 228, 0.92);
+  color: #322010;
+  font: inherit;
+  font-size: 0.94rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 14px 28px rgba(57, 32, 6, 0.16);
+  backdrop-filter: blur(8px);
+}
+
+.viewport-fullscreen-toggle:focus-visible {
+  outline: 2px solid #fff0a4;
+  outline-offset: 3px;
+}
+
+.viewport-fullscreen-toggle[aria-pressed="true"] {
+  background: rgba(61, 31, 5, 0.9);
+  color: #fff4d6;
+  border-color: rgba(255, 226, 165, 0.28);
+}
+
 .viewport-shell {
   width: 100%;
   min-height: 540px;
@@ -110,6 +140,22 @@ body::after {
   display: block;
   width: 100% !important;
   height: 100% !important;
+}
+
+.experience-stage:fullscreen {
+  background: #20150d;
+}
+
+.experience-stage:fullscreen .viewport-shell {
+  height: 100%;
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.experience-stage:fullscreen .login-gate {
+  padding: clamp(16px, 4vw, 32px);
 }
 
 .bee-nameplate {
@@ -307,6 +353,11 @@ body::after {
     min-height: 420px;
   }
 
+  .viewport-fullscreen-toggle {
+    top: 14px;
+    right: 14px;
+  }
+
   .status-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -323,6 +374,14 @@ body::after {
 
   .viewport-shell {
     min-height: 340px;
+  }
+
+  .viewport-fullscreen-toggle {
+    top: 12px;
+    right: 12px;
+    min-height: 40px;
+    padding: 0 14px;
+    font-size: 0.86rem;
   }
 
   .login-gate {

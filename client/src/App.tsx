@@ -4,6 +4,7 @@ import { GameViewport } from "./components/GameViewport";
 import { LoginGate } from "./components/LoginGate";
 import { StatusPanel } from "./components/StatusPanel";
 import { API_URL, WS_URL } from "./game/env";
+import { useFullscreenTarget } from "./hooks/useFullscreenTarget";
 import { useBackendHealth } from "./hooks/useBackendHealth";
 import { useGameSession } from "./hooks/useGameSession";
 
@@ -19,6 +20,8 @@ export function App() {
   const [formError, setFormError] = useState<string>();
   const backendHealth = useBackendHealth();
   const gameSession = useGameSession(activeUsername);
+  const { targetRef, isFullscreen, isSupported, toggleFullscreen } =
+    useFullscreenTarget<HTMLDivElement>();
 
   useEffect(() => {
     if (gameSession.connectionState !== "connected" || !gameSession.localUsername) {
@@ -63,7 +66,7 @@ export function App() {
       </section>
 
       <section className="experience-card" aria-label="Viewport 3D inicial">
-        <div className="experience-stage">
+        <div className="experience-stage" ref={targetRef}>
           <div className="viewport-shell">
             <GameViewport
               connectionState={gameSession.connectionState}
@@ -84,6 +87,20 @@ export function App() {
               }}
               username={draftUsername}
             />
+          ) : null}
+
+          {isSupported ? (
+            <button
+              aria-label={isFullscreen ? "Sair da tela cheia" : "Entrar em tela cheia"}
+              aria-pressed={isFullscreen}
+              className="viewport-fullscreen-toggle"
+              onClick={() => {
+                void toggleFullscreen();
+              }}
+              type="button"
+            >
+              {isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+            </button>
           ) : null}
         </div>
 

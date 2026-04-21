@@ -146,8 +146,21 @@ func TestWebSocketMoveBroadcastsState(t *testing.T) {
 		t.Fatalf("expected one player in updated state, got %d", len(updatedState.Players))
 	}
 
-	if updatedState.Players[0].X != expectedSpawnX+1 || updatedState.Players[0].Y != expectedSpawnY {
-		t.Fatalf("expected updated position %.1f,%.1f, got %.1f,%.1f", expectedSpawnX+1, expectedSpawnY, updatedState.Players[0].X, updatedState.Players[0].Y)
+	if math.Abs(updatedState.Players[0].X-expectedSpawnX) > 0.001 || math.Abs(updatedState.Players[0].Y-expectedSpawnY) > 0.001 {
+		t.Fatalf("expected move to preserve current position %.1f,%.1f, got %.1f,%.1f", expectedSpawnX, expectedSpawnY, updatedState.Players[0].X, updatedState.Players[0].Y)
+	}
+
+	if updatedState.Players[0].TargetX == nil || updatedState.Players[0].TargetY == nil {
+		t.Fatalf("expected keyboard move target to be present in world state")
+	}
+
+	expectedTargetX := clampToWorld(expectedSpawnX + 1)
+	if math.Abs(*updatedState.Players[0].TargetX-expectedTargetX) > 0.001 || math.Abs(*updatedState.Players[0].TargetY-expectedSpawnY) > 0.001 {
+		t.Fatalf("expected keyboard move target %.1f,%.1f, got %.1f,%.1f", expectedTargetX, expectedSpawnY, *updatedState.Players[0].TargetX, *updatedState.Players[0].TargetY)
+	}
+
+	if updatedState.Players[0].Speed != defaultPlayerSpeed {
+		t.Fatalf("expected default player speed %.1f, got %.1f", defaultPlayerSpeed, updatedState.Players[0].Speed)
 	}
 }
 
@@ -245,6 +258,46 @@ func TestAdvancePlayerLockedMovesTowardTargetAtConstantSpeed(t *testing.T) {
 	}
 }
 
+func TestMovePlayerUsesCurrentProgressWhenAlreadyMoving(t *testing.T) {
+	hub := newGameHub()
+	baseTime := time.Date(2026, time.April, 21, 14, 0, 0, 0, time.UTC)
+	currentTime := baseTime
+	hub.now = func() time.Time {
+		return currentTime
+	}
+
+	player := &playerState{
+		ID:        "player:test",
+		Username:  "test",
+		X:         0,
+		Y:         0,
+		Speed:     2,
+		UpdatedAt: currentTime,
+	}
+	hub.players[player.ID] = player
+
+	if ok := hub.movePlayer(player.ID, "right"); !ok {
+		t.Fatalf("expected first move command to succeed")
+	}
+
+	if player.TargetX == nil || math.Abs(*player.TargetX-1) > 0.001 {
+		t.Fatalf("expected first move target to be 1.0, got %v", player.TargetX)
+	}
+
+	currentTime = baseTime.Add(250 * time.Millisecond)
+	if ok := hub.movePlayer(player.ID, "right"); !ok {
+		t.Fatalf("expected second move command to succeed")
+	}
+
+	if math.Abs(player.X-0.5) > 0.001 {
+		t.Fatalf("expected player to advance to 0.5 before recalculating target, got %.3f", player.X)
+	}
+
+	if player.TargetX == nil || math.Abs(*player.TargetX-1.5) > 0.001 {
+		t.Fatalf("expected recalculated target to stay one unit ahead at 1.5, got %v", player.TargetX)
+	}
+}
+
 func TestWebSocketSessionUsesDistinctPlayerIDs(t *testing.T) {
 	handler := NewHandler()
 	testServer := httptest.NewServer(handler)
@@ -330,6 +383,17 @@ func TestWebSocketReconnectLoadsPlayerStateByUsername(t *testing.T) {
 		t.Fatalf("read moved state: %v", err)
 	}
 
+	expectedSpawnX, expectedSpawnY := profileSpawnPosition("beekeeper")
+	expectedTargetX := clampToWorld(expectedSpawnX + 1)
+
+	if math.Abs(movedState.Players[0].X-expectedSpawnX) > 0.001 || math.Abs(movedState.Players[0].Y-expectedSpawnY) > 0.001 {
+		t.Fatalf("expected moved snapshot to preserve current position %.1f,%.1f, got %.1f,%.1f", expectedSpawnX, expectedSpawnY, movedState.Players[0].X, movedState.Players[0].Y)
+	}
+
+	if movedState.Players[0].TargetX == nil || math.Abs(*movedState.Players[0].TargetX-expectedTargetX) > 0.001 {
+		t.Fatalf("expected moved snapshot target %.1f, got %v", expectedTargetX, movedState.Players[0].TargetX)
+	}
+
 	if err := firstConnection.Close(); err != nil {
 		t.Fatalf("close first connection: %v", err)
 	}
@@ -359,13 +423,22 @@ func TestWebSocketReconnectLoadsPlayerStateByUsername(t *testing.T) {
 		t.Fatalf("expected one active player after reconnect, got %d", len(restoredState.Players))
 	}
 
-	expectedSpawnX, expectedSpawnY := profileSpawnPosition("beekeeper")
-
-	if restoredState.Players[0].X != expectedSpawnX+1 || restoredState.Players[0].Y != expectedSpawnY {
-		t.Fatalf("expected restored position %.1f,%.1f, got %.1f,%.1f", expectedSpawnX+1, expectedSpawnY, restoredState.Players[0].X, restoredState.Players[0].Y)
+	restoredPlayer := restoredState.Players[0]
+	if math.Abs(restoredPlayer.Y-expectedSpawnY) > 0.001 {
+		t.Fatalf("expected restored Y %.1f, got %.1f", expectedSpawnY, restoredPlayer.Y)
 	}
 
-	if restoredState.Players[0].Username != "beekeeper" {
-		t.Fatalf("expected restored username beekeeper, got %q", restoredState.Players[0].Username)
+	if restoredPlayer.X < expectedSpawnX-0.001 || restoredPlayer.X > expectedTargetX+0.001 {
+		t.Fatalf("expected restored X between %.1f and %.1f, got %.3f", expectedSpawnX, expectedTargetX, restoredPlayer.X)
+	}
+
+	if math.Abs(restoredPlayer.X-expectedTargetX) > 0.001 {
+		if restoredPlayer.TargetX == nil || math.Abs(*restoredPlayer.TargetX-expectedTargetX) > 0.001 {
+			t.Fatalf("expected in-flight restored target %.1f, got %v", expectedTargetX, restoredPlayer.TargetX)
+		}
+	}
+
+	if restoredPlayer.Username != "beekeeper" {
+		t.Fatalf("expected restored username beekeeper, got %q", restoredPlayer.Username)
 	}
 }

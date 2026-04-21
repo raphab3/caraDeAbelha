@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -14,14 +15,21 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const worldLimit = 6
-
 const maxUsernameLength = 24
 const defaultPlayerSpeed = 3.0
 const movementStopDistance = 0.08
+const worldChunkSize = 4.0
+const worldRenderDistance = 1
+const worldTickInterval = 120 * time.Millisecond
+const worldDecorationPadding = 0.55
 
 var errInvalidUsername = errors.New("username invalido")
 var errUsernameInUse = errors.New("username em uso")
+
+var flowerPetalPalette = []string{"#fff2a1", "#ffd4ef", "#d8ffd0", "#ffe0b2", "#f6f1ff"}
+var flowerCorePalette = []string{"#8d5519", "#774011", "#5f360f"}
+var hiveTonePalette = []string{"#a86a18", "#b9821c", "#94611a"}
+var hiveGlowPalette = []string{"#ffd96a", "#ffbf45", "#ffe89d"}
 
 type playerAction struct {
 	Type string  `json:"type"`
@@ -48,9 +56,40 @@ type sessionMessage struct {
 }
 
 type worldStateMessage struct {
-	Type    string        `json:"type"`
-	Tick    uint64        `json:"tick"`
-	Players []playerState `json:"players"`
+	Type           string            `json:"type"`
+	Tick           uint64            `json:"tick"`
+	Players        []playerState     `json:"players"`
+	Chunks         []worldChunkState `json:"chunks"`
+	CenterChunkX   int               `json:"centerChunkX"`
+	CenterChunkY   int               `json:"centerChunkY"`
+	RenderDistance int               `json:"renderDistance"`
+	ChunkSize      float64           `json:"chunkSize"`
+}
+
+type worldFlowerState struct {
+	ID         string  `json:"id"`
+	X          float64 `json:"x"`
+	Y          float64 `json:"y"`
+	Scale      float64 `json:"scale"`
+	PetalColor string  `json:"petalColor"`
+	CoreColor  string  `json:"coreColor"`
+}
+
+type worldHiveState struct {
+	ID        string  `json:"id"`
+	X         float64 `json:"x"`
+	Y         float64 `json:"y"`
+	Scale     float64 `json:"scale"`
+	ToneColor string  `json:"toneColor"`
+	GlowColor string  `json:"glowColor"`
+}
+
+type worldChunkState struct {
+	Key     string             `json:"key"`
+	X       int                `json:"x"`
+	Y       int                `json:"y"`
+	Flowers []worldFlowerState `json:"flowers"`
+	Hives   []worldHiveState   `json:"hives"`
 }
 
 type clientSession struct {
@@ -71,7 +110,7 @@ type gameHub struct {
 }
 
 func newGameHub() *gameHub {
-	return &gameHub{
+	hub := &gameHub{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(_ *http.Request) bool {
 				return true
@@ -82,6 +121,10 @@ func newGameHub() *gameHub {
 		profiles: make(map[string]*playerState),
 		now:      time.Now,
 	}
+
+	go hub.runMovementLoop(worldTickInterval)
+
+	return hub
 }
 
 func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -102,7 +145,7 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, initialState, err := hub.register(connection, profileKey, username)
+	client, err := hub.register(connection, profileKey, username)
 	if err != nil {
 		writeCloseMessage(connection, err.Error())
 		return
@@ -113,13 +156,13 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		PlayerID: client.id,
 		Username: username,
 	})
-	hub.broadcast(initialState)
+	hub.broadcast()
 
 	defer func() {
 		_ = connection.Close()
 
-		if state, ok := hub.unregister(client.id); ok {
-			hub.broadcast(state)
+		if hub.unregister(client.id) {
+			hub.broadcast()
 		}
 	}()
 
@@ -132,16 +175,13 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var (
-			state worldStateMessage
-			ok    bool
-		)
+		var ok bool
 
 		switch action.Type {
 		case "move":
-			state, ok = hub.movePlayer(client.id, action.Dir)
+			ok = hub.movePlayer(client.id, action.Dir)
 		case "move_to":
-			state, ok = hub.movePlayerTo(client.id, action.X, action.Z)
+			ok = hub.movePlayerTo(client.id, action.X, action.Z)
 		default:
 			continue
 		}
@@ -150,11 +190,11 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		hub.broadcast(state)
+		hub.broadcast()
 	}
 }
 
-func (hub *gameHub) register(connection *websocket.Conn, profileKey string, username string) (*clientSession, worldStateMessage, error) {
+func (hub *gameHub) register(connection *websocket.Conn, profileKey string, username string) (*clientSession, error) {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
@@ -175,7 +215,7 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 	hub.advancePlayerLocked(profile, hub.now())
 
 	if _, active := hub.players[profile.ID]; active {
-		return nil, worldStateMessage{}, errUsernameInUse
+		return nil, errUsernameInUse
 	}
 
 	profile.Username = username
@@ -190,78 +230,88 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 	hub.players[profile.ID] = profile
 	hub.tick++
 
-	return client, hub.snapshotLocked(), nil
+	return client, nil
 }
 
-func (hub *gameHub) unregister(clientID string) (worldStateMessage, bool) {
+func (hub *gameHub) unregister(clientID string) bool {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
 	if _, ok := hub.clients[clientID]; !ok {
-		return worldStateMessage{}, false
+		return false
 	}
 
 	delete(hub.clients, clientID)
 	delete(hub.players, clientID)
 	hub.tick++
 
-	return hub.snapshotLocked(), true
+	return true
 }
 
-func (hub *gameHub) movePlayer(clientID string, direction string) (worldStateMessage, bool) {
+func (hub *gameHub) movePlayer(clientID string, direction string) bool {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
 	player, ok := hub.players[clientID]
 	if !ok {
-		return worldStateMessage{}, false
-	}
-
-	hub.advancePlayerLocked(player, hub.now())
-
-	switch direction {
-	case "up":
-		player.Y = clampToWorld(player.Y - 1)
-	case "down":
-		player.Y = clampToWorld(player.Y + 1)
-	case "left":
-		player.X = clampToWorld(player.X - 1)
-	case "right":
-		player.X = clampToWorld(player.X + 1)
-	default:
-		return worldStateMessage{}, false
-	}
-
-	hub.tick++
-
-	return hub.snapshotLocked(), true
-}
-
-func (hub *gameHub) movePlayerTo(clientID string, x float64, z float64) (worldStateMessage, bool) {
-	hub.mu.Lock()
-	defer hub.mu.Unlock()
-
-	player, ok := hub.players[clientID]
-	if !ok {
-		return worldStateMessage{}, false
+		return false
 	}
 
 	now := hub.now()
-	hub.advancePlayerLocked(player, now)
+	hub.advanceActivePlayersLocked(now)
+	nextX := player.X
+	nextY := player.Y
+
+	switch direction {
+	case "up":
+		nextY = clampToWorld(player.Y - 1)
+	case "down":
+		nextY = clampToWorld(player.Y + 1)
+	case "left":
+		nextX = clampToWorld(player.X - 1)
+	case "right":
+		nextX = clampToWorld(player.X + 1)
+	default:
+		return false
+	}
+
+	hub.setPlayerTargetLocked(player, nextX, nextY, now)
+
+	hub.tick++
+
+	return true
+}
+
+func (hub *gameHub) movePlayerTo(clientID string, x float64, z float64) bool {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	player, ok := hub.players[clientID]
+	if !ok {
+		return false
+	}
+
+	now := hub.now()
+	hub.advanceActivePlayersLocked(now)
 	hub.setPlayerTargetLocked(player, clampToWorld(x), clampToWorld(z), now)
 	hub.tick++
 
-	return hub.snapshotLocked(), true
+	return true
 }
 
-func (hub *gameHub) broadcast(message worldStateMessage) {
-	clients := hub.listClients()
+type clientSnapshot struct {
+	client  *clientSession
+	message worldStateMessage
+}
 
-	for _, client := range clients {
-		err := hub.writeJSON(client, message)
+func (hub *gameHub) broadcast() {
+	snapshots := hub.collectClientSnapshots()
+
+	for _, snapshot := range snapshots {
+		err := hub.writeJSON(snapshot.client, snapshot.message)
 
 		if err != nil {
-			log.Printf("websocket write failed for %s: %v", client.id, err)
+			log.Printf("websocket write failed for %s: %v", snapshot.client.id, err)
 		}
 	}
 }
@@ -272,23 +322,35 @@ func (hub *gameHub) sendToClient(client *clientSession, message sessionMessage) 
 	}
 }
 
-func (hub *gameHub) listClients() []*clientSession {
+func (hub *gameHub) collectClientSnapshots() []clientSnapshot {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
-	clients := make([]*clientSession, 0, len(hub.clients))
+	snapshots := make([]clientSnapshot, 0, len(hub.clients))
 	for _, client := range hub.clients {
-		clients = append(clients, client)
+		viewer := hub.players[client.id]
+		if viewer == nil {
+			continue
+		}
+
+		snapshots = append(snapshots, clientSnapshot{
+			client:  client,
+			message: hub.snapshotForPlayerLocked(viewer),
+		})
 	}
 
-	return clients
+	return snapshots
 }
 
-func (hub *gameHub) snapshotLocked() worldStateMessage {
-	hub.advanceActivePlayersLocked(hub.now())
-
+func (hub *gameHub) snapshotForPlayerLocked(viewer *playerState) worldStateMessage {
+	centerChunkX, centerChunkY := playerChunkPosition(viewer)
 	players := make([]playerState, 0, len(hub.players))
 	for _, player := range hub.players {
+		playerChunkX, playerChunkY := playerChunkPosition(player)
+		if !isChunkWithinDistance(centerChunkX, centerChunkY, playerChunkX, playerChunkY, worldRenderDistance) {
+			continue
+		}
+
 		players = append(players, *player)
 	}
 
@@ -296,10 +358,17 @@ func (hub *gameHub) snapshotLocked() worldStateMessage {
 		return players[left].ID < players[right].ID
 	})
 
+	chunks := visibleChunksAround(centerChunkX, centerChunkY)
+
 	return worldStateMessage{
-		Type:    "state",
-		Tick:    hub.tick,
-		Players: players,
+		Type:           "state",
+		Tick:           hub.tick,
+		Players:        players,
+		Chunks:         chunks,
+		CenterChunkX:   centerChunkX,
+		CenterChunkY:   centerChunkY,
+		RenderDistance: worldRenderDistance,
+		ChunkSize:      worldChunkSize,
 	}
 }
 
@@ -323,9 +392,50 @@ func buildPlayerID(profileKey string) string {
 	return "player:" + profileKey
 }
 
+func buildChunkKey(chunkX int, chunkY int) string {
+	return fmt.Sprintf("chunk:%d:%d", chunkX, chunkY)
+}
+
 func (hub *gameHub) advanceActivePlayersLocked(now time.Time) {
 	for _, player := range hub.players {
 		hub.advancePlayerLocked(player, now)
+	}
+}
+
+func (hub *gameHub) stepMovingPlayers() bool {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	if len(hub.players) == 0 {
+		return false
+	}
+
+	now := hub.now()
+	changed := false
+	for _, player := range hub.players {
+		if hub.advancePlayerLocked(player, now) {
+			changed = true
+		}
+	}
+
+	if !changed {
+		return false
+	}
+
+	hub.tick++
+	return true
+}
+
+func (hub *gameHub) runMovementLoop(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if !hub.stepMovingPlayers() {
+			continue
+		}
+
+		hub.broadcast()
 	}
 }
 
@@ -398,6 +508,114 @@ func (hub *gameHub) setPlayerTargetLocked(player *playerState, x float64, y floa
 	player.UpdatedAt = now
 }
 
+func playerChunkPosition(player *playerState) (int, int) {
+	if player == nil {
+		return 0, 0
+	}
+
+	return worldAxisToChunk(player.X), worldAxisToChunk(player.Y)
+}
+
+func worldAxisToChunk(value float64) int {
+	return int(math.Floor(value / worldChunkSize))
+}
+
+func isChunkWithinDistance(centerChunkX int, centerChunkY int, chunkX int, chunkY int, distance int) bool {
+	return absInt(centerChunkX-chunkX) <= distance && absInt(centerChunkY-chunkY) <= distance
+}
+
+func visibleChunksAround(centerChunkX int, centerChunkY int) []worldChunkState {
+	chunks := make([]worldChunkState, 0, (worldRenderDistance*2+1)*(worldRenderDistance*2+1))
+
+	for chunkY := centerChunkY - worldRenderDistance; chunkY <= centerChunkY+worldRenderDistance; chunkY++ {
+		for chunkX := centerChunkX - worldRenderDistance; chunkX <= centerChunkX+worldRenderDistance; chunkX++ {
+			chunks = append(chunks, buildChunkState(chunkX, chunkY))
+		}
+	}
+
+	return chunks
+}
+
+func buildChunkState(chunkX int, chunkY int) worldChunkState {
+	originX := float64(chunkX) * worldChunkSize
+	originY := float64(chunkY) * worldChunkSize
+	flowerCount := 3 + positiveModulo(int(hashUint32(chunkX, chunkY, 1)), 3)
+	flowers := make([]worldFlowerState, 0, flowerCount)
+
+	for index := 0; index < flowerCount; index++ {
+		flowers = append(flowers, worldFlowerState{
+			ID:         fmt.Sprintf("flower:%d:%d:%d", chunkX, chunkY, index),
+			X:          originX + hashRange(worldDecorationPadding, worldChunkSize-worldDecorationPadding, chunkX, chunkY, index, 11),
+			Y:          originY + hashRange(worldDecorationPadding, worldChunkSize-worldDecorationPadding, chunkX, chunkY, index, 23),
+			Scale:      hashRange(0.72, 1.28, chunkX, chunkY, index, 37),
+			PetalColor: flowerPetalPalette[positiveModulo(int(hashUint32(chunkX, chunkY, index, 41)), len(flowerPetalPalette))],
+			CoreColor:  flowerCorePalette[positiveModulo(int(hashUint32(chunkX, chunkY, index, 53)), len(flowerCorePalette))],
+		})
+	}
+
+	hives := make([]worldHiveState, 0, 1)
+	if positiveModulo(int(hashUint32(chunkX, chunkY, 97)), 4) == 0 {
+		hives = append(hives, worldHiveState{
+			ID:        fmt.Sprintf("hive:%d:%d", chunkX, chunkY),
+			X:         originX + hashRange(worldChunkSize*0.24, worldChunkSize*0.76, chunkX, chunkY, 0, 101),
+			Y:         originY + hashRange(worldChunkSize*0.24, worldChunkSize*0.76, chunkX, chunkY, 0, 131),
+			Scale:     hashRange(0.92, 1.24, chunkX, chunkY, 0, 151),
+			ToneColor: hiveTonePalette[positiveModulo(int(hashUint32(chunkX, chunkY, 0, 163)), len(hiveTonePalette))],
+			GlowColor: hiveGlowPalette[positiveModulo(int(hashUint32(chunkX, chunkY, 0, 173)), len(hiveGlowPalette))],
+		})
+	}
+
+	return worldChunkState{
+		Key:     buildChunkKey(chunkX, chunkY),
+		X:       chunkX,
+		Y:       chunkY,
+		Flowers: flowers,
+		Hives:   hives,
+	}
+}
+
+func hashUint32(parts ...int) uint32 {
+	hash := uint32(2166136261)
+	const prime uint32 = 16777619
+
+	for _, part := range parts {
+		value := uint32(int32(part)) + 0x9e3779b9
+		hash ^= value
+		hash *= prime
+	}
+
+	return hash
+}
+
+func hashRange(min float64, max float64, parts ...int) float64 {
+	if max <= min {
+		return min
+	}
+
+	return min + hashUnit(parts...)*(max-min)
+}
+
+func hashUnit(parts ...int) float64 {
+	return float64(hashUint32(parts...)%10000) / 9999
+}
+
+func positiveModulo(value int, divisor int) int {
+	remainder := value % divisor
+	if remainder < 0 {
+		return remainder + divisor
+	}
+
+	return remainder
+}
+
+func absInt(value int) int {
+	if value < 0 {
+		return -value
+	}
+
+	return value
+}
+
 func profileSpawnPosition(profileKey string) (float64, float64) {
 	spawnPoints := [][2]float64{
 		{3.4, 0},
@@ -443,13 +661,5 @@ func writeCloseMessage(connection *websocket.Conn, message string) {
 }
 
 func clampToWorld(value float64) float64 {
-	if value < -worldLimit {
-		return -worldLimit
-	}
-
-	if value > worldLimit {
-		return worldLimit
-	}
-
 	return value
 }
