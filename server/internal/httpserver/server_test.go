@@ -327,93 +327,95 @@ func TestRespawnPlayerReturnsToProfileSpawn(t *testing.T) {
 	}
 }
 
-func TestPruneInactiveClientsRemovesDisconnectedPlayers(t *testing.T) {
-	baseTime := time.Date(2026, time.April, 21, 12, 0, 0, 0, time.UTC)
-	activePlayer := &playerState{ID: "player:active", Username: "active", UpdatedAt: baseTime}
-	stalePlayer := &playerState{ID: "player:stale", Username: "stale", UpdatedAt: baseTime}
+func TestUnregisterRemovesActivePlayerButKeepsProfile(t *testing.T) {
+	player := &playerState{ID: "player:beekeeper", Username: "beekeeper"}
+	client := &clientSession{id: player.ID, profileKey: "beekeeper"}
 	hub := &gameHub{
 		clients: map[string]*clientSession{
-			activePlayer.ID: {
-				id:         activePlayer.ID,
-				profileKey: "active",
-				lastSeenAt: baseTime.Add(-heartbeatInterval),
-			},
-			stalePlayer.ID: {
-				id:         stalePlayer.ID,
-				profileKey: "stale",
-				lastSeenAt: baseTime.Add(-clientInactivityTimeout - time.Second),
-			},
+			player.ID: client,
 		},
 		players: map[string]*playerState{
-			activePlayer.ID: activePlayer,
-			stalePlayer.ID:  stalePlayer,
+			player.ID: player,
 		},
 		profiles: map[string]*playerState{
-			"active": activePlayer,
-			"stale":  stalePlayer,
-		},
-		now: func() time.Time {
-			return baseTime
+			"beekeeper": player,
 		},
 	}
 
-	staleClients := hub.pruneInactiveClients()
-	if len(staleClients) != 1 {
-		t.Fatalf("expected one stale client, got %d", len(staleClients))
+	if ok := hub.unregister(client); !ok {
+		t.Fatalf("expected unregister to remove the active client")
 	}
 
-	if staleClients[0].id != stalePlayer.ID {
-		t.Fatalf("expected stale client %q, got %q", stalePlayer.ID, staleClients[0].id)
+	if _, ok := hub.clients[player.ID]; ok {
+		t.Fatalf("expected client to be removed from active clients")
 	}
 
-	if _, ok := hub.clients[stalePlayer.ID]; ok {
-		t.Fatalf("expected stale client to be removed from active clients")
+	if _, ok := hub.players[player.ID]; ok {
+		t.Fatalf("expected player to be removed from active players")
 	}
 
-	if _, ok := hub.players[stalePlayer.ID]; ok {
-		t.Fatalf("expected stale player to be removed from active players")
-	}
-
-	if _, ok := hub.profiles[staleClients[0].profileKey]; !ok {
-		t.Fatalf("expected stale player profile to remain available for reconnect")
-	}
-
-	if _, ok := hub.clients[activePlayer.ID]; !ok {
-		t.Fatalf("expected active client to remain connected")
-	}
-
-	if hub.tick != 1 {
-		t.Fatalf("expected tick to advance once after pruning, got %d", hub.tick)
+	if profile := hub.profiles[client.profileKey]; profile != player {
+		t.Fatalf("expected profile for %q to remain available after disconnect", client.profileKey)
 	}
 }
 
-func TestTouchClientRefreshesLastSeenAt(t *testing.T) {
-	baseTime := time.Date(2026, time.April, 21, 12, 0, 0, 0, time.UTC)
-	client := &clientSession{
-		id:         "player:scout",
-		profileKey: "scout",
-		lastSeenAt: baseTime.Add(-clientInactivityTimeout),
-	}
-	hub := &gameHub{
-		clients: map[string]*clientSession{
-			client.id: client,
-		},
-		now: func() time.Time {
-			return baseTime
-		},
+func TestWebSocketTimeoutRemovesPlayerButKeepsProfile(t *testing.T) {
+	hub := newGameHub()
+	hub.pongWait = 180 * time.Millisecond
+	hub.pingPeriod = 60 * time.Millisecond
+	hub.writeWait = 80 * time.Millisecond
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", hub.handleWebSocket)
+	testServer := httptest.NewServer(mux)
+	defer testServer.Close()
+
+	websocketURL := "ws" + strings.TrimPrefix(testServer.URL, "http") + "/ws"
+	connection := openGameSocket(t, websocketURL, "idlebee")
+	defer connection.Close()
+
+	var session sessionMessage
+	if err := connection.ReadJSON(&session); err != nil {
+		t.Fatalf("read session: %v", err)
 	}
 
-	if ok := hub.touchClient(client.id); !ok {
-		t.Fatalf("expected touchClient to succeed for registered client")
+	var initialState worldStateMessage
+	if err := connection.ReadJSON(&initialState); err != nil {
+		t.Fatalf("read initial state: %v", err)
 	}
 
-	if !client.lastSeenAt.Equal(baseTime) {
-		t.Fatalf("expected lastSeenAt to refresh to %s, got %s", baseTime, client.lastSeenAt)
+	hub.mu.Lock()
+	player := hub.players[session.PlayerID]
+	targetX := player.X + 1
+	targetY := player.Y
+	player.TargetX = &targetX
+	player.TargetY = &targetY
+	hub.mu.Unlock()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		hub.mu.Lock()
+		_, clientStillConnected := hub.clients[session.PlayerID]
+		_, playerStillActive := hub.players[session.PlayerID]
+		profile := hub.profiles["idlebee"]
+		hub.mu.Unlock()
+
+		if !clientStillConnected && !playerStillActive {
+			if profile == nil {
+				t.Fatalf("expected profile to remain available for reconnect")
+			}
+
+			if profile.TargetX == nil || profile.TargetY == nil {
+				t.Fatalf("expected stored profile target to remain available after timeout")
+			}
+
+			return
+		}
+
+		time.Sleep(20 * time.Millisecond)
 	}
 
-	if ok := hub.touchClient("missing"); ok {
-		t.Fatalf("expected touchClient to fail for unknown client")
-	}
+	t.Fatalf("expected websocket timeout to remove player from active maps")
 }
 
 func TestWebSocketRespawnBroadcastsState(t *testing.T) {

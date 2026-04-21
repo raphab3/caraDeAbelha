@@ -9,11 +9,6 @@ type playerAction struct {
 	Z    float64 `json:"z,omitempty"`
 }
 
-type heartbeatMessage struct {
-	Type      string `json:"type"`
-	Timestamp string `json:"timestamp"`
-}
-
 type playerState struct {
 	ID        string    `json:"id"`
 	Username  string    `json:"username"`

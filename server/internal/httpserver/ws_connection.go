@@ -33,6 +33,18 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		_ = replacedClient.conn.Close()
 	}
 
+	if err := connection.SetReadDeadline(hub.now().Add(hub.pongWait)); err != nil {
+		_ = connection.Close()
+		return
+	}
+
+	connection.SetPongHandler(func(string) error {
+		return connection.SetReadDeadline(hub.now().Add(hub.pongWait))
+	})
+
+	stopPingLoop := make(chan struct{})
+	go hub.runPingLoop(client, stopPingLoop)
+
 	hub.sendToClient(client, sessionMessage{
 		Type:     "session",
 		PlayerID: client.id,
@@ -41,6 +53,7 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	hub.broadcast()
 
 	defer func() {
+		close(stopPingLoop)
 		_ = connection.Close()
 
 		if hub.unregister(client) {
@@ -57,15 +70,13 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if !hub.touchClient(client.id) {
+		if err := connection.SetReadDeadline(hub.now().Add(hub.pongWait)); err != nil {
 			return
 		}
 
 		var ok bool
 
 		switch action.Type {
-		case "heartbeat":
-			continue
 		case "move":
 			ok = hub.movePlayer(client.id, action.Dir)
 		case "move_to":
@@ -124,11 +135,39 @@ func (hub *gameHub) writeJSON(client *clientSession, message any) error {
 	client.writeMu.Lock()
 	defer client.writeMu.Unlock()
 
-	if err := client.conn.SetWriteDeadline(hub.now().Add(websocketWriteTimeout)); err != nil {
+	if err := client.conn.SetWriteDeadline(hub.now().Add(hub.writeWait)); err != nil {
 		return err
 	}
 
 	return client.conn.WriteJSON(message)
+}
+
+func (hub *gameHub) writeControl(client *clientSession, messageType int, payload []byte) error {
+	client.writeMu.Lock()
+	defer client.writeMu.Unlock()
+
+	return client.conn.WriteControl(messageType, payload, hub.now().Add(hub.writeWait))
+}
+
+func (hub *gameHub) runPingLoop(client *clientSession, stop <-chan struct{}) {
+	if client == nil || hub.pingPeriod <= 0 {
+		return
+	}
+
+	ticker := time.NewTicker(hub.pingPeriod)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			if err := hub.writeControl(client, websocket.PingMessage, nil); err != nil {
+				_ = client.conn.Close()
+				return
+			}
+		}
+	}
 }
 
 func parseUsername(rawUsername string) (string, string, error) {

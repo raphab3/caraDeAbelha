@@ -5,15 +5,12 @@ import { WSClient } from "../game/WSClient";
 import type {
   GameSessionController,
   GameSessionState,
-  HeartbeatMessage,
   MoveDirection,
   SessionMessage,
   WorldPlayerState,
   WorldStateMessage,
 } from "../types/game";
 
-const CLIENT_HEARTBEAT_INTERVAL_MS = 30 * 1000;
-const CLIENT_SOCKET_TIMEOUT_MS = 60 * 1000;
 const DEFAULT_DISCONNECT_ERROR = "A conexao com o jardim ficou sem resposta. Tente reconectar.";
 const OFFLINE_DISCONNECT_ERROR = "Sua internet ficou offline. Tente reconectar para voltar ao jardim.";
 const WS_CONNECT_ERROR = "Falha ao conectar no websocket do jogo.";
@@ -107,14 +104,6 @@ function isSessionMessage(message: unknown): message is SessionMessage {
   return "type" in message && message.type === "session";
 }
 
-function isHeartbeatMessage(message: unknown): message is HeartbeatMessage {
-  if (typeof message !== "object" || message === null) {
-    return false;
-  }
-
-  return "type" in message && message.type === "heartbeat";
-}
-
 function resolveDisconnectError(reason?: string): string {
   const normalizedReason = reason?.trim();
   return normalizedReason ? normalizedReason : DEFAULT_DISCONNECT_ERROR;
@@ -135,14 +124,12 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
   const pressedDirectionsRef = useRef<RelativeMoveDirection[]>([]);
   const localPlayerRef = useRef<WorldPlayerState | undefined>(undefined);
   const facingDirectionRef = useRef<MoveDirection>("up");
-  const lastPacketAtRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!username) {
       pressedDirectionsRef.current = [];
       localPlayerRef.current = undefined;
       facingDirectionRef.current = "up";
-      lastPacketAtRef.current = null;
       clientRef.current?.disconnect();
       clientRef.current = null;
       setGameSession(createInitialState("idle"));
@@ -163,7 +150,6 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
       pressedDirectionsRef.current = [];
       localPlayerRef.current = undefined;
       facingDirectionRef.current = "up";
-      lastPacketAtRef.current = null;
 
       setGameSession((current) => {
         const error = current.error ?? resolveDisconnectError(reason);
@@ -195,8 +181,6 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
           return;
         }
 
-        lastPacketAtRef.current = Date.now();
-
         setGameSession((current) => ({
           ...current,
           connectionState: "connected",
@@ -205,23 +189,6 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
       },
       onMessage: (message) => {
         if (!active) {
-          return;
-        }
-
-        lastPacketAtRef.current = Date.now();
-
-        if (isHeartbeatMessage(message)) {
-          setGameSession((current) => {
-            if (current.connectionState === "connected" && current.error === undefined) {
-              return current;
-            }
-
-            return {
-              ...current,
-              connectionState: "connected",
-              error: undefined,
-            };
-          });
           return;
         }
 
@@ -268,26 +235,6 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
       },
     });
 
-    const heartbeatIntervalId = window.setInterval(() => {
-      client.send({
-        type: "heartbeat",
-      });
-    }, CLIENT_HEARTBEAT_INTERVAL_MS);
-
-    const connectionWatchdogId = window.setInterval(() => {
-      const lastPacketAt = lastPacketAtRef.current;
-      if (!active || lastPacketAt === null) {
-        return;
-      }
-
-      if (Date.now() - lastPacketAt < CLIENT_SOCKET_TIMEOUT_MS) {
-        return;
-      }
-
-      disconnectSession(DEFAULT_DISCONNECT_ERROR);
-      client.disconnect();
-    }, 1000);
-
     const handleOffline = () => {
       disconnectSession(OFFLINE_DISCONNECT_ERROR);
       client.disconnect();
@@ -300,9 +247,6 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
       pressedDirectionsRef.current = [];
       localPlayerRef.current = undefined;
       facingDirectionRef.current = "up";
-      lastPacketAtRef.current = null;
-      window.clearInterval(heartbeatIntervalId);
-      window.clearInterval(connectionWatchdogId);
       window.removeEventListener("offline", handleOffline);
       client.disconnect();
 
