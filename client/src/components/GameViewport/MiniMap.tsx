@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import type { WorldChunkState, WorldPlayerState } from "../../types/game";
 
@@ -10,6 +10,7 @@ interface MiniMapProps {
   chunks: WorldChunkState[];
   chunkSize: number;
   localPlayerId?: string;
+  onPlayerClick?: (x: number, z: number) => void;
 }
 
 interface MiniMapBounds {
@@ -121,7 +122,8 @@ function resolveBounds(
   };
 }
 
-export function MiniMap({ players, chunks, chunkSize, localPlayerId }: MiniMapProps) {
+export function MiniMap({ players, chunks, chunkSize, localPlayerId, onPlayerClick }: MiniMapProps) {
+  const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
   const localPlayer = useMemo(
     () => players.find((player) => player.id === localPlayerId),
     [localPlayerId, players],
@@ -154,7 +156,6 @@ export function MiniMap({ players, chunks, chunkSize, localPlayerId }: MiniMapPr
   }, [bounds.height, bounds.minX, bounds.minY, bounds.width, localPlayerId, players]);
 
   const nearbyPlayers = markers.filter((player) => !player.isLocal);
-  const showLabels = markers.length <= 5;
   const localCoordinates = useMemo<CoordinateReadout>(() => {
     return {
       latitudeLabel: formatLatitude(localPlayer?.y ?? 0),
@@ -165,42 +166,107 @@ export function MiniMap({ players, chunks, chunkSize, localPlayerId }: MiniMapPr
   return (
     <aside className="mini-map" aria-label="Mini mapa dos jogadores">
       <div className="mini-map__header">
-        <div>
-          <p className="mini-map__eyebrow">radar</p>
-          <strong>{markers.length} jogadores</strong>
+        <div className="mini-map__header-left">
+          <span className="mini-map__radar-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="1.4" opacity="0.6" />
+              <circle cx="10" cy="10" r="5.5" stroke="currentColor" strokeWidth="1.2" opacity="0.45" />
+              <circle cx="10" cy="10" r="2.4" stroke="currentColor" strokeWidth="1.2" opacity="0.7" />
+              <line x1="10" y1="2" x2="10" y2="10" stroke="currentColor" strokeWidth="1.4" opacity="0.9" />
+              <circle cx="10" cy="10" r="1.5" fill="currentColor" />
+            </svg>
+          </span>
+          <div>
+            <p className="mini-map__eyebrow">radar</p>
+            <strong className="mini-map__player-count">Jogadores ativos: {markers.length}</strong>
+          </div>
         </div>
-        <span className="mini-map__bounds">janela {Math.round(bounds.width)}m</span>
+        <span className="mini-map__bounds">Janela: {Math.round(bounds.width)}m</span>
       </div>
 
       <div className="mini-map__surface" aria-hidden="true">
         <div className="mini-map__grid" />
-        <span className="mini-map__axis mini-map__axis--top">lat {formatLatitude(bounds.maxY)}</span>
-        <span className="mini-map__axis mini-map__axis--bottom">lat {formatLatitude(bounds.minY)}</span>
-        <span className="mini-map__axis mini-map__axis--left">long {formatLongitude(bounds.minX)}</span>
-        <span className="mini-map__axis mini-map__axis--right">long {formatLongitude(bounds.maxX)}</span>
 
-        {markers.map((player) => (
-          <div
-            key={player.id}
-            className={`mini-map__marker${player.isLocal ? " mini-map__marker--local" : ""}`}
-            style={{ left: `${player.left}%`, top: `${player.top}%` }}
-          >
-            <span className="mini-map__dot" />
-            {showLabels ? <span className="mini-map__label">{player.username}</span> : null}
-          </div>
-        ))}
+        {/* Bússola */}
+        <span className="mini-map__compass mini-map__compass--n">N</span>
+        <span className="mini-map__compass mini-map__compass--s">S</span>
+        <span className="mini-map__compass mini-map__compass--w">O</span>
+        <span className="mini-map__compass mini-map__compass--e">L</span>
+
+        {markers.map((player) =>
+          player.isLocal ? (
+            <div
+              key={player.id}
+              className="mini-map__marker mini-map__marker--local"
+              style={{ left: `${player.left}%`, top: `${player.top}%` }}
+            >
+              <span className="mini-map__local-triangle" aria-label="Você" />
+            </div>
+          ) : (
+            <button
+              key={player.id}
+              type="button"
+              className={`mini-map__marker mini-map__marker--remote${hoveredPlayerId === player.id ? " mini-map__marker--hovered" : ""}`}
+              style={{ left: `${player.left}%`, top: `${player.top}%` }}
+              aria-label={`Ir até ${player.username} em lat ${formatLatitude(player.y)} long ${formatLongitude(player.x)}`}
+              onClick={() => onPlayerClick?.(player.x, player.y)}
+              onMouseEnter={() => setHoveredPlayerId(player.id)}
+              onMouseLeave={() => setHoveredPlayerId(null)}
+            >
+              <span className="mini-map__dot" />
+              <span className="mini-map__dot-pulse" />
+              {hoveredPlayerId === player.id ? (
+                <span className="mini-map__tooltip">
+                  <strong>{player.username}</strong>
+                  <span className="mini-map__tooltip-id">ID: {player.id.slice(0, 6)}</span>
+                </span>
+              ) : null}
+            </button>
+          ),
+        )}
+
+        {/* Linha do jogador local ao alvo mais próximo */}
+        {localPlayer && nearbyPlayers.length > 0 && nearbyPlayers[0] ? (
+          <svg className="mini-map__lines" aria-hidden="true">
+            <line
+              x1={`${markers.find((m) => m.isLocal)?.left ?? 50}%`}
+              y1={`${markers.find((m) => m.isLocal)?.top ?? 50}%`}
+              x2={`${nearbyPlayers[0].left}%`}
+              y2={`${nearbyPlayers[0].top}%`}
+              stroke="rgba(255,255,255,0.18)"
+              strokeWidth="1"
+              strokeDasharray="3 4"
+            />
+          </svg>
+        ) : null}
       </div>
 
-      <div className="mini-map__coordinates" aria-label="Coordenadas atuais">
-        <span>lat {localCoordinates.latitudeLabel}</span>
-        <span>long {localCoordinates.longitudeLabel}</span>
-      </div>
+      <div className="mini-map__footer">
+        <div className="mini-map__coordinates" aria-label="Coordenadas atuais">
+          <span className="mini-map__coord-icon" aria-hidden="true">📍</span>
+          <span>
+            Local do alvo:{" "}
+            {nearbyPlayers.length > 0 && nearbyPlayers[0]
+              ? `Lat ${formatLatitude(nearbyPlayers[0].y)} S, Long ${formatLongitude(nearbyPlayers[0].x)} E`
+              : `Lat ${localCoordinates.latitudeLabel}, Long ${localCoordinates.longitudeLabel}`}
+          </span>
+        </div>
 
-      <p className="mini-map__summary">
-        {nearbyPlayers.length > 0
-          ? `Procure por ${nearbyPlayers.map((player) => player.username).join(", ")}.`
-          : "Nenhum outro jogador entrou no seu radar ainda."}
-      </p>
+        <p className="mini-map__summary">
+          {nearbyPlayers.length > 0
+            ? <>Procure por{" "}{nearbyPlayers.map((player, index) => (
+                <button
+                  key={player.id}
+                  type="button"
+                  className="mini-map__name-link"
+                  onClick={() => onPlayerClick?.(player.x, player.y)}
+                >
+                  {player.username}{index < nearbyPlayers.length - 1 ? ", " : ""}
+                </button>
+              ))}{" "}</>
+            : "Nenhum outro jogador entrou no seu radar ainda."}
+        </p>
+      </div>
     </aside>
   );
 }

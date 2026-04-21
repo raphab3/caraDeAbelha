@@ -7,10 +7,12 @@ import {
   CircleGeometry,
   DoubleSide,
   IcosahedronGeometry,
+  InstancedMesh,
   MOUSE,
   MathUtils,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  Object3D,
   RepeatWrapping,
   RingGeometry,
   SRGBColorSpace,
@@ -211,6 +213,15 @@ interface BeeActorProps {
   trackedPositionRef?: MutableRefObject<Vector3>;
 }
 
+interface RemoteBeeInstance {
+  player: WorldPlayerState;
+  currentPosition: Vector3;
+  authoritativePosition: Vector3;
+  desiredTargetPosition: Vector3;
+  rotationY: number;
+  drift: number;
+}
+
 function BeeActor({ player, drift, accentColor, isLocal, trackedPositionRef }: BeeActorProps) {
   const groupRef = useRef<Group>(null);
   const leftWingRef = useRef<Mesh>(null);
@@ -322,6 +333,202 @@ function BeeActor({ player, drift, accentColor, isLocal, trackedPositionRef }: B
           {player.username}
         </div>
       </Html>
+    </group>
+  );
+}
+
+function RemoteBeeNameplates({ players }: { players: WorldPlayerState[] }) {
+  return (
+    <group>
+      {players.map((player) => (
+        <group key={`${player.id}:label`} position={[toSceneAxis(player.x), 1.9, toSceneAxis(player.y)]}>
+          <Html center distanceFactor={8} sprite transform>
+            <div className="bee-nameplate">{player.username}</div>
+          </Html>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function RemoteBeesInstanced({ players }: { players: WorldPlayerState[] }) {
+  const bodyRef = useRef<InstancedMesh>(null);
+  const stripeLeftRef = useRef<InstancedMesh>(null);
+  const stripeCenterRef = useRef<InstancedMesh>(null);
+  const stripeRightRef = useRef<InstancedMesh>(null);
+  const headRef = useRef<InstancedMesh>(null);
+  const leftWingRef = useRef<InstancedMesh>(null);
+  const rightWingRef = useRef<InstancedMesh>(null);
+  const bodyDummy = useMemo(() => new Object3D(), []);
+  const stripeLeftDummy = useMemo(() => new Object3D(), []);
+  const stripeCenterDummy = useMemo(() => new Object3D(), []);
+  const stripeRightDummy = useMemo(() => new Object3D(), []);
+  const headDummy = useMemo(() => new Object3D(), []);
+  const leftWingDummy = useMemo(() => new Object3D(), []);
+  const rightWingDummy = useMemo(() => new Object3D(), []);
+  const instancesRef = useRef<RemoteBeeInstance[]>([]);
+  const remoteBodyMaterial = useMemo(() => getBeeBodyMaterial("#ffd86f", false), []);
+
+  useEffect(() => {
+    const previousById = new Map(instancesRef.current.map((instance) => [instance.player.id, instance]));
+
+    instancesRef.current = players.map((player, index) => {
+      const previous = previousById.get(player.id);
+      const authoritativeX = toSceneAxis(player.x);
+      const authoritativeZ = toSceneAxis(player.y);
+      const desiredX = hasMoveTarget(player) ? toSceneAxis(player.targetX) : authoritativeX;
+      const desiredZ = hasMoveTarget(player) ? toSceneAxis(player.targetY) : authoritativeZ;
+
+      if (previous) {
+        previous.player = player;
+        previous.authoritativePosition.set(authoritativeX, BEE_HEIGHT, authoritativeZ);
+        previous.desiredTargetPosition.set(desiredX, BEE_HEIGHT, desiredZ);
+        return previous;
+      }
+
+      return {
+        player,
+        currentPosition: new Vector3(authoritativeX, BEE_HEIGHT, authoritativeZ),
+        authoritativePosition: new Vector3(authoritativeX, BEE_HEIGHT, authoritativeZ),
+        desiredTargetPosition: new Vector3(desiredX, BEE_HEIGHT, desiredZ),
+        rotationY: 0,
+        drift: index * 0.9,
+      };
+    });
+  }, [players]);
+
+  useFrame((state, delta) => {
+    const instances = instancesRef.current;
+    const bodyMesh = bodyRef.current;
+    const stripeLeftMesh = stripeLeftRef.current;
+    const stripeCenterMesh = stripeCenterRef.current;
+    const stripeRightMesh = stripeRightRef.current;
+    const headMesh = headRef.current;
+    const leftWingMesh = leftWingRef.current;
+    const rightWingMesh = rightWingRef.current;
+
+    if (
+      !bodyMesh ||
+      !stripeLeftMesh ||
+      !stripeCenterMesh ||
+      !stripeRightMesh ||
+      !headMesh ||
+      !leftWingMesh ||
+      !rightWingMesh
+    ) {
+      return;
+    }
+
+    bodyMesh.count = instances.length;
+    stripeLeftMesh.count = instances.length;
+    stripeCenterMesh.count = instances.length;
+    stripeRightMesh.count = instances.length;
+    headMesh.count = instances.length;
+    leftWingMesh.count = instances.length;
+    rightWingMesh.count = instances.length;
+
+    for (let index = 0; index < instances.length; index += 1) {
+      const instance = instances[index];
+      const { player, currentPosition, authoritativePosition, desiredTargetPosition } = instance;
+      const time = state.clock.elapsedTime + instance.drift;
+      const hoverHeight = BEE_HEIGHT + Math.sin(time * 2.4) * 0.18;
+      const movementStep = Math.max(player.speed, 0.001) * WORLD_TO_SCENE_SCALE * delta;
+
+      authoritativePosition.set(toSceneAxis(player.x), currentPosition.y, toSceneAxis(player.y));
+
+      if (hasMoveTarget(player)) {
+        desiredTargetPosition.set(toSceneAxis(player.targetX), currentPosition.y, toSceneAxis(player.targetY));
+
+        if (currentPosition.distanceTo(authoritativePosition) > RENDER_CORRECTION_DISTANCE) {
+          currentPosition.copy(authoritativePosition);
+        }
+
+        moveTowards(currentPosition, desiredTargetPosition, movementStep);
+      } else {
+        const correctionDistance = currentPosition.distanceTo(authoritativePosition);
+        moveTowards(
+          currentPosition,
+          authoritativePosition,
+          Math.max(movementStep, correctionDistance * 0.24),
+        );
+      }
+
+      currentPosition.y = MathUtils.lerp(currentPosition.y, hoverHeight, 0.18);
+
+      const lookTarget = hasMoveTarget(player) ? desiredTargetPosition : authoritativePosition;
+      const lookDeltaX = lookTarget.x - currentPosition.x;
+      const lookDeltaZ = lookTarget.z - currentPosition.z;
+
+      if (Math.abs(lookDeltaX) > 0.001 || Math.abs(lookDeltaZ) > 0.001) {
+        instance.rotationY = Math.atan2(lookDeltaX, lookDeltaZ);
+      }
+
+      bodyDummy.position.copy(currentPosition);
+      bodyDummy.rotation.set(0, instance.rotationY, 0);
+      bodyDummy.scale.set(1, 1, 1);
+      bodyDummy.updateMatrix();
+      bodyMesh.setMatrixAt(index, bodyDummy.matrix);
+
+      stripeLeftDummy.position.set(currentPosition.x - 0.35, currentPosition.y, currentPosition.z);
+      stripeLeftDummy.rotation.set(0, instance.rotationY, 0);
+      stripeLeftDummy.scale.set(1, 1, 1);
+      stripeLeftDummy.updateMatrix();
+      stripeLeftMesh.setMatrixAt(index, stripeLeftDummy.matrix);
+
+      stripeCenterDummy.position.copy(currentPosition);
+      stripeCenterDummy.rotation.set(0, instance.rotationY, 0);
+      stripeCenterDummy.scale.set(1, 1, 1);
+      stripeCenterDummy.updateMatrix();
+      stripeCenterMesh.setMatrixAt(index, stripeCenterDummy.matrix);
+
+      stripeRightDummy.position.set(currentPosition.x + 0.35, currentPosition.y, currentPosition.z);
+      stripeRightDummy.rotation.set(0, instance.rotationY, 0);
+      stripeRightDummy.scale.set(1, 1, 1);
+      stripeRightDummy.updateMatrix();
+      stripeRightMesh.setMatrixAt(index, stripeRightDummy.matrix);
+
+      headDummy.position.set(currentPosition.x + 0.7, currentPosition.y, currentPosition.z);
+      headDummy.rotation.set(0, instance.rotationY, 0);
+      headDummy.scale.set(1, 1, 1);
+      headDummy.updateMatrix();
+      headMesh.setMatrixAt(index, headDummy.matrix);
+
+      leftWingDummy.position.set(currentPosition.x - 0.08, currentPosition.y + 0.44, currentPosition.z - 0.3);
+      leftWingDummy.rotation.set(0.2, instance.rotationY, 0.15 + Math.sin(time * 18) * 0.3);
+      leftWingDummy.scale.set(1, 1, 1);
+      leftWingDummy.updateMatrix();
+      leftWingMesh.setMatrixAt(index, leftWingDummy.matrix);
+
+      rightWingDummy.position.set(currentPosition.x - 0.08, currentPosition.y + 0.44, currentPosition.z + 0.3);
+      rightWingDummy.rotation.set(-0.2, instance.rotationY, -0.15 - Math.sin(time * 18) * 0.3);
+      rightWingDummy.scale.set(1, 1, 1);
+      rightWingDummy.updateMatrix();
+      rightWingMesh.setMatrixAt(index, rightWingDummy.matrix);
+    }
+
+    bodyMesh.instanceMatrix.needsUpdate = true;
+    stripeLeftMesh.instanceMatrix.needsUpdate = true;
+    stripeCenterMesh.instanceMatrix.needsUpdate = true;
+    stripeRightMesh.instanceMatrix.needsUpdate = true;
+    headMesh.instanceMatrix.needsUpdate = true;
+    leftWingMesh.instanceMatrix.needsUpdate = true;
+    rightWingMesh.instanceMatrix.needsUpdate = true;
+  });
+
+  if (players.length === 0) {
+    return null;
+  }
+
+  return (
+    <group>
+      <instancedMesh ref={bodyRef} args={[beeBodyGeometry, remoteBodyMaterial, players.length]} castShadow frustumCulled={false} />
+      <instancedMesh ref={stripeLeftRef} args={[beeStripeGeometry, beeStripeMaterial, players.length]} castShadow frustumCulled={false} />
+      <instancedMesh ref={stripeCenterRef} args={[beeStripeGeometry, beeStripeMaterial, players.length]} castShadow frustumCulled={false} />
+      <instancedMesh ref={stripeRightRef} args={[beeStripeGeometry, beeStripeMaterial, players.length]} castShadow frustumCulled={false} />
+      <instancedMesh ref={headRef} args={[beeHeadGeometry, beeStripeMaterial, players.length]} castShadow frustumCulled={false} />
+      <instancedMesh ref={leftWingRef} args={[beeWingGeometry, beeWingMaterial, players.length]} frustumCulled={false} />
+      <instancedMesh ref={rightWingRef} args={[beeWingGeometry, beeWingMaterial, players.length]} frustumCulled={false} />
+      <RemoteBeeNameplates players={players} />
     </group>
   );
 }
@@ -520,6 +727,10 @@ function HiveCore({
     () => players.find((player) => player.id === localPlayerId),
     [localPlayerId, players],
   );
+  const remotePlayers = useMemo(
+    () => players.filter((player) => player.id !== localPlayerId),
+    [localPlayerId, players],
+  );
 
   useEffect(() => {
     if (connectionState !== "connected" || !localPlayerId) {
@@ -605,16 +816,17 @@ function HiveCore({
 
       {moveTargetMarker ? <MoveTargetMarker target={moveTargetMarker} /> : null}
 
-      {players.map((player, index) => (
+      {localPlayer ? (
         <BeeActor
-          key={player.id}
-          accentColor={player.id === localPlayerId ? "#f8c537" : "#ffd86f"}
-          player={player}
-          drift={index * 0.9}
-          isLocal={player.id === localPlayerId}
-          trackedPositionRef={player.id === localPlayerId ? localPlayerPositionRef : undefined}
+          accentColor="#f8c537"
+          drift={0}
+          isLocal
+          player={localPlayer}
+          trackedPositionRef={localPlayerPositionRef}
         />
-      ))}
+      ) : null}
+
+      <RemoteBeesInstanced players={remotePlayers} />
 
       {connectionState === "disconnected" ? (
         <mesh
@@ -679,6 +891,7 @@ export function GameViewport({
         chunks={chunks}
         localPlayerId={localPlayerId}
         players={players}
+        onPlayerClick={onMoveToTarget}
       />
     </div>
   );
