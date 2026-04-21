@@ -119,9 +119,9 @@ function resolveViewportScale(chunkSize: number, renderDistance: number): {
 } {
   if (chunkSize <= 0 || renderDistance <= 0) {
     return {
-      cameraDistance: 38,
+      cameraDistance: 18,
       groundInputSize: 960,
-      maxCameraDistance: 180,
+      maxCameraDistance: 50,
     };
   }
 
@@ -129,9 +129,9 @@ function resolveViewportScale(chunkSize: number, renderDistance: number): {
   const sceneSpan = toSceneAxis(chunkSpan);
 
   return {
-    cameraDistance: Math.max(38, sceneSpan * 0.72),
-    groundInputSize: Math.max(960, sceneSpan * 4.2),
-    maxCameraDistance: Math.max(180, sceneSpan * 3.2),
+    cameraDistance: Math.max(18, sceneSpan * 0.3),
+    groundInputSize: Math.max(960, sceneSpan * 3),
+    maxCameraDistance: Math.max(70, sceneSpan * 1.2),
   };
 }
 
