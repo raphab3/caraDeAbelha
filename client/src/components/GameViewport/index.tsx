@@ -1,6 +1,6 @@
 import { Html, OrbitControls } from "@react-three/drei";
 import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
-import { type ElementRef, useEffect, useMemo, useRef, useState } from "react";
+import { type ElementRef, type MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
 import { DoubleSide, MOUSE, MathUtils, Vector3 } from "three";
 import type { Group, Mesh } from "three";
 
@@ -9,6 +9,8 @@ import type { GameSessionState, WorldPlayerState } from "../../types/game";
 const WORLD_TO_SCENE_SCALE = 1.35;
 const WORLD_LIMIT = 6;
 const TARGET_REACHED_DISTANCE = 0.22;
+const BEE_HEIGHT = 0.48;
+const RENDER_CORRECTION_DISTANCE = WORLD_TO_SCENE_SCALE * 0.9;
 
 interface MoveTargetMarkerState {
   sceneX: number;
@@ -23,55 +25,103 @@ function toWorldAxis(value: number): number {
   return MathUtils.clamp(value / WORLD_TO_SCENE_SCALE, -WORLD_LIMIT, WORLD_LIMIT);
 }
 
+function hasMoveTarget(player: WorldPlayerState): player is WorldPlayerState & { targetX: number; targetY: number } {
+  return player.targetX !== undefined && player.targetY !== undefined;
+}
+
+function moveTowards(currentPosition: Vector3, targetPosition: Vector3, maxStep: number): number {
+  const deltaX = targetPosition.x - currentPosition.x;
+  const deltaZ = targetPosition.z - currentPosition.z;
+  const distance = Math.hypot(deltaX, deltaZ);
+
+  if (distance <= maxStep || distance <= 0.0001) {
+    currentPosition.x = targetPosition.x;
+    currentPosition.z = targetPosition.z;
+    return 0;
+  }
+
+  const ratio = maxStep / distance;
+  currentPosition.x += deltaX * ratio;
+  currentPosition.z += deltaZ * ratio;
+  return distance - maxStep;
+}
+
 interface BeeActorProps {
   player: WorldPlayerState;
   drift: number;
   accentColor: string;
   isLocal: boolean;
-  trackedPositionRef?: React.MutableRefObject<Vector3>;
+  trackedPositionRef?: MutableRefObject<Vector3>;
 }
 
 function BeeActor({ player, drift, accentColor, isLocal, trackedPositionRef }: BeeActorProps) {
   const groupRef = useRef<Group>(null);
   const leftWingRef = useRef<Mesh>(null);
   const rightWingRef = useRef<Mesh>(null);
+  const authoritativePositionRef = useRef(new Vector3());
+  const desiredTargetPositionRef = useRef(new Vector3());
 
-  useFrame((state) => {
+  useEffect(() => {
+    if (!groupRef.current) {
+      return;
+    }
+
+    groupRef.current.position.set(toSceneAxis(player.x), BEE_HEIGHT, toSceneAxis(player.y));
+    trackedPositionRef?.current.copy(groupRef.current.position);
+  }, [player.id, player.x, player.y, trackedPositionRef]);
+
+  useFrame((state, delta) => {
     if (!groupRef.current || !leftWingRef.current || !rightWingRef.current) {
       return;
     }
 
     const time = state.clock.elapsedTime + drift;
-    const targetX = player.x * 1.35;
-    const targetZ = player.y * 1.35;
-    const hoverHeight = 0.48 + Math.sin(time * 2.4) * 0.18;
+    const hoverHeight = BEE_HEIGHT + Math.sin(time * 2.4) * 0.18;
+    const currentPosition = groupRef.current.position;
+    const movementStep = Math.max(player.speed, 0.001) * WORLD_TO_SCENE_SCALE * delta;
 
-    groupRef.current.position.x = MathUtils.lerp(
-      groupRef.current.position.x,
-      targetX,
-      0.16,
-    );
-    groupRef.current.position.y = MathUtils.lerp(
-      groupRef.current.position.y,
-      hoverHeight,
-      0.18,
-    );
-    groupRef.current.position.z = MathUtils.lerp(
-      groupRef.current.position.z,
-      targetZ,
-      0.16,
-    );
-    groupRef.current.rotation.y = Math.atan2(
-      targetX - groupRef.current.position.x,
-      targetZ - groupRef.current.position.z,
-    );
+    authoritativePositionRef.current.set(toSceneAxis(player.x), currentPosition.y, toSceneAxis(player.y));
+
+    if (hasMoveTarget(player)) {
+      desiredTargetPositionRef.current.set(
+        toSceneAxis(player.targetX),
+        currentPosition.y,
+        toSceneAxis(player.targetY),
+      );
+
+      if (currentPosition.distanceTo(authoritativePositionRef.current) > RENDER_CORRECTION_DISTANCE) {
+        currentPosition.copy(authoritativePositionRef.current);
+      }
+
+      moveTowards(currentPosition, desiredTargetPositionRef.current, movementStep);
+    } else {
+      const correctionDistance = currentPosition.distanceTo(authoritativePositionRef.current);
+      moveTowards(
+        currentPosition,
+        authoritativePositionRef.current,
+        Math.max(movementStep, correctionDistance * 0.24),
+      );
+    }
+
+    currentPosition.y = MathUtils.lerp(currentPosition.y, hoverHeight, 0.18);
+
+    const lookTarget = hasMoveTarget(player)
+      ? desiredTargetPositionRef.current
+      : authoritativePositionRef.current;
+    const lookDeltaX = lookTarget.x - currentPosition.x;
+    const lookDeltaZ = lookTarget.z - currentPosition.z;
+
+    if (Math.abs(lookDeltaX) > 0.001 || Math.abs(lookDeltaZ) > 0.001) {
+      groupRef.current.rotation.y = Math.atan2(lookDeltaX, lookDeltaZ);
+    }
+
     trackedPositionRef?.current.copy(groupRef.current.position);
     leftWingRef.current.rotation.z = Math.sin(time * 18) * 0.3;
     rightWingRef.current.rotation.z = -Math.sin(time * 18) * 0.3;
   });
 
   return (
-    <group ref={groupRef} position={[player.x * 1.35, 0.48, player.y * 1.35]}>
+    <group ref={groupRef} position={[toSceneAxis(player.x), BEE_HEIGHT, toSceneAxis(player.y)]}>
       {isLocal ? (
         <mesh position={[0, -0.56, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.78, 1.04, 40]} />
@@ -174,7 +224,13 @@ function MoveTargetMarker({ target }: { target: MoveTargetMarkerState }) {
   );
 }
 
-function CameraRig({ focusPlayer }: { focusPlayer?: WorldPlayerState }) {
+function CameraRig({
+  focusPlayer,
+  trackedPositionRef,
+}: {
+  focusPlayer?: WorldPlayerState;
+  trackedPositionRef: MutableRefObject<Vector3>;
+}) {
   const controlsRef = useRef<ElementRef<typeof OrbitControls>>(null);
   const smoothedTargetRef = useRef(new Vector3(0, 0.45, 0));
   const { gl } = useThree();
@@ -192,8 +248,9 @@ function CameraRig({ focusPlayer }: { focusPlayer?: WorldPlayerState }) {
   }, [gl]);
 
   useFrame((_, delta) => {
-    const nextX = focusPlayer ? toSceneAxis(focusPlayer.x) : 0;
-    const nextZ = focusPlayer ? toSceneAxis(focusPlayer.y) : 0;
+    const hasTrackedPosition = Number.isFinite(trackedPositionRef.current.x) && Number.isFinite(trackedPositionRef.current.z);
+    const nextX = hasTrackedPosition ? trackedPositionRef.current.x : focusPlayer ? toSceneAxis(focusPlayer.x) : 0;
+    const nextZ = hasTrackedPosition ? trackedPositionRef.current.z : focusPlayer ? toSceneAxis(focusPlayer.y) : 0;
     const desiredTarget = new Vector3(nextX, 0.42, nextZ);
 
     smoothedTargetRef.current.lerp(desiredTarget, 1 - Math.exp(-delta * 6));
@@ -225,20 +282,40 @@ interface HiveCoreProps {
   players: WorldPlayerState[];
   connectionState: GameSessionState["connectionState"];
   localPlayerId?: string;
+  localPlayerPositionRef: MutableRefObject<Vector3>;
   onMoveToTarget: (x: number, z: number) => void;
 }
 
-function HiveCore({ players, connectionState, localPlayerId, onMoveToTarget }: HiveCoreProps) {
+function HiveCore({ players, connectionState, localPlayerId, localPlayerPositionRef, onMoveToTarget }: HiveCoreProps) {
   const hiveRef = useRef<Group>(null);
-  const localPlayerPositionRef = useRef(new Vector3(Number.NaN, Number.NaN, Number.NaN));
   const [moveTargetMarker, setMoveTargetMarker] = useState<MoveTargetMarkerState | null>(null);
+  const localPlayer = useMemo(
+    () => players.find((player) => player.id === localPlayerId),
+    [localPlayerId, players],
+  );
 
   useEffect(() => {
     if (connectionState !== "connected" || !localPlayerId) {
       setMoveTargetMarker(null);
       localPlayerPositionRef.current.set(Number.NaN, Number.NaN, Number.NaN);
     }
-  }, [connectionState, localPlayerId]);
+  }, [connectionState, localPlayerId, localPlayerPositionRef]);
+
+  useEffect(() => {
+    if (!localPlayer) {
+      return;
+    }
+
+    if (hasMoveTarget(localPlayer)) {
+      setMoveTargetMarker({
+        sceneX: toSceneAxis(localPlayer.targetX),
+        sceneZ: toSceneAxis(localPlayer.targetY),
+      });
+      return;
+    }
+
+    setMoveTargetMarker(null);
+  }, [localPlayer]);
 
   useFrame((state) => {
     if (!hiveRef.current) {
@@ -373,6 +450,7 @@ export function GameViewport({ players, connectionState, localPlayerId, onMoveTo
     () => players.find((player) => player.id === localPlayerId),
     [localPlayerId, players],
   );
+  const localPlayerPositionRef = useRef(new Vector3(Number.NaN, Number.NaN, Number.NaN));
 
   return (
     <Canvas
@@ -382,10 +460,11 @@ export function GameViewport({ players, connectionState, localPlayerId, onMoveTo
       gl={{ antialias: true }}
     >
       <color attach="background" args={["#f7cd4a"]} />
-      <CameraRig focusPlayer={localPlayer} />
+      <CameraRig focusPlayer={localPlayer} trackedPositionRef={localPlayerPositionRef} />
       <HiveCore
         connectionState={connectionState}
         localPlayerId={localPlayerId}
+        localPlayerPositionRef={localPlayerPositionRef}
         onMoveToTarget={onMoveToTarget}
         players={players}
       />

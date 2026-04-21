@@ -16,6 +16,9 @@ export interface WorldPlayerState {
   username: string;
   x: number;
   y: number;
+  targetX?: number;
+  targetY?: number;
+  speed: number;
 }
 
 export interface WorldStateMessage {

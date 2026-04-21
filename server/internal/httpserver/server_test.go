@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -190,8 +191,57 @@ func TestWebSocketMoveToBroadcastsState(t *testing.T) {
 		t.Fatalf("expected player id %q, got %q", session.PlayerID, updatedState.Players[0].ID)
 	}
 
-	if updatedState.Players[0].X != 2.5 || updatedState.Players[0].Y != -1.5 {
-		t.Fatalf("expected updated position 2.5,-1.5, got %.1f,%.1f", updatedState.Players[0].X, updatedState.Players[0].Y)
+	if math.Abs(updatedState.Players[0].X-initialState.Players[0].X) > 0.001 || math.Abs(updatedState.Players[0].Y-initialState.Players[0].Y) > 0.001 {
+		t.Fatalf("expected move_to to preserve current position %.1f,%.1f, got %.1f,%.1f", initialState.Players[0].X, initialState.Players[0].Y, updatedState.Players[0].X, updatedState.Players[0].Y)
+	}
+
+	if updatedState.Players[0].TargetX == nil || updatedState.Players[0].TargetY == nil {
+		t.Fatalf("expected move_to target to be present in world state")
+	}
+
+	if math.Abs(*updatedState.Players[0].TargetX-2.5) > 0.001 || math.Abs(*updatedState.Players[0].TargetY+1.5) > 0.001 {
+		t.Fatalf("expected move_to target 2.5,-1.5, got %.1f,%.1f", *updatedState.Players[0].TargetX, *updatedState.Players[0].TargetY)
+	}
+
+	if updatedState.Players[0].Speed != defaultPlayerSpeed {
+		t.Fatalf("expected default player speed %.1f, got %.1f", defaultPlayerSpeed, updatedState.Players[0].Speed)
+	}
+}
+
+func TestAdvancePlayerLockedMovesTowardTargetAtConstantSpeed(t *testing.T) {
+	hub := newGameHub()
+	baseTime := time.Date(2026, time.April, 21, 12, 0, 0, 0, time.UTC)
+	targetX := 3.0
+	targetY := 0.0
+	player := &playerState{
+		ID:        "player:test",
+		Username:  "test",
+		X:         0,
+		Y:         0,
+		TargetX:   &targetX,
+		TargetY:   &targetY,
+		Speed:     2,
+		UpdatedAt: baseTime,
+	}
+
+	hub.advancePlayerLocked(player, baseTime.Add(500*time.Millisecond))
+
+	if math.Abs(player.X-1.0) > 0.001 || math.Abs(player.Y) > 0.001 {
+		t.Fatalf("expected player to advance to 1.0,0.0 after 0.5s, got %.3f,%.3f", player.X, player.Y)
+	}
+
+	if player.TargetX == nil || player.TargetY == nil {
+		t.Fatalf("expected player target to remain active mid-journey")
+	}
+
+	hub.advancePlayerLocked(player, baseTime.Add(1500*time.Millisecond))
+
+	if math.Abs(player.X-3.0) > 0.001 || math.Abs(player.Y) > 0.001 {
+		t.Fatalf("expected player to reach 3.0,0.0 after 1.5s, got %.3f,%.3f", player.X, player.Y)
+	}
+
+	if player.TargetX != nil || player.TargetY != nil {
+		t.Fatalf("expected player target to clear on arrival")
 	}
 }
 

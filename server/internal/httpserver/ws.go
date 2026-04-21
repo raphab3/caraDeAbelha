@@ -17,6 +17,8 @@ import (
 const worldLimit = 6
 
 const maxUsernameLength = 24
+const defaultPlayerSpeed = 3.0
+const movementStopDistance = 0.08
 
 var errInvalidUsername = errors.New("username invalido")
 var errUsernameInUse = errors.New("username em uso")
@@ -29,10 +31,14 @@ type playerAction struct {
 }
 
 type playerState struct {
-	ID       string  `json:"id"`
-	Username string  `json:"username"`
-	X        float64 `json:"x"`
-	Y        float64 `json:"y"`
+	ID        string    `json:"id"`
+	Username  string    `json:"username"`
+	X         float64   `json:"x"`
+	Y         float64   `json:"y"`
+	TargetX   *float64  `json:"targetX,omitempty"`
+	TargetY   *float64  `json:"targetY,omitempty"`
+	Speed     float64   `json:"speed"`
+	UpdatedAt time.Time `json:"-"`
 }
 
 type sessionMessage struct {
@@ -61,6 +67,7 @@ type gameHub struct {
 	players  map[string]*playerState
 	profiles map[string]*playerState
 	tick     uint64
+	now      func() time.Time
 }
 
 func newGameHub() *gameHub {
@@ -73,6 +80,7 @@ func newGameHub() *gameHub {
 		clients:  make(map[string]*clientSession),
 		players:  make(map[string]*playerState),
 		profiles: make(map[string]*playerState),
+		now:      time.Now,
 	}
 }
 
@@ -154,13 +162,17 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 	if !ok {
 		spawnX, spawnY := profileSpawnPosition(profileKey)
 		profile = &playerState{
-			ID:       buildPlayerID(profileKey),
-			Username: username,
-			X:        spawnX,
-			Y:        spawnY,
+			ID:        buildPlayerID(profileKey),
+			Username:  username,
+			X:         spawnX,
+			Y:         spawnY,
+			Speed:     defaultPlayerSpeed,
+			UpdatedAt: hub.now(),
 		}
 		hub.profiles[profileKey] = profile
 	}
+
+	hub.advancePlayerLocked(profile, hub.now())
 
 	if _, active := hub.players[profile.ID]; active {
 		return nil, worldStateMessage{}, errUsernameInUse
@@ -205,6 +217,8 @@ func (hub *gameHub) movePlayer(clientID string, direction string) (worldStateMes
 		return worldStateMessage{}, false
 	}
 
+	hub.advancePlayerLocked(player, hub.now())
+
 	switch direction {
 	case "up":
 		player.Y = clampToWorld(player.Y - 1)
@@ -232,8 +246,9 @@ func (hub *gameHub) movePlayerTo(clientID string, x float64, z float64) (worldSt
 		return worldStateMessage{}, false
 	}
 
-	player.X = clampToWorld(x)
-	player.Y = clampToWorld(z)
+	now := hub.now()
+	hub.advancePlayerLocked(player, now)
+	hub.setPlayerTargetLocked(player, clampToWorld(x), clampToWorld(z), now)
 	hub.tick++
 
 	return hub.snapshotLocked(), true
@@ -270,6 +285,8 @@ func (hub *gameHub) listClients() []*clientSession {
 }
 
 func (hub *gameHub) snapshotLocked() worldStateMessage {
+	hub.advanceActivePlayersLocked(hub.now())
+
 	players := make([]playerState, 0, len(hub.players))
 	for _, player := range hub.players {
 		players = append(players, *player)
@@ -304,6 +321,81 @@ func (hub *gameHub) isUsernameAvailable(profileKey string) bool {
 
 func buildPlayerID(profileKey string) string {
 	return "player:" + profileKey
+}
+
+func (hub *gameHub) advanceActivePlayersLocked(now time.Time) {
+	for _, player := range hub.players {
+		hub.advancePlayerLocked(player, now)
+	}
+}
+
+func (hub *gameHub) advancePlayerLocked(player *playerState, now time.Time) bool {
+	if player == nil {
+		return false
+	}
+
+	if player.UpdatedAt.IsZero() {
+		player.UpdatedAt = now
+		return false
+	}
+
+	if player.TargetX == nil || player.TargetY == nil {
+		player.UpdatedAt = now
+		return false
+	}
+
+	elapsed := now.Sub(player.UpdatedAt).Seconds()
+	if elapsed <= 0 {
+		return false
+	}
+
+	deltaX := *player.TargetX - player.X
+	deltaY := *player.TargetY - player.Y
+	distance := math.Hypot(deltaX, deltaY)
+
+	if distance <= movementStopDistance {
+		player.X = *player.TargetX
+		player.Y = *player.TargetY
+		player.TargetX = nil
+		player.TargetY = nil
+		player.UpdatedAt = now
+		return true
+	}
+
+	stepDistance := player.Speed * elapsed
+	if stepDistance >= distance {
+		player.X = *player.TargetX
+		player.Y = *player.TargetY
+		player.TargetX = nil
+		player.TargetY = nil
+		player.UpdatedAt = now
+		return true
+	}
+
+	ratio := stepDistance / distance
+	player.X += deltaX * ratio
+	player.Y += deltaY * ratio
+	player.UpdatedAt = now
+	return true
+}
+
+func (hub *gameHub) setPlayerTargetLocked(player *playerState, x float64, y float64, now time.Time) {
+	if player == nil {
+		return
+	}
+
+	if math.Abs(player.X-x) <= movementStopDistance && math.Abs(player.Y-y) <= movementStopDistance {
+		player.X = x
+		player.Y = y
+		player.TargetX = nil
+		player.TargetY = nil
+		player.UpdatedAt = now
+		return
+	}
+
+	player.TargetX = &x
+	player.TargetY = &y
+	player.UpdatedAt = now
 }
 
 func profileSpawnPosition(profileKey string) (float64, float64) {
