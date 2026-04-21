@@ -3,7 +3,6 @@ import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, type ElementRef, type MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
 import {
   BoxGeometry,
-  CanvasTexture,
   CircleGeometry,
   DoubleSide,
   IcosahedronGeometry,
@@ -13,9 +12,7 @@ import {
   MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
-  RepeatWrapping,
   RingGeometry,
-  SRGBColorSpace,
   SphereGeometry,
   Vector3,
 } from "three";
@@ -35,13 +32,13 @@ const TARGET_REACHED_DISTANCE = 0.22;
 const BEE_HEIGHT = 0.48;
 const RENDER_CORRECTION_DISTANCE = WORLD_TO_SCENE_SCALE * 0.9;
 const SKY_COLOR = "#dff4ff";
-const FOG_NEAR = 16;
-const FOG_FAR = 42;
+const FOG_COLOR = "#cddfb1";
+const FOG_NEAR = 34;
+const FOG_FAR = 92;
 const GROUND_HEIGHT = -1.15;
-const GROUND_SIZE = 260;
-const GROUND_TILE_WORLD_SIZE = 2.5;
-const DEFAULT_CAMERA_POSITION = [7.2, 5.2, 8.4] as const;
-const DEFAULT_CAMERA_FOV = 42;
+const GROUND_INPUT_SIZE = 520;
+const DEFAULT_CAMERA_POSITION = [14, 10.5, 15.5] as const;
+const DEFAULT_CAMERA_FOV = 50;
 
 const beeBodyGeometry = new SphereGeometry(0.62, 32, 32);
 const beeStripeGeometry = new BoxGeometry(0.12, 0.9, 1.18);
@@ -136,52 +133,6 @@ function resolveAnchorScenePosition(
   }
 
   return { x: 0, z: 0 };
-}
-
-function createGroundTexture(): CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 192;
-  canvas.height = 192;
-
-  const context = canvas.getContext("2d");
-  if (!context) {
-    throw new Error("nao foi possivel criar a textura do chao");
-  }
-
-  context.fillStyle = "#86b454";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-
-  context.fillStyle = "#7aa648";
-  for (let stripe = 0; stripe < 12; stripe += 1) {
-    context.fillRect(stripe * 16, 0, 8, canvas.height);
-  }
-
-  context.fillStyle = "rgba(255, 255, 255, 0.08)";
-  for (let band = 0; band < 8; band += 1) {
-    context.fillRect(0, band * 24, canvas.width, 4);
-  }
-
-  for (let patch = 0; patch < 72; patch += 1) {
-    const x = (patch * 37) % canvas.width;
-    const y = (patch * 53) % canvas.height;
-    const radius = 2 + (patch % 4);
-
-    context.fillStyle = patch % 3 === 0 ? "rgba(106, 142, 35, 0.26)" : "rgba(66, 115, 34, 0.22)";
-    context.beginPath();
-    context.arc(x, y, radius, 0, Math.PI * 2);
-    context.fill();
-  }
-
-  const texture = new CanvasTexture(canvas);
-  texture.wrapS = RepeatWrapping;
-  texture.wrapT = RepeatWrapping;
-  texture.colorSpace = SRGBColorSpace;
-  texture.repeat.set(
-    GROUND_SIZE / (WORLD_TO_SCENE_SCALE * GROUND_TILE_WORLD_SIZE),
-    GROUND_SIZE / (WORLD_TO_SCENE_SCALE * GROUND_TILE_WORLD_SIZE),
-  );
-
-  return texture;
 }
 
 function hasMoveTarget(player: WorldPlayerState): player is WorldPlayerState & { targetX: number; targetY: number } {
@@ -599,9 +550,9 @@ function CameraRig({
       enableDamping
       enablePan={false}
       makeDefault
-      maxDistance={38}
+      maxDistance={78}
       maxPolarAngle={Math.PI / 2.1}
-      minDistance={3.4}
+      minDistance={6}
       minPolarAngle={0.45}
       zoomSpeed={1.35}
       mouseButtons={{
@@ -675,9 +626,6 @@ function InfiniteGround({
   onPointerDown: (event: ThreeEvent<PointerEvent>) => void;
 }) {
   const groundRef = useRef<Mesh>(null);
-  const groundTexture = useMemo(() => createGroundTexture(), []);
-
-  useEffect(() => () => groundTexture.dispose(), [groundTexture]);
 
   useFrame(() => {
     if (!groundRef.current) {
@@ -697,8 +645,8 @@ function InfiniteGround({
       rotation={[-Math.PI / 2, 0, 0]}
       position={[0, GROUND_HEIGHT, 0]}
     >
-      <planeGeometry args={[GROUND_SIZE, GROUND_SIZE]} />
-      <meshStandardMaterial color="#95c45a" map={groundTexture} roughness={0.98} />
+      <planeGeometry args={[GROUND_INPUT_SIZE, GROUND_INPUT_SIZE]} />
+      <meshBasicMaterial opacity={0} side={DoubleSide} transparent />
     </mesh>
   );
 }
@@ -790,7 +738,7 @@ function HiveCore({
 
   return (
     <group>
-      <fog attach="fog" args={[SKY_COLOR, FOG_NEAR, FOG_FAR]} />
+      <fog attach="fog" args={[FOG_COLOR, FOG_NEAR, FOG_FAR]} />
       <ambientLight intensity={1} />
       <hemisphereLight color="#fff8d4" groundColor="#6b9035" intensity={0.64} />
       <directionalLight
@@ -811,7 +759,11 @@ function HiveCore({
         trackedPositionRef={localPlayerPositionRef}
       />
       <Suspense fallback={null}>
-        <InstancedWorldField chunkSize={chunkSize} chunks={chunks} />
+        <InstancedWorldField
+          chunkSize={chunkSize}
+          chunks={chunks}
+          onTerrainPointerDown={handleGroundPointerDown}
+        />
       </Suspense>
 
       {moveTargetMarker ? <MoveTargetMarker target={moveTargetMarker} /> : null}
@@ -843,16 +795,22 @@ interface GameViewportProps {
   players: WorldPlayerState[];
   chunks: WorldChunkState[];
   chunkSize: number;
+  renderDistance: number;
   connectionState: GameSessionState["connectionState"];
   localPlayerId?: string;
   onPerformanceChange: (snapshot: RenderPerformanceSnapshot) => void;
   onMoveToTarget: (x: number, z: number) => void;
 }
 
+function toChunkCoord(worldPos: number, chunkSize: number): number {
+  return Math.floor(worldPos / chunkSize);
+}
+
 export function GameViewport({
   players,
   chunks,
   chunkSize,
+  renderDistance,
   connectionState,
   localPlayerId,
   onPerformanceChange,
@@ -863,6 +821,18 @@ export function GameViewport({
     [localPlayerId, players],
   );
   const localPlayerPositionRef = useRef(new Vector3(Number.NaN, Number.NaN, Number.NaN));
+
+  // Jogadores visíveis no 3D — mesma lógica de chunk do servidor
+  const nearbyPlayers = useMemo(() => {
+    if (!localPlayer || chunkSize <= 0) return players;
+    const centerChunkX = toChunkCoord(localPlayer.x, chunkSize);
+    const centerChunkY = toChunkCoord(localPlayer.y, chunkSize);
+    return players.filter((player) => {
+      const px = toChunkCoord(player.x, chunkSize);
+      const py = toChunkCoord(player.y, chunkSize);
+      return Math.abs(centerChunkX - px) <= renderDistance && Math.abs(centerChunkY - py) <= renderDistance;
+    });
+  }, [players, localPlayer, chunkSize, renderDistance]);
 
   return (
     <div className="viewport-canvas-shell">
@@ -882,13 +852,11 @@ export function GameViewport({
           localPlayerId={localPlayerId}
           localPlayerPositionRef={localPlayerPositionRef}
           onMoveToTarget={onMoveToTarget}
-          players={players}
+          players={nearbyPlayers}
         />
       </Canvas>
 
       <MiniMap
-        chunkSize={chunkSize}
-        chunks={chunks}
         localPlayerId={localPlayerId}
         players={players}
         onPlayerClick={onMoveToTarget}

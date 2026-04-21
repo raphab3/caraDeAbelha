@@ -1,25 +1,24 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useGLTF } from "@react-three/drei";
+import type { ThreeEvent } from "@react-three/fiber";
 import {
 	type BufferGeometry,
 	type Material,
 	Group,
 	InstancedMesh,
 	Mesh,
-	MeshBasicMaterial,
 	Object3D,
-	PlaneGeometry,
 } from "three";
 
 import type { WorldChunkState } from "../../types/game";
 
 const WORLD_TO_SCENE_SCALE = 1.35;
 const GROUND_HEIGHT = -1.15;
-const CHUNK_OVERLAY_HEIGHT = GROUND_HEIGHT + 0.02;
+const TERRAIN_SURFACE_HEIGHT = GROUND_HEIGHT + 0.02;
+const TERRAIN_BLOCK_SCALE = WORLD_TO_SCENE_SCALE;
+const TERRAIN_BLOCK_CENTER_Y = TERRAIN_SURFACE_HEIGHT - TERRAIN_BLOCK_SCALE * 0.5;
 
-const chunkOverlayGeometry = new PlaneGeometry(1, 1);
-const basicMaterialCache = new Map<string, MeshBasicMaterial>();
-
+const TERRAIN_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/block-grass.glb";
 const FLOWERS_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/flowers.glb";
 const HIVE_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/barrel.glb";
 
@@ -30,7 +29,7 @@ interface InstanceConfig {
 }
 
 interface WorldFieldBuild {
-	overlayByColor: Map<string, InstanceConfig[]>;
+	terrainModelInstances: InstanceConfig[];
 	flowerModelInstances: InstanceConfig[];
 	hiveModelInstances: InstanceConfig[];
 }
@@ -44,52 +43,34 @@ function toSceneAxis(value: number): number {
 	return value * WORLD_TO_SCENE_SCALE;
 }
 
-function getBasicMaterial(key: string, color: string, opacity: number): MeshBasicMaterial {
-	const cacheKey = [key, color, opacity].join(":");
-	const cached = basicMaterialCache.get(cacheKey);
-	if (cached) {
-		return cached;
-	}
-
-	const material = new MeshBasicMaterial({ color, opacity, transparent: opacity < 1 });
-	basicMaterialCache.set(cacheKey, material);
-	return material;
-}
-
-function pushGroupedInstance(group: Map<string, InstanceConfig[]>, color: string, instance: InstanceConfig): void {
-	const bucket = group.get(color);
-	if (bucket) {
-		bucket.push(instance);
-		return;
-	}
-
-	group.set(color, [instance]);
-}
-
 function buildWorldField(chunks: WorldChunkState[], chunkSize: number): WorldFieldBuild {
-	const overlayByColor = new Map<string, InstanceConfig[]>();
+	const terrainModelInstances: InstanceConfig[] = [];
 	const flowerModelInstances: InstanceConfig[] = [];
 	const hiveModelInstances: InstanceConfig[] = [];
-	const chunkSceneSize = toSceneAxis(chunkSize) - 0.12;
 
 	for (const chunk of chunks) {
-		const overlayColor = Math.abs(chunk.x + chunk.y) % 2 === 0 ? "#88b44d" : "#7eaa45";
-		pushGroupedInstance(overlayByColor, overlayColor, {
-			position: [
-				toSceneAxis((chunk.x + 0.5) * chunkSize),
-				CHUNK_OVERLAY_HEIGHT,
-				toSceneAxis((chunk.y + 0.5) * chunkSize),
-			],
-			rotation: [-Math.PI / 2, 0, 0],
-			scale: [chunkSceneSize, chunkSceneSize, 1],
-		});
+		const chunkOriginX = chunk.x * chunkSize;
+		const chunkOriginY = chunk.y * chunkSize;
+
+		for (let cellX = 0; cellX < chunkSize; cellX += 1) {
+			for (let cellY = 0; cellY < chunkSize; cellY += 1) {
+				terrainModelInstances.push({
+					position: [
+						toSceneAxis(chunkOriginX + cellX + 0.5),
+						TERRAIN_BLOCK_CENTER_Y,
+						toSceneAxis(chunkOriginY + cellY + 0.5),
+					],
+					scale: TERRAIN_BLOCK_SCALE,
+				});
+			}
+		}
 
 		for (const flower of chunk.flowers) {
 			const baseX = toSceneAxis(flower.x);
 			const baseZ = toSceneAxis(flower.y);
 
 			flowerModelInstances.push({
-				position: [baseX, GROUND_HEIGHT + 0.02, baseZ],
+				position: [baseX, TERRAIN_SURFACE_HEIGHT + 0.02, baseZ],
 				rotation: [0, (baseX + baseZ) * 0.05, 0],
 				scale: 0.36 * flower.scale,
 			});
@@ -100,7 +81,7 @@ function buildWorldField(chunks: WorldChunkState[], chunkSize: number): WorldFie
 			const baseZ = toSceneAxis(hive.y);
 
 			hiveModelInstances.push({
-				position: [baseX, GROUND_HEIGHT + 0.04, baseZ],
+				position: [baseX, TERRAIN_SURFACE_HEIGHT + 0.04, baseZ],
 				rotation: [0, (baseX - baseZ) * 0.03, 0],
 				scale: 0.78 * hive.scale,
 			});
@@ -108,7 +89,7 @@ function buildWorldField(chunks: WorldChunkState[], chunkSize: number): WorldFie
 	}
 
 	return {
-		overlayByColor,
+		terrainModelInstances,
 		flowerModelInstances,
 		hiveModelInstances,
 	};
@@ -141,12 +122,14 @@ function InstancedLayer({
 	geometry,
 	castShadow = false,
 	receiveShadow = false,
+	onPointerDown,
 }: {
 	instances: InstanceConfig[];
 	material: Material;
 	geometry: BufferGeometry;
 	castShadow?: boolean;
 	receiveShadow?: boolean;
+	onPointerDown?: (event: ThreeEvent<PointerEvent>) => void;
 }) {
 	const meshRef = useRef<InstancedMesh>(null);
 	const dummy = useMemo(() => new Object3D(), []);
@@ -193,16 +176,30 @@ function InstancedLayer({
 			ref={meshRef}
 			args={[geometry, material, instances.length]}
 			castShadow={castShadow}
+			onPointerDown={onPointerDown}
 			receiveShadow={receiveShadow}
 			frustumCulled={false}
 		/>
 	);
 }
 
-export function InstancedWorldField({ chunks, chunkSize }: { chunks: WorldChunkState[]; chunkSize: number }) {
+export function InstancedWorldField({
+	chunks,
+	chunkSize,
+	onTerrainPointerDown,
+}: {
+	chunks: WorldChunkState[];
+	chunkSize: number;
+	onTerrainPointerDown?: (event: ThreeEvent<PointerEvent>) => void;
+}) {
 	const worldField = useMemo(() => buildWorldField(chunks, chunkSize), [chunkSize, chunks]);
+	const terrainModel = useGLTF(TERRAIN_MODEL_PATH);
 	const flowersModel = useGLTF(FLOWERS_MODEL_PATH);
 	const hiveModel = useGLTF(HIVE_MODEL_PATH);
+	const terrainMeshSources = useMemo(
+		() => collectInstancedModelMeshes(terrainModel.scene),
+		[terrainModel.scene],
+	);
 	const flowerMeshSources = useMemo(
 		() => collectInstancedModelMeshes(flowersModel.scene),
 		[flowersModel.scene],
@@ -218,12 +215,15 @@ export function InstancedWorldField({ chunks, chunkSize }: { chunks: WorldChunkS
 
 	return (
 		<group>
-			{[...worldField.overlayByColor.entries()].map(([color, instances]) => (
+			{terrainMeshSources.map((source, index) => (
 				<InstancedLayer
-					key={`overlay:${color}`}
-					geometry={chunkOverlayGeometry}
-					instances={instances}
-					material={getBasicMaterial("chunk-overlay", color, 0.18)}
+					key={`terrain-model:${index}`}
+					castShadow
+					receiveShadow
+					geometry={source.geometry}
+					instances={worldField.terrainModelInstances}
+					material={source.material}
+					onPointerDown={onTerrainPointerDown}
 				/>
 			))}
 
@@ -251,5 +251,6 @@ export function InstancedWorldField({ chunks, chunkSize }: { chunks: WorldChunkS
 	);
 }
 
+useGLTF.preload(TERRAIN_MODEL_PATH);
 useGLTF.preload(FLOWERS_MODEL_PATH);
 useGLTF.preload(HIVE_MODEL_PATH);

@@ -74,6 +74,7 @@ export function App() {
             <GameViewport
               chunks={gameSession.chunks}
               chunkSize={gameSession.chunkSize}
+              renderDistance={gameSession.renderDistance}
               connectionState={gameSession.connectionState}
               localPlayerId={gameSession.localPlayerId}
               onPerformanceChange={setRenderPerformance}

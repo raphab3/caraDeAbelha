@@ -19,7 +19,7 @@ const maxUsernameLength = 24
 const defaultPlayerSpeed = 3.0
 const movementStopDistance = 0.08
 const worldChunkSize = 4.0
-const worldRenderDistance = 1
+const worldRenderDistance = 3
 const worldTickInterval = 120 * time.Millisecond
 const worldDecorationPadding = 0.55
 
@@ -345,13 +345,10 @@ func (hub *gameHub) collectClientSnapshots() []clientSnapshot {
 
 func (hub *gameHub) snapshotForPlayerLocked(viewer *playerState) worldStateMessage {
 	centerChunkX, centerChunkY := playerChunkPosition(viewer)
+
+	// Todos os jogadores são sempre incluídos — o cliente filtra por distância para o render 3D
 	players := make([]playerState, 0, len(hub.players))
 	for _, player := range hub.players {
-		playerChunkX, playerChunkY := playerChunkPosition(player)
-		if !isChunkWithinDistance(centerChunkX, centerChunkY, playerChunkX, playerChunkY, worldRenderDistance) {
-			continue
-		}
-
 		players = append(players, *player)
 	}
 
