@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 
 import { GameViewport } from "./components/GameViewport";
 import { LoginGate } from "./components/LoginGate";
@@ -10,12 +10,17 @@ import { useGameSession } from "./hooks/useGameSession";
 import type { RenderPerformanceSnapshot } from "./types/game";
 
 const USERNAME_STORAGE_KEY = "cara-de-abelha.username";
+const MapGenerator = lazy(() => import("./components/MapGenerator"));
+
+function isMapGeneratorPath(pathname: string): boolean {
+  return pathname === "/dev/mapa" || pathname === "/dev/mapa/";
+}
 
 function readStoredUsername(): string {
   return window.localStorage.getItem(USERNAME_STORAGE_KEY)?.trim() ?? "";
 }
 
-export function App() {
+function GameApp() {
   const [draftUsername, setDraftUsername] = useState(readStoredUsername);
   const [activeUsername, setActiveUsername] = useState<string>();
   const [formError, setFormError] = useState<string>();
@@ -122,4 +127,26 @@ export function App() {
       </section>
     </main>
   );
+}
+
+export function App() {
+  const pathname = typeof window === "undefined" ? "/" : window.location.pathname;
+
+  if (isMapGeneratorPath(pathname)) {
+    return (
+      <Suspense
+        fallback={
+          <main className="app-shell">
+            <section className="hero-copy" aria-label="Carregando gerador de mapa">
+              <h1>Carregando gerador de mapa...</h1>
+            </section>
+          </main>
+        }
+      >
+        <MapGenerator />
+      </Suspense>
+    );
+  }
+
+  return <GameApp />;
 }
