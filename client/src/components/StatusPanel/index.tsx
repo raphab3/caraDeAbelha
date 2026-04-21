@@ -37,6 +37,10 @@ function getConnectionLabel(gameSession: GameSessionState): string {
 
 export function StatusPanel({ backendHealth, gameSession, apiUrl, wsUrl }: StatusPanelProps) {
   const statusClassName = `status-pill status-pill--${backendHealth.state}`;
+  const activeWorldObjects = gameSession.chunks.reduce(
+    (total, chunk) => total + chunk.flowers.length + chunk.hives.length,
+    0,
+  );
 
   return (
     <aside className="status-panel" aria-label="Estado atual do ambiente">
@@ -45,7 +49,7 @@ export function StatusPanel({ backendHealth, gameSession, apiUrl, wsUrl }: Statu
       <div className="status-grid">
         <article className="status-card">
           <h2>Infra pronta</h2>
-          <p>React, Three.js e React Three Fiber configurados em uma base minima para crescer por fases.</p>
+          <p>Fog, chao em esteira e mundo por chunks ativos mantem a cena leve mesmo quando ela cresce.</p>
         </article>
 
         <article className="status-card">
@@ -60,7 +64,19 @@ export function StatusPanel({ backendHealth, gameSession, apiUrl, wsUrl }: Statu
 
         <article className="status-card">
           <h2>Jogadores</h2>
-          <p>{gameSession.players.length} conectados na cena autoritativa</p>
+          <p>{gameSession.players.length} jogadores no raio visivel da sua abelha</p>
+        </article>
+
+        <article className="status-card">
+          <h2>Chunks ativos</h2>
+          <p>
+            {gameSession.chunks.length} carregados com raio {gameSession.renderDistance} e chunk de {gameSession.chunkSize || "-"}
+          </p>
+        </article>
+
+        <article className="status-card">
+          <h2>Mundo visivel</h2>
+          <p>{activeWorldObjects} flores e colmeias renderizadas agora</p>
         </article>
 
         <article className="status-card">

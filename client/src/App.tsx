@@ -69,6 +69,8 @@ export function App() {
         <div className="experience-stage" ref={targetRef}>
           <div className="viewport-shell">
             <GameViewport
+              chunks={gameSession.chunks}
+              chunkSize={gameSession.chunkSize}
               connectionState={gameSession.connectionState}
               localPlayerId={gameSession.localPlayerId}
               onMoveToTarget={gameSession.moveToTarget}
