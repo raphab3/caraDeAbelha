@@ -23,6 +23,11 @@ export interface WorldStateMessage {
   players: WorldPlayerState[];
 }
 
+export interface SessionMessage {
+  type: "session";
+  playerId: string;
+}
+
 export type MoveDirection = "up" | "down" | "left" | "right";
 
 export interface MoveAction {
@@ -31,10 +36,11 @@ export interface MoveAction {
 }
 
 export type ClientMessage = MoveAction;
-export type ServerMessage = WorldStateMessage;
+export type ServerMessage = SessionMessage | WorldStateMessage;
 
 export interface GameSessionState {
   connectionState: "connecting" | "connected" | "disconnected";
+  localPlayerId?: string;
   players: WorldPlayerState[];
   tick: number;
   error?: string;

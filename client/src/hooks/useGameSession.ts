@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { WS_URL } from "../game/env";
 import { WSClient } from "../game/WSClient";
-import type { GameSessionState, MoveDirection, WorldStateMessage } from "../types/game";
+import type { GameSessionState, MoveDirection, SessionMessage, WorldStateMessage } from "../types/game";
 
 const INITIAL_STATE: GameSessionState = {
   connectionState: "connecting",
@@ -29,6 +29,14 @@ function isWorldStateMessage(message: unknown): message is WorldStateMessage {
   return "type" in message && message.type === "state";
 }
 
+function isSessionMessage(message: unknown): message is SessionMessage {
+  if (typeof message !== "object" || message === null) {
+    return false;
+  }
+
+  return "type" in message && message.type === "session";
+}
+
 export function useGameSession(): GameSessionState {
   const [gameSession, setGameSession] = useState<GameSessionState>(INITIAL_STATE);
   const clientRef = useRef<WSClient | null>(null);
@@ -47,26 +55,39 @@ export function useGameSession(): GameSessionState {
         }));
       },
       onMessage: (message) => {
+        if (isSessionMessage(message)) {
+          setGameSession((current) => ({
+            ...current,
+            localPlayerId: message.playerId,
+          }));
+          return;
+        }
+
         if (!isWorldStateMessage(message)) {
           return;
         }
 
-        setGameSession({
+        setGameSession((current) => ({
+          ...current,
           connectionState: "connected",
           players: message.players,
           tick: message.tick,
-        });
+          error: undefined,
+        }));
       },
       onClose: () => {
-        setGameSession((current) => ({
-          ...current,
+        setGameSession({
           connectionState: "disconnected",
-        }));
+          players: [],
+          tick: 0,
+          error: undefined,
+        });
       },
       onError: () => {
         setGameSession((current) => ({
           ...current,
           connectionState: "disconnected",
+          localPlayerId: undefined,
           error: "falha ao conectar no websocket do jogo",
         }));
       },

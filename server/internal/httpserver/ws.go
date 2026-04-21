@@ -23,6 +23,11 @@ type playerState struct {
 	Y  int    `json:"y"`
 }
 
+type sessionMessage struct {
+	Type     string `json:"type"`
+	PlayerID string `json:"playerId"`
+}
+
 type worldStateMessage struct {
 	Type    string        `json:"type"`
 	Tick    uint64        `json:"tick"`
@@ -64,6 +69,10 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client, initialState := hub.register(connection)
+	hub.sendToClient(client, sessionMessage{
+		Type:     "session",
+		PlayerID: client.id,
+	})
 	hub.broadcast(initialState)
 
 	defer func() {
@@ -160,13 +169,17 @@ func (hub *gameHub) broadcast(message worldStateMessage) {
 	clients := hub.listClients()
 
 	for _, client := range clients {
-		client.writeMu.Lock()
-		err := client.conn.WriteJSON(message)
-		client.writeMu.Unlock()
+		err := hub.writeJSON(client, message)
 
 		if err != nil {
 			log.Printf("websocket write failed for %s: %v", client.id, err)
 		}
+	}
+}
+
+func (hub *gameHub) sendToClient(client *clientSession, message sessionMessage) {
+	if err := hub.writeJSON(client, message); err != nil {
+		log.Printf("websocket write failed for %s: %v", client.id, err)
 	}
 }
 
@@ -197,6 +210,13 @@ func (hub *gameHub) snapshotLocked() worldStateMessage {
 		Tick:    hub.tick,
 		Players: players,
 	}
+}
+
+func (hub *gameHub) writeJSON(client *clientSession, message any) error {
+	client.writeMu.Lock()
+	defer client.writeMu.Unlock()
+
+	return client.conn.WriteJSON(message)
 }
 
 func clampToWorld(value int) int {

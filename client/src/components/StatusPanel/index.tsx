@@ -60,6 +60,11 @@ export function StatusPanel({ backendHealth, gameSession, apiUrl, wsUrl }: Statu
         </article>
 
         <article className="status-card">
+          <h2>Jogador local</h2>
+          <p>{gameSession.localPlayerId ?? "aguardando session do servidor"}</p>
+        </article>
+
+        <article className="status-card">
           <h2>Controles</h2>
           <p>Use WASD ou setas. O client envia apenas a intencao e o servidor responde com o novo estado.</p>
         </article>

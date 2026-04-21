@@ -25,8 +25,12 @@ export class WSClient {
     });
 
     socket.addEventListener("message", (event) => {
-      const message = JSON.parse(event.data) as ServerMessage;
-      handlers.onMessage(message);
+      try {
+        const message = JSON.parse(event.data) as ServerMessage;
+        handlers.onMessage(message);
+      } catch {
+        handlers.onError?.(new Event("messageerror"));
+      }
     });
 
     socket.addEventListener("close", (event) => {
