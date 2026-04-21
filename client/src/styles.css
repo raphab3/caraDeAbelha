@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   color: #1f140c;
   background:
@@ -49,7 +51,7 @@ body::after {
 }
 
 #app {
-  padding: 28px;
+  min-height: 100vh;
 }
 
 .app-shell {
@@ -57,6 +59,74 @@ body::after {
   margin: 0 auto;
   display: grid;
   gap: 24px;
+  padding: 28px;
+}
+
+.player-experience {
+  width: 100%;
+  min-height: 100vh;
+}
+
+.player-experience--immersive {
+  min-height: 100vh;
+}
+
+.player-experience__stage {
+  position: relative;
+  isolation: isolate;
+}
+
+.player-experience__stage--immersive {
+  min-height: 100vh;
+}
+
+.player-preview-shell {
+  position: relative;
+}
+
+.player-viewport-shell {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: #050505;
+  box-shadow: none;
+}
+
+.player-login-backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 213, 102, 0.2), transparent 22%),
+    radial-gradient(circle at 82% 16%, rgba(113, 167, 76, 0.24), transparent 24%),
+    radial-gradient(circle at 50% 100%, rgba(255, 173, 51, 0.16), transparent 34%),
+    linear-gradient(180deg, #050507 0%, #140d09 52%, #24160a 100%);
+}
+
+.player-login-backdrop::before,
+.player-login-backdrop::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(48px);
+  opacity: 0.65;
+}
+
+.player-login-backdrop::before {
+  width: min(48vw, 420px);
+  height: min(48vw, 420px);
+  top: 8%;
+  right: -8%;
+  background: rgba(255, 206, 92, 0.22);
+}
+
+.player-login-backdrop::after {
+  width: min(56vw, 520px);
+  height: min(56vw, 520px);
+  left: -12%;
+  bottom: -18%;
+  background: rgba(92, 146, 62, 0.18);
 }
 
 .hero-copy {

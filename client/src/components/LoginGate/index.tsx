@@ -5,19 +5,19 @@ interface LoginGateProps {
   error?: string;
   connectionState: GameSessionState["connectionState"];
   onUsernameChange: (value: string) => void;
-  onSubmit: () => void;
+  onSubmit: () => void | Promise<void>;
 }
 
 function getButtonLabel(connectionState: GameSessionState["connectionState"]): string {
   if (connectionState === "connecting") {
-    return "Conectando...";
+    return "Abrindo o jardim...";
   }
 
   if (connectionState === "disconnected") {
     return "Tentar entrar de novo";
   }
 
-  return "Entrar no jardim";
+  return "Comecar aventura";
 }
 
 export function LoginGate({ username, error, connectionState, onUsernameChange, onSubmit }: LoginGateProps) {
@@ -29,14 +29,13 @@ export function LoginGate({ username, error, connectionState, onUsernameChange, 
         className="login-card"
         onSubmit={(event) => {
           event.preventDefault();
-          onSubmit();
+          void onSubmit();
         }}
       >
-        <p className="login-eyebrow">Entrada local</p>
-        <h2>Escolha seu username</h2>
+        <p className="login-eyebrow">Entrada do enxame</p>
+        <h2>Escolha sua abelha</h2>
         <p className="login-copy">
-          O nome identifica sua abelha nesta sessao. Se voce entrar de novo com o mesmo username,
-          o servidor recarrega o estado salvo desse jogador.
+          Ao entrar, o jardim abre em tela cheia e tenta recuperar o progresso salvo para esse username.
         </p>
 
         <label className="login-field" htmlFor="username">

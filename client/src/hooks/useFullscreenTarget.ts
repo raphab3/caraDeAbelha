@@ -4,6 +4,7 @@ interface FullscreenTargetState<T extends HTMLElement> {
   targetRef: MutableRefObject<T | null>;
   isFullscreen: boolean;
   isSupported: boolean;
+  requestFullscreen: () => Promise<void>;
   toggleFullscreen: () => Promise<void>;
 }
 
@@ -18,6 +19,7 @@ export function useFullscreenTarget<T extends HTMLElement>(): FullscreenTargetSt
 
       setIsFullscreen(document.fullscreenElement === target);
       setIsSupported(
+        document.fullscreenEnabled !== false &&
         typeof document.exitFullscreen === "function" &&
           typeof target?.requestFullscreen === "function",
       );
@@ -30,6 +32,24 @@ export function useFullscreenTarget<T extends HTMLElement>(): FullscreenTargetSt
       document.removeEventListener("fullscreenchange", syncFullscreenState);
     };
   }, []);
+
+  async function requestFullscreen() {
+    const target = targetRef.current;
+
+    if (!target || typeof target.requestFullscreen !== "function") {
+      return;
+    }
+
+    try {
+      if (document.fullscreenElement === target) {
+        return;
+      }
+
+      await target.requestFullscreen();
+    } catch (error) {
+      console.error("fullscreen request failed", error);
+    }
+  }
 
   async function toggleFullscreen() {
     const target = targetRef.current;
@@ -44,7 +64,7 @@ export function useFullscreenTarget<T extends HTMLElement>(): FullscreenTargetSt
         return;
       }
 
-      await target.requestFullscreen();
+      await requestFullscreen();
     } catch (error) {
       console.error("fullscreen toggle failed", error);
     }
@@ -54,6 +74,7 @@ export function useFullscreenTarget<T extends HTMLElement>(): FullscreenTargetSt
     targetRef,
     isFullscreen,
     isSupported,
+    requestFullscreen,
     toggleFullscreen,
   };
 }

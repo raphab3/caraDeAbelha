@@ -1,152 +1,83 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 
-import { GameViewport } from "./components/GameViewport";
-import { LoginGate } from "./components/LoginGate";
-import { StatusPanel } from "./components/StatusPanel";
-import { API_URL, WS_URL } from "./game/env";
-import { useFullscreenTarget } from "./hooks/useFullscreenTarget";
-import { useBackendHealth } from "./hooks/useBackendHealth";
-import { useGameSession } from "./hooks/useGameSession";
-import type { RenderPerformanceSnapshot } from "./types/game";
+import { AdminDashboard } from "./components/AdminDashboard";
+import { AdminLayout } from "./components/AdminLayout";
+import { AdminInfoPanel } from "./components/AdminInfoPanel";
 
-const USERNAME_STORAGE_KEY = "cara-de-abelha.username";
 const MapGenerator = lazy(() => import("./components/MapGenerator"));
+const PlayerExperience = lazy(() => import("./components/PlayerExperience"));
 
-function isMapGeneratorPath(pathname: string): boolean {
-  return pathname === "/dev/mapa" || pathname === "/dev/mapa/";
+interface RouteFallbackProps {
+  title: string;
+  description: string;
 }
 
-function readStoredUsername(): string {
-  return window.localStorage.getItem(USERNAME_STORAGE_KEY)?.trim() ?? "";
-}
-
-function GameApp() {
-  const [draftUsername, setDraftUsername] = useState(readStoredUsername);
-  const [activeUsername, setActiveUsername] = useState<string>();
-  const [formError, setFormError] = useState<string>();
-  const [renderPerformance, setRenderPerformance] = useState<RenderPerformanceSnapshot>({
-    fps: 0,
-    drawCalls: 0,
-    triangles: 0,
-    geometries: 0,
-    textures: 0,
-  });
-  const backendHealth = useBackendHealth();
-  const gameSession = useGameSession(activeUsername);
-  const { targetRef, isFullscreen, isSupported, toggleFullscreen } =
-    useFullscreenTarget<HTMLDivElement>();
-
-  useEffect(() => {
-    if (gameSession.connectionState !== "connected" || !gameSession.localUsername) {
-      return;
-    }
-
-    window.localStorage.setItem(USERNAME_STORAGE_KEY, gameSession.localUsername);
-  }, [gameSession.connectionState, gameSession.localUsername]);
-
-  const loginError =
-    formError ??
-    (activeUsername && gameSession.connectionState === "disconnected" ? gameSession.error : undefined);
-
-  const showLoginGate = !gameSession.localPlayerId;
-
-  const handleJoin = () => {
-    const normalizedUsername = draftUsername.trim();
-
-    if (!normalizedUsername) {
-      setFormError("Escolha um username para entrar no jogo.");
-      return;
-    }
-
-    if (normalizedUsername.length > 24) {
-      setFormError("Use no maximo 24 caracteres no username.");
-      return;
-    }
-
-    setFormError(undefined);
-    setActiveUsername(normalizedUsername);
-  };
-
+function RouteFallback({ title, description }: RouteFallbackProps) {
   return (
-    <main className="app-shell">
-      <section className="hero-copy" aria-label="Resumo do projeto">
-        <h1>Sem Cara de Abelha</h1>
-      </section>
-
-      <section className="experience-card" aria-label="Viewport 3D inicial">
-        <div className="experience-stage" ref={targetRef}>
-          <div className="viewport-shell">
-            <GameViewport
-              chunks={gameSession.chunks}
-              chunkSize={gameSession.chunkSize}
-              renderDistance={gameSession.renderDistance}
-              connectionState={gameSession.connectionState}
-              localPlayerId={gameSession.localPlayerId}
-              onPerformanceChange={setRenderPerformance}
-              onMoveToTarget={gameSession.moveToTarget}
-              onRespawn={gameSession.respawn}
-              players={gameSession.players}
-            />
-          </div>
-
-          {showLoginGate ? (
-            <LoginGate
-              connectionState={gameSession.connectionState}
-              error={loginError}
-              onSubmit={handleJoin}
-              onUsernameChange={(value) => {
-                setDraftUsername(value);
-                setFormError(undefined);
-              }}
-              username={draftUsername}
-            />
-          ) : null}
-
-          {isSupported ? (
-            <button
-              aria-label={isFullscreen ? "Sair da tela cheia" : "Entrar em tela cheia"}
-              aria-pressed={isFullscreen}
-              className="viewport-fullscreen-toggle"
-              onClick={() => {
-                void toggleFullscreen();
-              }}
-              type="button"
-            >
-              {isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
-            </button>
-          ) : null}
-        </div>
-
-        <StatusPanel
-          backendHealth={backendHealth}
-          gameSession={gameSession}
-          apiUrl={API_URL}
-          renderPerformance={renderPerformance}
-          wsUrl={WS_URL}
-        />
-      </section>
+    <main className="grid min-h-screen place-items-center bg-slate-950 px-6 text-slate-50">
+      <div className="w-full max-w-lg rounded-[32px] border border-white/10 bg-white/5 p-8 shadow-[0_28px_80px_rgba(15,23,42,0.35)] backdrop-blur">
+        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/70">Cara de Abelha</p>
+        <h1 className="mt-4 text-3xl font-semibold text-white">{title}</h1>
+        <p className="mt-3 text-sm leading-7 text-slate-300">{description}</p>
+      </div>
     </main>
   );
 }
 
+function AdminToolsRoute() {
+  return (
+    <AdminLayout
+      description="Acompanhe a saude do servidor, valide endpoints e abra as ferramentas internas sem misturar esse fluxo com o jogo principal."
+      title="Dashboard do servidor"
+    >
+      <AdminDashboard />
+    </AdminLayout>
+  );
+}
+
+function AdminMapGeneratorRoute() {
+  return (
+    <AdminLayout
+      description="Prototipe terrenos, ajuste seeds e exporte JSONs de mapa a partir de uma rota isolada das operacoes do servidor."
+      title="Gerador de mapas"
+    >
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
+        <Suspense
+          fallback={
+            <div className="grid min-h-[420px] place-items-center rounded-[28px] border border-white/10 bg-slate-950/70 px-6 text-center text-slate-300">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-200/70">Admin</p>
+                <p className="mt-3 text-base">Carregando gerador de fases...</p>
+              </div>
+            </div>
+          }
+        >
+          <MapGenerator />
+        </Suspense>
+
+        <AdminInfoPanel />
+      </div>
+    </AdminLayout>
+  );
+}
+
 export function App() {
-  const pathname = typeof window === "undefined" ? "/" : window.location.pathname;
-
-  if (isMapGeneratorPath(pathname)) {
-    return (
-      <Suspense
-        fallback={
-          <main className="app-shell">
-            <section className="hero-copy" aria-label="Carregando gerador de mapa">
-              <h1>Carregando gerador de mapa...</h1>
-            </section>
-          </main>
-        }
-      >
-        <MapGenerator />
-      </Suspense>
-    );
-  }
-
-  return <GameApp />;
+  return (
+    <Suspense
+      fallback={
+        <RouteFallback
+          title="Preparando a rota"
+          description="Separando a experiencia do jogador das ferramentas internas."
+        />
+      }
+    >
+      <Routes>
+        <Route path="/" element={<PlayerExperience />} />
+        <Route path="/admin" element={<AdminToolsRoute />} />
+        <Route path="/admin/mapas" element={<AdminMapGeneratorRoute />} />
+        <Route path="*" element={<Navigate replace to="/" />} />
+      </Routes>
+    </Suspense>
+  );
 }

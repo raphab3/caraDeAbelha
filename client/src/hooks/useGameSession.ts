@@ -109,7 +109,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return target.isContentEditable || tagName === "input" || tagName === "textarea" || tagName === "select";
 }
 
-export function useGameSession(username?: string): GameSessionController {
+export function useGameSession(username?: string, reconnectKey = 0): GameSessionController {
   const [gameSession, setGameSession] = useState<GameSessionState>(createInitialState("idle"));
   const clientRef = useRef<WSClient | null>(null);
   const pressedDirectionsRef = useRef<RelativeMoveDirection[]>([]);
@@ -223,7 +223,7 @@ export function useGameSession(username?: string): GameSessionController {
         clientRef.current = null;
       }
     };
-  }, [username]);
+  }, [reconnectKey, username]);
 
   useEffect(() => {
     const localPlayer = gameSession.localPlayerId
