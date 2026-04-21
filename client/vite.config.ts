@@ -1,9 +1,11 @@
+import { fileURLToPath } from "node:url";
+
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     react(),
     tailwindcss(),
@@ -36,6 +38,10 @@ export default defineConfig({
         navigateFallback: "index.html",
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
       },
+      devOptions: {
+        enabled: command === "serve",
+        resolveTempFolder: () => fileURLToPath(new URL("./.vite/pwa-dev", import.meta.url)),
+      },
     }),
   ],
   server: {
@@ -46,4 +52,4 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 4173,
   },
-});
+}));

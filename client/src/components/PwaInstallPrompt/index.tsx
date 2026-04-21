@@ -7,9 +7,13 @@ export function PwaInstallPrompt() {
   const [isPrompting, setIsPrompting] = useState(false);
   const { canInstall, isInstalled, isIosManualInstall, promptInstall } = usePwaInstallPrompt();
 
-  if (isDismissed || isInstalled || (!canInstall && !isIosManualInstall)) {
+  if (isDismissed || isInstalled) {
     return null;
   }
+
+  const installHint = isIosManualInstall
+    ? "No Safari do iPhone ou iPad, toque em Compartilhar e depois em Adicionar a Tela de Inicio."
+    : "Se o botao de instalar nao aparecer sozinho, abra o menu do navegador ou teste no Chrome/Edge para instalar o app.";
 
   async function handleInstall() {
     setIsPrompting(true);
@@ -29,12 +33,7 @@ export function PwaInstallPrompt() {
         <p className="player-install-banner__text">
           Abra mais rapido, entre com menos distracoes do navegador e volte para a aventura com um toque.
         </p>
-
-        {isIosManualInstall ? (
-          <p className="player-install-banner__hint">
-            No Safari do iPhone ou iPad, toque em Compartilhar e depois em Adicionar a Tela de Inicio.
-          </p>
-        ) : null}
+        <p className="player-install-banner__hint">{installHint}</p>
       </div>
 
       <div className="player-install-banner__actions">
