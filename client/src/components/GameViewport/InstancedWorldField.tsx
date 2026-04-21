@@ -20,6 +20,7 @@ import {
 	toTerrainBlockCenterY,
 	toTerrainSurfaceY,
 } from "./worldSurface";
+import type { TapTargetingHandlers } from "./useTapTargeting";
 
 const TERRAIN_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/block-grass.glb";
 const FLOWERS_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/flowers.glb";
@@ -187,14 +188,20 @@ function InstancedLayer({
 	geometry,
 	castShadow = false,
 	receiveShadow = false,
+	onPointerCancel,
 	onPointerDown,
+	onPointerMove,
+	onPointerUp,
 }: {
 	instances: InstanceConfig[];
 	material: Material;
 	geometry: BufferGeometry;
 	castShadow?: boolean;
 	receiveShadow?: boolean;
+	onPointerCancel?: (event: ThreeEvent<PointerEvent>) => void;
 	onPointerDown?: (event: ThreeEvent<PointerEvent>) => void;
+	onPointerMove?: (event: ThreeEvent<PointerEvent>) => void;
+	onPointerUp?: (event: ThreeEvent<PointerEvent>) => void;
 }) {
 	const meshRef = useRef<InstancedMesh>(null);
 	const dummy = useMemo(() => new Object3D(), []);
@@ -241,7 +248,10 @@ function InstancedLayer({
 			ref={meshRef}
 			args={[geometry, material, instances.length]}
 			castShadow={castShadow}
+			onPointerCancel={onPointerCancel}
 			onPointerDown={onPointerDown}
+			onPointerMove={onPointerMove}
+			onPointerUp={onPointerUp}
 			receiveShadow={receiveShadow}
 			frustumCulled={false}
 		/>
@@ -252,12 +262,12 @@ export function InstancedWorldField({
 	chunks,
 	chunkSize,
 	detailFocus,
-	onTerrainPointerDown,
+	terrainPointerHandlers,
 }: {
 	chunks: WorldChunkState[];
 	chunkSize: number;
 	detailFocus?: DetailFocus;
-	onTerrainPointerDown?: (event: ThreeEvent<PointerEvent>) => void;
+	terrainPointerHandlers?: TapTargetingHandlers;
 }) {
 	const worldField = useMemo(
 		() => buildWorldField(chunks, detailFocus),
@@ -320,7 +330,10 @@ export function InstancedWorldField({
 					geometry={source.geometry}
 					instances={worldField.grassTerrainInstances}
 					material={source.material}
-					onPointerDown={onTerrainPointerDown}
+					onPointerCancel={terrainPointerHandlers?.onPointerCancel}
+					onPointerDown={terrainPointerHandlers?.onPointerDown}
+					onPointerMove={terrainPointerHandlers?.onPointerMove}
+					onPointerUp={terrainPointerHandlers?.onPointerUp}
 				/>
 			))}
 
@@ -330,7 +343,10 @@ export function InstancedWorldField({
 				geometry={terrainBoxGeometry}
 				instances={worldField.stoneTerrainInstances}
 				material={stoneMaterial}
-				onPointerDown={onTerrainPointerDown}
+				onPointerCancel={terrainPointerHandlers?.onPointerCancel}
+				onPointerDown={terrainPointerHandlers?.onPointerDown}
+				onPointerMove={terrainPointerHandlers?.onPointerMove}
+				onPointerUp={terrainPointerHandlers?.onPointerUp}
 			/>
 
 			<InstancedLayer
@@ -338,7 +354,10 @@ export function InstancedWorldField({
 				geometry={terrainBoxGeometry}
 				instances={worldField.waterTerrainInstances}
 				material={waterMaterial}
-				onPointerDown={onTerrainPointerDown}
+				onPointerCancel={terrainPointerHandlers?.onPointerCancel}
+				onPointerDown={terrainPointerHandlers?.onPointerDown}
+				onPointerMove={terrainPointerHandlers?.onPointerMove}
+				onPointerUp={terrainPointerHandlers?.onPointerUp}
 			/>
 
 			{flowerMeshSources.map((source, index) => (

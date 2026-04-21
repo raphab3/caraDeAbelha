@@ -1,6 +1,6 @@
 import { Html, OrbitControls } from "@react-three/drei";
 import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
-import { Suspense, type ElementRef, type MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, type ElementRef, type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BoxGeometry,
   CircleGeometry,
@@ -21,6 +21,7 @@ import type { Group, Mesh } from "three";
 import { InstancedWorldField } from "./InstancedWorldField";
 import { AtmosphereBackdrop } from "./AtmosphereBackdrop";
 import { MiniMap } from "./MiniMap";
+import { type TapTargetingConfig, type TapTargetingHandlers, useTapTargeting } from "./useTapTargeting";
 import type {
   GameSessionState,
   RenderPerformanceSnapshot,
@@ -736,14 +737,14 @@ function RendererMetricsReporter({ onChange }: { onChange: (snapshot: RenderPerf
 
 function InfiniteGround({
   focusPlayer,
-  trackedPositionRef,
-  onPointerDown,
+  pointerHandlers,
   size,
+  trackedPositionRef,
 }: {
   focusPlayer?: WorldPlayerState;
-  trackedPositionRef: MutableRefObject<Vector3>;
-  onPointerDown: (event: ThreeEvent<PointerEvent>) => void;
+  pointerHandlers: TapTargetingHandlers;
   size: number;
+  trackedPositionRef: MutableRefObject<Vector3>;
 }) {
   const groundRef = useRef<Mesh>(null);
 
@@ -761,7 +762,10 @@ function InfiniteGround({
     <mesh
       ref={groundRef}
       receiveShadow
-      onPointerDown={onPointerDown}
+      onPointerCancel={pointerHandlers.onPointerCancel}
+      onPointerDown={pointerHandlers.onPointerDown}
+      onPointerMove={pointerHandlers.onPointerMove}
+      onPointerUp={pointerHandlers.onPointerUp}
       rotation={[-Math.PI / 2, 0, 0]}
       position={[0, GROUND_HEIGHT, 0]}
     >
@@ -782,6 +786,7 @@ interface HiveCoreProps {
   localPlayerId?: string;
   localPlayerPositionRef: MutableRefObject<Vector3>;
   onMoveToTarget: (x: number, z: number) => void;
+  tapTargetingConfig?: Partial<TapTargetingConfig>;
 }
 
 function HiveCore({
@@ -795,9 +800,11 @@ function HiveCore({
   localPlayerId,
   localPlayerPositionRef,
   onMoveToTarget,
+  tapTargetingConfig,
 }: HiveCoreProps) {
   const [moveTargetMarker, setMoveTargetMarker] = useState<MoveTargetMarkerState | null>(null);
   const surfaceIndex = useMemo(() => buildWorldSurfaceIndex(chunks), [chunks]);
+  const canvasWidth = useThree((state) => state.size.width);
   const localPlayer = useMemo(
     () => players.find((player) => player.id === localPlayerId),
     [localPlayerId, players],
@@ -811,12 +818,39 @@ function HiveCore({
     [localPlayer],
   );
 
+  const handleTargetTap = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      if (connectionState !== "connected" || !localPlayerId) {
+        return;
+      }
+
+      const worldX = toWorldAxis(event.point.x);
+      const worldZ = toWorldAxis(event.point.z);
+
+      setMoveTargetMarker({
+        sceneX: toSceneAxis(worldX),
+        sceneY: resolveTargetMarkerSceneY(surfaceIndex, worldX, worldZ),
+        sceneZ: toSceneAxis(worldZ),
+      });
+
+      onMoveToTarget(worldX, worldZ);
+    },
+    [connectionState, localPlayerId, onMoveToTarget, surfaceIndex],
+  );
+
+  const { pointerHandlers, resetPendingTap } = useTapTargeting({
+    canvasWidth,
+    config: tapTargetingConfig,
+    onTap: handleTargetTap,
+  });
+
   useEffect(() => {
     if (connectionState !== "connected" || !localPlayerId) {
       setMoveTargetMarker(null);
       localPlayerPositionRef.current.set(Number.NaN, Number.NaN, Number.NaN);
+      resetPendingTap();
     }
-  }, [connectionState, localPlayerId, localPlayerPositionRef]);
+  }, [connectionState, localPlayerId, localPlayerPositionRef, resetPendingTap]);
 
   useEffect(() => {
     if (!localPlayer) {
@@ -850,25 +884,6 @@ function HiveCore({
     }
   });
 
-  const handleGroundPointerDown = (event: ThreeEvent<PointerEvent>) => {
-    if (event.button !== 0 || connectionState !== "connected" || !localPlayerId) {
-      return;
-    }
-
-    event.stopPropagation();
-
-    const worldX = toWorldAxis(event.point.x);
-    const worldZ = toWorldAxis(event.point.z);
-
-    setMoveTargetMarker({
-      sceneX: toSceneAxis(worldX),
-      sceneY: resolveTargetMarkerSceneY(surfaceIndex, worldX, worldZ),
-      sceneZ: toSceneAxis(worldZ),
-    });
-
-    onMoveToTarget(worldX, worldZ);
-  };
-
   return (
     <group>
       <AtmosphereBackdrop />
@@ -890,7 +905,7 @@ function HiveCore({
       />
       <InfiniteGround
         focusPlayer={localPlayer}
-        onPointerDown={handleGroundPointerDown}
+        pointerHandlers={pointerHandlers}
         size={groundInputSize}
         trackedPositionRef={localPlayerPositionRef}
       />
@@ -899,7 +914,7 @@ function HiveCore({
           chunkSize={chunkSize}
           chunks={chunks}
           detailFocus={detailFocus}
-          onTerrainPointerDown={handleGroundPointerDown}
+          terrainPointerHandlers={pointerHandlers}
         />
       </Suspense>
 
@@ -939,6 +954,7 @@ interface GameViewportProps {
   onPerformanceChange: (snapshot: RenderPerformanceSnapshot) => void;
   onMoveToTarget: (x: number, z: number) => void;
   onRespawn: () => void;
+  tapTargetingConfig?: Partial<TapTargetingConfig>;
 }
 
 function toChunkCoord(worldPos: number, chunkSize: number): number {
@@ -955,6 +971,7 @@ export function GameViewport({
   onPerformanceChange,
   onMoveToTarget,
   onRespawn,
+  tapTargetingConfig,
 }: GameViewportProps) {
   const localPlayer = useMemo(
     () => players.find((player) => player.id === localPlayerId),
@@ -1011,6 +1028,7 @@ export function GameViewport({
           localPlayerId={localPlayerId}
           localPlayerPositionRef={localPlayerPositionRef}
           onMoveToTarget={onMoveToTarget}
+          tapTargetingConfig={tapTargetingConfig}
           players={nearbyPlayers}
         />
       </Canvas>

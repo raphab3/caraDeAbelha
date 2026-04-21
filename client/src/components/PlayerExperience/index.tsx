@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { GameViewport } from "../GameViewport";
 import { LoginGate } from "../LoginGate";
+import { PwaInstallPrompt } from "../PwaInstallPrompt";
 import { useFullscreenTarget } from "../../hooks/useFullscreenTarget";
 import { useGameSession } from "../../hooks/useGameSession";
 
@@ -134,6 +135,7 @@ export default function PlayerExperience() {
       </section>
 
       <section className="experience-card" aria-label="Entrada do jogador">
+        {!isFullscreen ? <PwaInstallPrompt /> : null}
         {renderStage()}
       </section>
     </main>
