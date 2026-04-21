@@ -7,6 +7,7 @@ import type {
   GameSessionState,
   MoveDirection,
   SessionMessage,
+  WorldPlayerState,
   WorldStateMessage,
 } from "../types/game";
 
@@ -27,16 +28,61 @@ function createInitialState(
   };
 }
 
-const KEY_TO_DIRECTION: Record<string, MoveDirection> = {
-  arrowup: "up",
-  w: "up",
-  arrowdown: "down",
-  s: "down",
+type RelativeMoveDirection = "forward" | "backward" | "left" | "right";
+
+const KEY_TO_DIRECTION: Record<string, RelativeMoveDirection> = {
+  arrowup: "forward",
+  w: "forward",
+  arrowdown: "backward",
+  s: "backward",
   arrowleft: "left",
   a: "left",
   arrowright: "right",
   d: "right",
 };
+
+const CLOCKWISE_DIRECTIONS: MoveDirection[] = ["up", "right", "down", "left"];
+
+function getHeadingDirection(player?: WorldPlayerState): MoveDirection | undefined {
+  if (player?.targetX === undefined || player.targetY === undefined) {
+    return undefined;
+  }
+
+  const deltaX = player.targetX - player.x;
+  const deltaY = player.targetY - player.y;
+
+  if (Math.abs(deltaX) < 0.001 && Math.abs(deltaY) < 0.001) {
+    return undefined;
+  }
+
+  if (Math.abs(deltaX) > Math.abs(deltaY)) {
+    return deltaX > 0 ? "right" : "left";
+  }
+
+  return deltaY > 0 ? "down" : "up";
+}
+
+function resolveRelativeDirection(
+  inputDirection: RelativeMoveDirection,
+  facingDirection: MoveDirection,
+): MoveDirection {
+  const facingIndex = CLOCKWISE_DIRECTIONS.indexOf(facingDirection);
+
+  if (facingIndex === -1) {
+    return "up";
+  }
+
+  switch (inputDirection) {
+    case "forward":
+      return CLOCKWISE_DIRECTIONS[facingIndex];
+    case "backward":
+      return CLOCKWISE_DIRECTIONS[(facingIndex + 2) % CLOCKWISE_DIRECTIONS.length];
+    case "left":
+      return CLOCKWISE_DIRECTIONS[(facingIndex + 3) % CLOCKWISE_DIRECTIONS.length];
+    case "right":
+      return CLOCKWISE_DIRECTIONS[(facingIndex + 1) % CLOCKWISE_DIRECTIONS.length];
+  }
+}
 
 function isWorldStateMessage(message: unknown): message is WorldStateMessage {
   if (typeof message !== "object" || message === null) {
@@ -66,11 +112,15 @@ function isEditableTarget(target: EventTarget | null): boolean {
 export function useGameSession(username?: string): GameSessionController {
   const [gameSession, setGameSession] = useState<GameSessionState>(createInitialState("idle"));
   const clientRef = useRef<WSClient | null>(null);
-  const pressedDirectionsRef = useRef<MoveDirection[]>([]);
+  const pressedDirectionsRef = useRef<RelativeMoveDirection[]>([]);
+  const localPlayerRef = useRef<WorldPlayerState | undefined>(undefined);
+  const facingDirectionRef = useRef<MoveDirection>("up");
 
   useEffect(() => {
     if (!username) {
       pressedDirectionsRef.current = [];
+      localPlayerRef.current = undefined;
+      facingDirectionRef.current = "up";
       clientRef.current?.disconnect();
       clientRef.current = null;
       setGameSession(createInitialState("idle"));
@@ -165,6 +215,8 @@ export function useGameSession(username?: string): GameSessionController {
     return () => {
       active = false;
       pressedDirectionsRef.current = [];
+      localPlayerRef.current = undefined;
+      facingDirectionRef.current = "up";
       client.disconnect();
 
       if (clientRef.current === client) {
@@ -174,7 +226,20 @@ export function useGameSession(username?: string): GameSessionController {
   }, [username]);
 
   useEffect(() => {
-    const syncPressedDirection = (direction: MoveDirection, pressed: boolean) => {
+    const localPlayer = gameSession.localPlayerId
+      ? gameSession.players.find((player) => player.id === gameSession.localPlayerId)
+      : undefined;
+
+    localPlayerRef.current = localPlayer;
+
+    const headingDirection = getHeadingDirection(localPlayer);
+    if (headingDirection) {
+      facingDirectionRef.current = headingDirection;
+    }
+  }, [gameSession.localPlayerId, gameSession.players]);
+
+  useEffect(() => {
+    const syncPressedDirection = (direction: RelativeMoveDirection, pressed: boolean) => {
       const directions = pressedDirectionsRef.current.filter((value) => value !== direction);
       if (pressed) {
         directions.push(direction);
@@ -215,10 +280,17 @@ export function useGameSession(username?: string): GameSessionController {
     };
 
     const intervalId = window.setInterval(() => {
-      const direction = pressedDirectionsRef.current.at(-1);
-      if (!direction) {
+      const inputDirection = pressedDirectionsRef.current.at(-1);
+      if (!inputDirection) {
         return;
       }
+
+      const headingDirection = getHeadingDirection(localPlayerRef.current);
+      if (headingDirection) {
+        facingDirectionRef.current = headingDirection;
+      }
+
+      const direction = resolveRelativeDirection(inputDirection, facingDirectionRef.current);
 
       clientRef.current?.send({
         type: "move",

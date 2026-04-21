@@ -4,6 +4,7 @@ import { type ElementRef, type MutableRefObject, useEffect, useMemo, useRef, use
 import { CanvasTexture, DoubleSide, MOUSE, MathUtils, RepeatWrapping, SRGBColorSpace, Vector3 } from "three";
 import type { Group, Mesh } from "three";
 
+import { MiniMap } from "./MiniMap";
 import type {
   GameSessionState,
   WorldChunkState,
@@ -643,23 +644,32 @@ export function GameViewport({
   const localPlayerPositionRef = useRef(new Vector3(Number.NaN, Number.NaN, Number.NaN));
 
   return (
-    <Canvas
-      camera={{ position: DEFAULT_CAMERA_POSITION, fov: DEFAULT_CAMERA_FOV }}
-      dpr={[1, 1.6]}
-      shadows
-      gl={{ antialias: true }}
-    >
-      <color attach="background" args={[SKY_COLOR]} />
-      <CameraRig focusPlayer={localPlayer} trackedPositionRef={localPlayerPositionRef} />
-      <HiveCore
-        chunks={chunks}
+    <div className="viewport-canvas-shell">
+      <Canvas
+        camera={{ position: DEFAULT_CAMERA_POSITION, fov: DEFAULT_CAMERA_FOV }}
+        dpr={[1, 1.6]}
+        shadows
+        gl={{ antialias: true }}
+      >
+        <color attach="background" args={[SKY_COLOR]} />
+        <CameraRig focusPlayer={localPlayer} trackedPositionRef={localPlayerPositionRef} />
+        <HiveCore
+          chunks={chunks}
+          chunkSize={chunkSize}
+          connectionState={connectionState}
+          localPlayerId={localPlayerId}
+          localPlayerPositionRef={localPlayerPositionRef}
+          onMoveToTarget={onMoveToTarget}
+          players={players}
+        />
+      </Canvas>
+
+      <MiniMap
         chunkSize={chunkSize}
-        connectionState={connectionState}
+        chunks={chunks}
         localPlayerId={localPlayerId}
-        localPlayerPositionRef={localPlayerPositionRef}
-        onMoveToTarget={onMoveToTarget}
         players={players}
       />
-    </Canvas>
+    </div>
   );
 }
