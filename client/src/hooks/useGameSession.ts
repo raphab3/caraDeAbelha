@@ -18,6 +18,11 @@ function createInitialState(
     connectionState,
     localUsername,
     players: [],
+    chunks: [],
+    centerChunkX: 0,
+    centerChunkY: 0,
+    renderDistance: 0,
+    chunkSize: 0,
     tick: 0,
   };
 }
@@ -115,6 +120,11 @@ export function useGameSession(username?: string): GameSessionController {
           ...current,
           connectionState: "connected",
           players: message.players,
+          chunks: message.chunks,
+          centerChunkX: message.centerChunkX,
+          centerChunkY: message.centerChunkY,
+          renderDistance: message.renderDistance,
+          chunkSize: message.chunkSize,
           tick: message.tick,
           error: undefined,
         }));
@@ -127,6 +137,11 @@ export function useGameSession(username?: string): GameSessionController {
         setGameSession((current) => ({
           connectionState: "disconnected",
           players: [],
+          chunks: [],
+          centerChunkX: 0,
+          centerChunkY: 0,
+          renderDistance: 0,
+          chunkSize: 0,
           tick: 0,
           localUsername: current.localUsername ?? username,
           error: current.error ?? (event.reason || undefined),

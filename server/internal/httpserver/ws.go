@@ -134,21 +134,20 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !hub.isUsernameAvailable(profileKey) {
-		http.Error(w, errUsernameInUse.Error(), http.StatusConflict)
-		return
-	}
-
 	connection, err := hub.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("websocket upgrade failed: %v", err)
 		return
 	}
 
-	client, err := hub.register(connection, profileKey, username)
+	client, replacedClient, err := hub.register(connection, profileKey, username)
 	if err != nil {
 		writeCloseMessage(connection, err.Error())
 		return
+	}
+
+	if replacedClient != nil {
+		_ = replacedClient.conn.Close()
 	}
 
 	hub.sendToClient(client, sessionMessage{
@@ -161,7 +160,7 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		_ = connection.Close()
 
-		if hub.unregister(client.id) {
+		if hub.unregister(client) {
 			hub.broadcast()
 		}
 	}()
@@ -194,7 +193,7 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (hub *gameHub) register(connection *websocket.Conn, profileKey string, username string) (*clientSession, error) {
+func (hub *gameHub) register(connection *websocket.Conn, profileKey string, username string) (*clientSession, *clientSession, error) {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
@@ -214,11 +213,8 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 
 	hub.advancePlayerLocked(profile, hub.now())
 
-	if _, active := hub.players[profile.ID]; active {
-		return nil, errUsernameInUse
-	}
-
 	profile.Username = username
+	replacedClient := hub.clients[profile.ID]
 
 	client := &clientSession{
 		id:         profile.ID,
@@ -230,19 +226,24 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 	hub.players[profile.ID] = profile
 	hub.tick++
 
-	return client, nil
+	return client, replacedClient, nil
 }
 
-func (hub *gameHub) unregister(clientID string) bool {
+func (hub *gameHub) unregister(client *clientSession) bool {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
-	if _, ok := hub.clients[clientID]; !ok {
+	if client == nil {
 		return false
 	}
 
-	delete(hub.clients, clientID)
-	delete(hub.players, clientID)
+	current, ok := hub.clients[client.id]
+	if !ok || current != client {
+		return false
+	}
+
+	delete(hub.clients, client.id)
+	delete(hub.players, client.id)
 	hub.tick++
 
 	return true
@@ -377,15 +378,6 @@ func (hub *gameHub) writeJSON(client *clientSession, message any) error {
 	defer client.writeMu.Unlock()
 
 	return client.conn.WriteJSON(message)
-}
-
-func (hub *gameHub) isUsernameAvailable(profileKey string) bool {
-	hub.mu.Lock()
-	defer hub.mu.Unlock()
-
-	profileID := buildPlayerID(profileKey)
-	_, active := hub.players[profileID]
-	return !active
 }
 
 func buildPlayerID(profileKey string) string {

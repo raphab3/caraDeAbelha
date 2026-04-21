@@ -42,6 +42,7 @@ O client precisa apontar para o IP da maquina host. Se ficar em `localhost`, o n
 ## Validacoes uteis
 
 ```bash
+make build
 make server-test
 make client-build
 docker compose config

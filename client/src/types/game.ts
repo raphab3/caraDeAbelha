@@ -21,10 +21,41 @@ export interface WorldPlayerState {
   speed: number;
 }
 
+export interface WorldFlowerState {
+  id: string;
+  x: number;
+  y: number;
+  scale: number;
+  petalColor: string;
+  coreColor: string;
+}
+
+export interface WorldHiveState {
+  id: string;
+  x: number;
+  y: number;
+  scale: number;
+  toneColor: string;
+  glowColor: string;
+}
+
+export interface WorldChunkState {
+  key: string;
+  x: number;
+  y: number;
+  flowers: WorldFlowerState[];
+  hives: WorldHiveState[];
+}
+
 export interface WorldStateMessage {
   type: "state";
   tick: number;
   players: WorldPlayerState[];
+  chunks: WorldChunkState[];
+  centerChunkX: number;
+  centerChunkY: number;
+  renderDistance: number;
+  chunkSize: number;
 }
 
 export interface SessionMessage {
@@ -54,6 +85,11 @@ export interface GameSessionState {
   localPlayerId?: string;
   localUsername?: string;
   players: WorldPlayerState[];
+  chunks: WorldChunkState[];
+  centerChunkX: number;
+  centerChunkY: number;
+  renderDistance: number;
+  chunkSize: number;
   tick: number;
   error?: string;
 }

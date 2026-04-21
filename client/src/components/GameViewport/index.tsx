@@ -11,7 +11,7 @@ const WORLD_LIMIT = 6;
 const TARGET_REACHED_DISTANCE = 0.22;
 const BEE_HEIGHT = 0.48;
 const RENDER_CORRECTION_DISTANCE = WORLD_TO_SCENE_SCALE * 0.9;
-const DEFAULT_CAMERA_POSITION = [4.9, 3.4, 5.6] as const;
+const DEFAULT_CAMERA_POSITION = [5.8, 3.9, 6.6] as const;
 const DEFAULT_CAMERA_FOV = 34;
 
 interface MoveTargetMarkerState {
@@ -271,7 +271,7 @@ function CameraRig({
       enableDamping
       enablePan={false}
       makeDefault
-      maxDistance={11.5}
+      maxDistance={18}
       maxPolarAngle={Math.PI / 2.1}
       minDistance={3.4}
       minPolarAngle={0.45}

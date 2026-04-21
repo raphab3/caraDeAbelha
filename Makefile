@@ -1,6 +1,8 @@
 SHELL := /bin/bash
 
-.PHONY: up down db-up db-down infra-up infra-down logs server server-test client client-build setup-client
+.PHONY: up down db-up db-down infra-up infra-down logs build server server-test client client-build setup-client
+
+build: server-test client-build
 
 up:
 	docker compose up --build -d --force-recreate --remove-orphans
