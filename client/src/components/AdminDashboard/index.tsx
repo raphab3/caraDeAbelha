@@ -53,7 +53,9 @@ function OverviewCard({ label, value, helper }: OverviewCardProps) {
   return (
     <article className="rounded-[24px] border border-white/10 bg-slate-950/45 p-5 shadow-[0_20px_44px_rgba(2,6,23,0.26)] backdrop-blur">
       <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">{label}</p>
-      <strong className="mt-4 block text-2xl font-semibold text-white">{value}</strong>
+      <strong className="mt-4 block text-[clamp(1.5rem,2vw,2rem)] font-semibold leading-tight text-white [overflow-wrap:anywhere]">
+        {value}
+      </strong>
       <p className="mt-3 text-sm leading-6 text-slate-300">{helper}</p>
     </article>
   );
@@ -64,7 +66,7 @@ export function AdminDashboard() {
   const serviceName = backendHealth.service ?? "cara-de-abelha-server";
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
+    <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px] 2xl:items-start">
       <section className="grid gap-6">
         <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(145deg,rgba(15,23,42,0.88),rgba(15,23,42,0.58))] p-6 shadow-[0_28px_70px_rgba(2,6,23,0.34)] md:p-7">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -90,7 +92,7 @@ export function AdminDashboard() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
           <OverviewCard
             helper="Servico retornado pelo health check do backend."
             label="Servico"
@@ -113,11 +115,11 @@ export function AdminDashboard() {
           />
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
           <article className="rounded-[28px] border border-white/10 bg-slate-950/45 p-6 shadow-[0_24px_54px_rgba(2,6,23,0.28)] backdrop-blur">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Operacao</p>
             <h4 className="mt-4 text-2xl font-semibold text-white">Fluxo recomendado para o admin</h4>
-            <div className="mt-5 grid gap-4 md:grid-cols-3">
+            <div className="mt-5 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">
               <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                 <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-200/70">1. Validar</span>
                 <p className="mt-3 text-sm leading-6 text-slate-300">Confira se o backend responde e se os endpoints estao apontando para o host correto.</p>

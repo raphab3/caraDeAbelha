@@ -56,7 +56,7 @@ function InfoCard({ label, value, helper }: InfoCardProps) {
   return (
     <article className="rounded-3xl border border-white/10 bg-white/5 p-4">
       <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">{label}</p>
-      <strong className="mt-3 block text-lg font-semibold text-white">{value}</strong>
+      <strong className="mt-3 block text-lg font-semibold leading-tight text-white [overflow-wrap:anywhere]">{value}</strong>
       <p className="mt-3 text-sm leading-6 text-slate-300">{helper}</p>
     </article>
   );

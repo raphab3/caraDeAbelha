@@ -42,7 +42,7 @@ function AdminMapGeneratorRoute() {
       description="Prototipe terrenos, ajuste seeds e exporte JSONs de mapa a partir de uma rota isolada das operacoes do servidor."
       title="Gerador de mapas"
     >
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px] 2xl:items-start">
         <Suspense
           fallback={
             <div className="grid min-h-[420px] place-items-center rounded-[28px] border border-white/10 bg-slate-950/70 px-6 text-center text-slate-300">
@@ -53,7 +53,7 @@ function AdminMapGeneratorRoute() {
             </div>
           }
         >
-          <MapGenerator />
+          <MapGenerator embedded />
         </Suspense>
 
         <AdminInfoPanel />

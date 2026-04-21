@@ -35,6 +35,10 @@ interface SliderFieldProps {
 	onChange: (nextValue: number) => void;
 }
 
+interface MapGeneratorProps {
+	embedded?: boolean;
+}
+
 function clamp(value: number, minimum: number, maximum: number): number {
 	return Math.min(maximum, Math.max(minimum, value));
 }
@@ -195,7 +199,7 @@ function LegendSwatch({ colorClass, label }: { colorClass: string; label: string
 	);
 }
 
-export default function MapGenerator() {
+export default function MapGenerator({ embedded = false }: MapGeneratorProps) {
 	const [seed, setSeed] = useState(DEFAULT_SETTINGS.seed);
 	const [mapSize, setMapSize] = useState(DEFAULT_SETTINGS.mapSize);
 	const [scale, setScale] = useState(DEFAULT_SETTINGS.scale);
@@ -332,9 +336,22 @@ export default function MapGenerator() {
 		window.URL.revokeObjectURL(objectUrl);
 	};
 
+	const shellClassName = embedded
+		? "mx-auto flex w-full max-w-none flex-col gap-6"
+		: "mx-auto flex min-h-screen w-full max-w-[1440px] flex-col gap-6 px-4 py-6 lg:px-8 lg:py-8";
+	const controlsGridClassName = embedded
+		? "grid gap-6 xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(320px,360px)_minmax(0,1fr)]"
+		: "grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[380px_minmax(0,1fr)]";
+	const previewGridClassName = embedded
+		? "grid gap-6 2xl:grid-cols-[minmax(0,1fr)_280px]"
+		: "grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]";
+	const canvasFrameClassName = embedded
+		? "map-generator-canvas-frame relative aspect-square min-h-[320px] overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 shadow-inner shadow-black/30 md:min-h-[420px] 2xl:min-h-[560px]"
+		: "map-generator-canvas-frame relative aspect-square min-h-[360px] overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 shadow-inner shadow-black/30 md:min-h-[460px] xl:min-h-[560px]";
+
 	return (
 		<div className="map-generator-shell min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(250,204,21,0.18),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(14,165,233,0.18),_transparent_28%),linear-gradient(135deg,_#020617_0%,_#0f172a_48%,_#1e293b_100%)] text-slate-100">
-			<main className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col gap-6 px-4 py-6 lg:px-8 lg:py-8">
+			<main className={shellClassName}>
 				<header className="rounded-[32px] border border-white/10 bg-slate-950/65 p-6 shadow-[0_30px_80px_rgba(2,6,23,0.45)] backdrop-blur-xl lg:p-8">
 					<div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
 						<div className="max-w-3xl">
@@ -363,7 +380,7 @@ export default function MapGenerator() {
 					</div>
 				</header>
 
-				<section className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)] xl:grid-cols-[380px_minmax(0,1fr)]">
+				<section className={controlsGridClassName}>
 					<aside className="rounded-[32px] border border-white/10 bg-slate-950/58 p-4 shadow-[0_24px_70px_rgba(2,6,23,0.3)] backdrop-blur-xl lg:sticky lg:top-6 lg:self-start lg:p-5">
 						<div className="mb-4 rounded-[28px] border border-emerald-300/16 bg-emerald-400/8 p-4">
 							<p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-emerald-200/78">Direção visual</p>
@@ -444,7 +461,7 @@ export default function MapGenerator() {
 						</div>
 					</aside>
 
-					<section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+					<section className={previewGridClassName}>
 						<div className="rounded-[32px] border border-white/10 bg-slate-950/58 p-4 shadow-[0_24px_70px_rgba(2,6,23,0.3)] backdrop-blur-xl lg:p-5">
 							<div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
 								<div>
@@ -456,7 +473,7 @@ export default function MapGenerator() {
 								</p>
 							</div>
 
-							<div ref={canvasFrameRef} className="map-generator-canvas-frame relative aspect-square min-h-[360px] overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 shadow-inner shadow-black/30 md:min-h-[460px] xl:min-h-[560px]">
+							<div ref={canvasFrameRef} className={canvasFrameClassName}>
 								<canvas ref={canvasRef} className="h-full w-full" />
 
 								<div className="pointer-events-none absolute inset-x-4 top-4 flex items-center justify-between gap-3 text-[11px] uppercase tracking-[0.28em] text-slate-200/68">
