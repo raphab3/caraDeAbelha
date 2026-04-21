@@ -21,10 +21,22 @@ Base inicial do projeto para estudar Go e React Three Fiber construindo um jogo 
 
 ```bash
 cp .env.example .env
+# edite LAN_HOST no .env com o IP da maquina que esta rodando o Docker
 make up
 ```
 
 Depois abra `http://localhost:3000`.
+
+## Testar em rede local
+
+1. Descubra o IP da maquina que esta rodando o projeto com `hostname -I` ou `ip addr`.
+2. Edite `LAN_HOST` no arquivo `.env` com esse IP, por exemplo `192.168.0.25`.
+3. Rode `make down && make up` para recriar o client com as URLs corretas.
+4. No outro computador da mesma rede Wi-Fi, abra `http://IP_DA_MAQUINA:3000`.
+5. Se nao abrir, libere as portas `3000` e `8080` no firewall da maquina host.
+
+Observacao:
+O client precisa apontar para o IP da maquina host. Se ficar em `localhost`, o navegador do segundo computador vai tentar falar com ele mesmo, nao com o host do jogo.
 
 ## Validacoes uteis
 
