@@ -13,12 +13,12 @@ import {
 } from "three";
 
 import type { WorldChunkState } from "../../types/game";
-
-const WORLD_TO_SCENE_SCALE = 1.35;
-const GROUND_HEIGHT = -1.15;
-const TERRAIN_SURFACE_HEIGHT = GROUND_HEIGHT + 0.02;
-const TERRAIN_BLOCK_SCALE = WORLD_TO_SCENE_SCALE;
-const TERRAIN_BLOCK_CENTER_Y = TERRAIN_SURFACE_HEIGHT - TERRAIN_BLOCK_SCALE * 0.5;
+import {
+	TERRAIN_BLOCK_SCALE,
+	toSceneAxis,
+	toTerrainBlockCenterY,
+	toTerrainSurfaceY,
+} from "./worldSurface";
 
 const TERRAIN_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/block-grass.glb";
 const FLOWERS_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/flowers.glb";
@@ -44,18 +44,6 @@ interface WorldFieldBuild {
 interface InstancedModelMeshSource {
 	geometry: BufferGeometry;
 	material: Material;
-}
-
-function toSceneAxis(value: number): number {
-	return value * WORLD_TO_SCENE_SCALE;
-}
-
-function toTerrainBlockCenterY(elevation: number): number {
-	return TERRAIN_BLOCK_CENTER_Y + elevation * WORLD_TO_SCENE_SCALE;
-}
-
-function toTerrainSurfaceY(elevation: number): number {
-	return TERRAIN_SURFACE_HEIGHT + elevation * WORLD_TO_SCENE_SCALE;
 }
 
 function buildWorldField(chunks: WorldChunkState[]): WorldFieldBuild {
@@ -248,11 +236,13 @@ export function InstancedWorldField({
 	const waterMaterial = useMemo(
 		() =>
 			new MeshStandardMaterial({
-				color: "#38bdf8",
+				color: "#5ac8fa",
+				emissive: "#0f5f8f",
+				emissiveIntensity: 0.18,
 				transparent: true,
-				opacity: 0.82,
-				roughness: 0.2,
-				metalness: 0.04,
+				opacity: 0.9,
+				roughness: 0.34,
+				metalness: 0.02,
 			}),
 		[],
 	);
