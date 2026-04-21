@@ -90,7 +90,7 @@ function resolveBounds(
 }
 
 export function MiniMap({ players, localPlayerId, onPlayerClick, onRespawn }: MiniMapProps) {
-	const [collapsed, setCollapsed] = useState(false);
+	const [collapsed, setCollapsed] = useState(true);
 	const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
 
 	const localPlayer = useMemo(

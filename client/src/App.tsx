@@ -28,7 +28,7 @@ function RouteFallback({ title, description }: RouteFallbackProps) {
 function AdminToolsRoute() {
   return (
     <AdminLayout
-      description="Acompanhe a saude do servidor, valide endpoints e abra as ferramentas internas sem misturar esse fluxo com o jogo principal."
+      description="Monitoramento do servidor e atalhos internos."
       title="Dashboard do servidor"
     >
       <AdminDashboard />
@@ -39,7 +39,7 @@ function AdminToolsRoute() {
 function AdminMapGeneratorRoute() {
   return (
     <AdminLayout
-      description="Prototipe terrenos, ajuste seeds e exporte JSONs de mapa a partir de uma rota isolada das operacoes do servidor."
+      description="Geracao de mapas com monitor lateral."
       title="Gerador de mapas"
     >
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_320px] 2xl:items-start">

@@ -67,8 +67,24 @@ body::after {
   min-height: 100vh;
 }
 
+.player-experience--immersive.app-shell {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  gap: 0;
+  padding: 0;
+}
+
 .player-experience--immersive {
   min-height: 100vh;
+}
+
+.player-experience--immersive .hero-copy {
+  display: none;
+}
+
+.player-experience--immersive .experience-card {
+  gap: 0;
 }
 
 .player-experience__stage {
@@ -280,6 +296,8 @@ body::after {
 
 .mini-map--collapsed {
   gap: 0;
+  width: fit-content;
+  min-width: 72px;
 }
 
 .mini-map__header-left {
@@ -792,8 +810,8 @@ body::after {
 }
 
 @media (max-width: 960px) {
-  #app {
-    padding: 18px;
+  .app-shell {
+    padding: 20px;
   }
 
   .viewport-shell {
@@ -816,16 +834,42 @@ body::after {
 }
 
 @media (max-width: 640px) {
+  .app-shell {
+    gap: 18px;
+    padding: 16px;
+  }
+
+  .hero-copy {
+    max-width: 24rem;
+  }
+
   .hero-copy h1 {
     font-size: clamp(2.4rem, 14vw, 3.5rem);
   }
 
   .hero-text {
     font-size: 1rem;
+    max-width: 26ch;
   }
 
   .viewport-shell {
     min-height: 340px;
+  }
+
+  .player-experience--started:not(.player-experience--immersive) .hero-copy {
+    display: none;
+  }
+
+  .player-experience--started:not(.player-experience--immersive) .experience-card {
+    min-height: calc(100vh - 32px);
+  }
+
+  .player-experience--started:not(.player-experience--immersive) .player-experience__stage {
+    min-height: calc(100vh - 32px);
+  }
+
+  .player-experience--started:not(.player-experience--immersive) .viewport-shell {
+    min-height: min(72vh, 560px);
   }
 
   .viewport-fullscreen-toggle {
@@ -842,6 +886,16 @@ body::after {
     width: min(210px, calc(100% - 24px));
     padding: 12px;
     border-radius: 18px;
+  }
+
+  .mini-map--collapsed {
+    width: fit-content;
+    min-width: 58px;
+    padding: 10px;
+  }
+
+  .mini-map__bounds {
+    font-size: 0.68rem;
   }
 
   .mini-map__summary {

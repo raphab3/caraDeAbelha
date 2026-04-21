@@ -36,12 +36,19 @@ export default function PlayerExperience() {
 
   const hasStartedAdventure = Boolean(activeUsername);
   const showLoginGate = !gameSession.localPlayerId;
+  const shellClassName = [
+    "app-shell player-experience",
+    hasStartedAdventure ? "player-experience--started" : "",
+    isFullscreen ? "player-experience--immersive" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-  function renderStage(isImmersive: boolean) {
-    const stageClassName = isImmersive
+  function renderStage() {
+    const stageClassName = isFullscreen
       ? "experience-stage player-experience__stage player-experience__stage--immersive w-screen h-screen overflow-hidden bg-black"
       : "experience-stage player-experience__stage";
-    const viewportClassName = isImmersive ? "viewport-shell player-viewport-shell" : "viewport-shell";
+    const viewportClassName = isFullscreen ? "viewport-shell player-viewport-shell" : "viewport-shell";
 
     return (
       <div className={stageClassName} ref={targetRef}>
@@ -109,17 +116,15 @@ export default function PlayerExperience() {
     }
 
     setFormError(undefined);
-    void requestFullscreen();
+    if (isSupported) {
+      void requestFullscreen();
+    }
     setConnectionAttempt((current) => current + 1);
     setActiveUsername(normalizedUsername);
   }
 
-  if (isFullscreen) {
-    return <main className="player-experience player-experience--immersive">{renderStage(true)}</main>;
-  }
-
   return (
-    <main className="app-shell player-experience">
+    <main className={shellClassName}>
       <section className="hero-copy" aria-label="Resumo do jogo">
         <p className="eyebrow">MMORPG de navegador</p>
         <h1>Cara de Abelha</h1>
@@ -129,7 +134,7 @@ export default function PlayerExperience() {
       </section>
 
       <section className="experience-card" aria-label="Entrada do jogador">
-        {renderStage(false)}
+        {renderStage()}
       </section>
     </main>
   );

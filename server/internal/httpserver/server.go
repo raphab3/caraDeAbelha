@@ -12,6 +12,14 @@ type healthResponse struct {
 	Timestamp string `json:"timestamp"`
 }
 
+type metricsResponse struct {
+	Status        string `json:"status"`
+	Service       string `json:"service"`
+	Timestamp     string `json:"timestamp"`
+	ActivePlayers int    `json:"activePlayers"`
+	Tick          uint64 `json:"tick"`
+}
+
 func NewHandler() http.Handler {
 	mux := http.NewServeMux()
 	gameHub := newGameHub()
@@ -39,6 +47,12 @@ func NewHandler() http.Handler {
 		}
 
 		_ = json.NewEncoder(w).Encode(response)
+	})
+
+	mux.HandleFunc("/metrics", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(gameHub.snapshotMetrics())
 	})
 
 	return withCORS(mux)

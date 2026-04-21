@@ -19,14 +19,14 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   {
     to: "/admin",
     label: "Dashboard",
-    description: "Status do servidor e atalhos operacionais.",
+    description: "Monitor do servidor.",
     badge: "inicio",
     end: true,
   },
   {
     to: "/admin/mapas",
     label: "Gerador de mapas",
-    description: "Ferramenta de criacao e exportacao do mundo.",
+    description: "Geracao e exportacao.",
     badge: "tool",
   },
 ];
@@ -56,9 +56,7 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
         <aside className="w-full rounded-[28px] border border-white/10 bg-slate-950/65 p-6 shadow-[0_28px_80px_rgba(2,6,23,0.45)] backdrop-blur lg:max-w-xs">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/70">Admin</p>
           <h1 className="mt-4 text-3xl font-semibold text-white">Ferramentas internas</h1>
-          <p className="mt-3 text-sm leading-7 text-slate-300">
-            Os utilitarios de desenvolvimento ficam isolados do bundle principal do jogador.
-          </p>
+          <p className="mt-3 text-sm leading-7 text-slate-300">Monitoramento e operacao sem misturar com a rota do jogador.</p>
 
           <nav aria-label="Ferramentas administrativas" className="mt-8 space-y-3">
             {ADMIN_NAV_ITEMS.map((item) => (

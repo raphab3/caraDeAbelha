@@ -55,3 +55,16 @@ func newGameHub() *gameHub {
 
 	return hub
 }
+
+func (hub *gameHub) snapshotMetrics() metricsResponse {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	return metricsResponse{
+		Status:        "ok",
+		Service:       "cara-de-abelha-server",
+		Timestamp:     hub.now().UTC().Format(time.RFC3339),
+		ActivePlayers: len(hub.players),
+		Tick:          hub.tick,
+	}
+}

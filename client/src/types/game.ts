@@ -8,6 +8,24 @@ export interface HealthStatusState {
   state: "loading" | "online" | "offline";
   service?: string;
   updatedAt?: string;
+  latencyMs?: number;
+  error?: string;
+}
+
+export interface ServerMetricsResponse {
+  status: string;
+  service: string;
+  timestamp: string;
+  activePlayers: number;
+  tick: number;
+}
+
+export interface ServerMetricsState {
+  state: "loading" | "online" | "offline";
+  service?: string;
+  updatedAt?: string;
+  activePlayers: number;
+  tick: number;
   error?: string;
 }
 

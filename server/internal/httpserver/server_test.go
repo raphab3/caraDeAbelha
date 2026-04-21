@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"encoding/json"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -73,6 +74,62 @@ func TestOptionsRequestReturnsCORSHeaders(t *testing.T) {
 
 	if allowOrigin := recorder.Header().Get("Access-Control-Allow-Origin"); allowOrigin != "*" {
 		t.Fatalf("expected Access-Control-Allow-Origin header '*', got %q", allowOrigin)
+	}
+}
+
+func TestMetricsReportsActivePlayers(t *testing.T) {
+	handler := NewHandler()
+	testServer := httptest.NewServer(handler)
+	defer testServer.Close()
+
+	websocketURL := "ws" + strings.TrimPrefix(testServer.URL, "http") + "/ws"
+	firstConnection := openGameSocket(t, websocketURL, "scout")
+	defer firstConnection.Close()
+
+	var firstSession sessionMessage
+	if err := firstConnection.ReadJSON(&firstSession); err != nil {
+		t.Fatalf("read first session: %v", err)
+	}
+
+	var firstState worldStateMessage
+	if err := firstConnection.ReadJSON(&firstState); err != nil {
+		t.Fatalf("read first state: %v", err)
+	}
+
+	secondConnection := openGameSocket(t, websocketURL, "guard")
+	defer secondConnection.Close()
+
+	var secondSession sessionMessage
+	if err := secondConnection.ReadJSON(&secondSession); err != nil {
+		t.Fatalf("read second session: %v", err)
+	}
+
+	var secondState worldStateMessage
+	if err := secondConnection.ReadJSON(&secondState); err != nil {
+		t.Fatalf("read second state: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	request.Header.Set("Origin", "http://localhost:3000")
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
+	}
+
+	var response metricsResponse
+	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+		t.Fatalf("decode metrics response: %v", err)
+	}
+
+	if response.ActivePlayers != 2 {
+		t.Fatalf("expected two active players, got %d", response.ActivePlayers)
+	}
+
+	if response.Service != "cara-de-abelha-server" {
+		t.Fatalf("expected service cara-de-abelha-server, got %q", response.Service)
 	}
 }
 

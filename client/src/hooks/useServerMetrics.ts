@@ -1,38 +1,38 @@
 import { useEffect, useState } from "react";
 
 import { API_URL } from "../game/env";
-import type { HealthStatusResponse, HealthStatusState } from "../types/game";
+import type { ServerMetricsResponse, ServerMetricsState } from "../types/game";
 
-const INITIAL_STATE: HealthStatusState = {
+const INITIAL_STATE: ServerMetricsState = {
   state: "loading",
+  activePlayers: 0,
+  tick: 0,
 };
 
-export function useBackendHealth(): HealthStatusState {
-  const [health, setHealth] = useState<HealthStatusState>(INITIAL_STATE);
+export function useServerMetrics(pollIntervalMs = 2000): ServerMetricsState {
+  const [metrics, setMetrics] = useState<ServerMetricsState>(INITIAL_STATE);
 
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
-      const startedAt = performance.now();
-
       try {
-        const response = await fetch(`${API_URL}/healthz`);
+        const response = await fetch(`${API_URL}/metrics`);
         if (!response.ok) {
-          throw new Error(`backend returned ${response.status}`);
+          throw new Error(`metrics returned ${response.status}`);
         }
 
-        const data = (await response.json()) as HealthStatusResponse;
-        const latencyMs = Math.round(performance.now() - startedAt);
+        const data = (await response.json()) as ServerMetricsResponse;
         if (cancelled) {
           return;
         }
 
-        setHealth({
+        setMetrics({
           state: "online",
           service: data.service,
           updatedAt: data.timestamp,
-          latencyMs,
+          activePlayers: data.activePlayers,
+          tick: data.tick,
         });
       } catch (error) {
         if (cancelled) {
@@ -40,10 +40,11 @@ export function useBackendHealth(): HealthStatusState {
         }
 
         const message = error instanceof Error ? error.message : "erro desconhecido";
-        setHealth({
+        setMetrics((current) => ({
+          ...current,
           state: "offline",
           error: message,
-        });
+        }));
       }
     };
 
@@ -51,13 +52,13 @@ export function useBackendHealth(): HealthStatusState {
 
     const intervalId = window.setInterval(() => {
       void load();
-    }, 10000);
+    }, pollIntervalMs);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, []);
+  }, [pollIntervalMs]);
 
-  return health;
+  return metrics;
 }
