@@ -3,6 +3,7 @@ package httpserver
 import (
 	"errors"
 	"log"
+	"math"
 	"net/http"
 	"sort"
 	"strings"
@@ -21,15 +22,17 @@ var errInvalidUsername = errors.New("username invalido")
 var errUsernameInUse = errors.New("username em uso")
 
 type playerAction struct {
-	Type string `json:"type"`
-	Dir  string `json:"dir,omitempty"`
+	Type string  `json:"type"`
+	Dir  string  `json:"dir,omitempty"`
+	X    float64 `json:"x,omitempty"`
+	Z    float64 `json:"z,omitempty"`
 }
 
 type playerState struct {
-	ID       string `json:"id"`
-	Username string `json:"username"`
-	X        int    `json:"x"`
-	Y        int    `json:"y"`
+	ID       string  `json:"id"`
+	Username string  `json:"username"`
+	X        float64 `json:"x"`
+	Y        float64 `json:"y"`
 }
 
 type sessionMessage struct {
@@ -67,8 +70,8 @@ func newGameHub() *gameHub {
 				return true
 			},
 		},
-		clients: make(map[string]*clientSession),
-		players: make(map[string]*playerState),
+		clients:  make(map[string]*clientSession),
+		players:  make(map[string]*playerState),
 		profiles: make(map[string]*playerState),
 	}
 }
@@ -121,11 +124,20 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if action.Type != "move" {
+		var (
+			state worldStateMessage
+			ok    bool
+		)
+
+		switch action.Type {
+		case "move":
+			state, ok = hub.movePlayer(client.id, action.Dir)
+		case "move_to":
+			state, ok = hub.movePlayerTo(client.id, action.X, action.Z)
+		default:
 			continue
 		}
 
-		state, ok := hub.movePlayer(client.id, action.Dir)
 		if !ok {
 			continue
 		}
@@ -140,11 +152,12 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 
 	profile, ok := hub.profiles[profileKey]
 	if !ok {
+		spawnX, spawnY := profileSpawnPosition(profileKey)
 		profile = &playerState{
 			ID:       buildPlayerID(profileKey),
 			Username: username,
-			X:        0,
-			Y:        0,
+			X:        spawnX,
+			Y:        spawnY,
 		}
 		hub.profiles[profileKey] = profile
 	}
@@ -205,6 +218,22 @@ func (hub *gameHub) movePlayer(clientID string, direction string) (worldStateMes
 		return worldStateMessage{}, false
 	}
 
+	hub.tick++
+
+	return hub.snapshotLocked(), true
+}
+
+func (hub *gameHub) movePlayerTo(clientID string, x float64, z float64) (worldStateMessage, bool) {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	player, ok := hub.players[clientID]
+	if !ok {
+		return worldStateMessage{}, false
+	}
+
+	player.X = clampToWorld(x)
+	player.Y = clampToWorld(z)
 	hub.tick++
 
 	return hub.snapshotLocked(), true
@@ -277,6 +306,27 @@ func buildPlayerID(profileKey string) string {
 	return "player:" + profileKey
 }
 
+func profileSpawnPosition(profileKey string) (float64, float64) {
+	spawnPoints := [][2]float64{
+		{3.4, 0},
+		{2.4, 2.4},
+		{0, 3.4},
+		{-2.4, 2.4},
+		{-3.4, 0},
+		{-2.4, -2.4},
+		{0, -3.4},
+		{2.4, -2.4},
+	}
+
+	hash := 0
+	for _, char := range profileKey {
+		hash += int(char)
+	}
+
+	position := spawnPoints[int(math.Abs(float64(hash)))%len(spawnPoints)]
+	return position[0], position[1]
+}
+
 func parseUsername(rawUsername string) (string, string, error) {
 	username := strings.Join(strings.Fields(strings.TrimSpace(rawUsername)), " ")
 	if username == "" {
@@ -300,7 +350,7 @@ func writeCloseMessage(connection *websocket.Conn, message string) {
 	_ = connection.Close()
 }
 
-func clampToWorld(value int) int {
+func clampToWorld(value float64) float64 {
 	if value < -worldLimit {
 		return -worldLimit
 	}

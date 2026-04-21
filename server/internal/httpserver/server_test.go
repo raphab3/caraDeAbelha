@@ -122,8 +122,10 @@ func TestWebSocketMoveBroadcastsState(t *testing.T) {
 		t.Fatalf("expected initial state username %q, got %q", session.Username, initialState.Players[0].Username)
 	}
 
-	if initialState.Players[0].X != 0 || initialState.Players[0].Y != 0 {
-		t.Fatalf("expected initial position 0,0, got %d,%d", initialState.Players[0].X, initialState.Players[0].Y)
+	expectedSpawnX, expectedSpawnY := profileSpawnPosition("scout")
+
+	if initialState.Players[0].X != expectedSpawnX || initialState.Players[0].Y != expectedSpawnY {
+		t.Fatalf("expected initial position %.1f,%.1f, got %.1f,%.1f", expectedSpawnX, expectedSpawnY, initialState.Players[0].X, initialState.Players[0].Y)
 	}
 
 	if err := connection.WriteJSON(playerAction{Type: "move", Dir: "right"}); err != nil {
@@ -143,8 +145,53 @@ func TestWebSocketMoveBroadcastsState(t *testing.T) {
 		t.Fatalf("expected one player in updated state, got %d", len(updatedState.Players))
 	}
 
-	if updatedState.Players[0].X != 1 || updatedState.Players[0].Y != 0 {
-		t.Fatalf("expected updated position 1,0, got %d,%d", updatedState.Players[0].X, updatedState.Players[0].Y)
+	if updatedState.Players[0].X != expectedSpawnX+1 || updatedState.Players[0].Y != expectedSpawnY {
+		t.Fatalf("expected updated position %.1f,%.1f, got %.1f,%.1f", expectedSpawnX+1, expectedSpawnY, updatedState.Players[0].X, updatedState.Players[0].Y)
+	}
+}
+
+func TestWebSocketMoveToBroadcastsState(t *testing.T) {
+	handler := NewHandler()
+	testServer := httptest.NewServer(handler)
+	defer testServer.Close()
+
+	websocketURL := "ws" + strings.TrimPrefix(testServer.URL, "http") + "/ws"
+	connection := openGameSocket(t, websocketURL, "cursor")
+	defer connection.Close()
+
+	var session sessionMessage
+	if err := connection.ReadJSON(&session); err != nil {
+		t.Fatalf("read session: %v", err)
+	}
+
+	var initialState worldStateMessage
+	if err := connection.ReadJSON(&initialState); err != nil {
+		t.Fatalf("read initial state: %v", err)
+	}
+
+	if err := connection.WriteJSON(playerAction{Type: "move_to", X: 2.5, Z: -1.5}); err != nil {
+		t.Fatalf("send move_to action: %v", err)
+	}
+
+	var updatedState worldStateMessage
+	if err := connection.ReadJSON(&updatedState); err != nil {
+		t.Fatalf("read updated state: %v", err)
+	}
+
+	if updatedState.Tick <= initialState.Tick {
+		t.Fatalf("expected updated tick greater than %d, got %d", initialState.Tick, updatedState.Tick)
+	}
+
+	if len(updatedState.Players) != 1 {
+		t.Fatalf("expected one player in updated state, got %d", len(updatedState.Players))
+	}
+
+	if updatedState.Players[0].ID != session.PlayerID {
+		t.Fatalf("expected player id %q, got %q", session.PlayerID, updatedState.Players[0].ID)
+	}
+
+	if updatedState.Players[0].X != 2.5 || updatedState.Players[0].Y != -1.5 {
+		t.Fatalf("expected updated position 2.5,-1.5, got %.1f,%.1f", updatedState.Players[0].X, updatedState.Players[0].Y)
 	}
 }
 
@@ -262,8 +309,10 @@ func TestWebSocketReconnectLoadsPlayerStateByUsername(t *testing.T) {
 		t.Fatalf("expected one active player after reconnect, got %d", len(restoredState.Players))
 	}
 
-	if restoredState.Players[0].X != 1 || restoredState.Players[0].Y != 0 {
-		t.Fatalf("expected restored position 1,0, got %d,%d", restoredState.Players[0].X, restoredState.Players[0].Y)
+	expectedSpawnX, expectedSpawnY := profileSpawnPosition("beekeeper")
+
+	if restoredState.Players[0].X != expectedSpawnX+1 || restoredState.Players[0].Y != expectedSpawnY {
+		t.Fatalf("expected restored position %.1f,%.1f, got %.1f,%.1f", expectedSpawnX+1, expectedSpawnY, restoredState.Players[0].X, restoredState.Players[0].Y)
 	}
 
 	if restoredState.Players[0].Username != "beekeeper" {
