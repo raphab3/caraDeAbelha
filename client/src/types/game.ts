@@ -77,7 +77,11 @@ export interface MoveToAction {
   z: number;
 }
 
-export type ClientMessage = MoveAction | MoveToAction;
+export interface RespawnAction {
+  type: "respawn";
+}
+
+export type ClientMessage = MoveAction | MoveToAction | RespawnAction;
 export type ServerMessage = SessionMessage | WorldStateMessage;
 
 export interface GameSessionState {
@@ -96,6 +100,7 @@ export interface GameSessionState {
 
 export interface GameSessionController extends GameSessionState {
   moveToTarget: (x: number, z: number) => void;
+  respawn: () => void;
 }
 
 export interface RenderPerformanceSnapshot {

@@ -79,6 +79,7 @@ export function App() {
               localPlayerId={gameSession.localPlayerId}
               onPerformanceChange={setRenderPerformance}
               onMoveToTarget={gameSession.moveToTarget}
+              onRespawn={gameSession.respawn}
               players={gameSession.players}
             />
           </div>

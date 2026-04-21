@@ -9,6 +9,7 @@ interface MiniMapProps {
 	players: WorldPlayerState[];
 	localPlayerId?: string;
 	onPlayerClick?: (x: number, z: number) => void;
+	onRespawn?: () => void;
 }
 
 interface MiniMapBounds {
@@ -88,7 +89,7 @@ function resolveBounds(
 	};
 }
 
-export function MiniMap({ players, localPlayerId, onPlayerClick }: MiniMapProps) {
+export function MiniMap({ players, localPlayerId, onPlayerClick, onRespawn }: MiniMapProps) {
 	const [collapsed, setCollapsed] = useState(false);
 	const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
 
@@ -228,6 +229,16 @@ export function MiniMap({ players, localPlayerId, onPlayerClick }: MiniMapProps)
 					</div>
 
 					<div className="mini-map__footer">
+						{localPlayer ? (
+							<button
+								type="button"
+								className="mini-map__respawn"
+								onClick={() => onRespawn?.()}
+							>
+								Respawn no encontro
+							</button>
+						) : null}
+
 						<div className="mini-map__coordinates" aria-label="Coordenadas atuais">
 							<span className="mini-map__coord-icon" aria-hidden="true">
 								📍

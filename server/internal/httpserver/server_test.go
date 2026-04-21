@@ -221,6 +221,113 @@ func TestWebSocketMoveToBroadcastsState(t *testing.T) {
 	}
 }
 
+func TestRespawnPlayerReturnsToProfileSpawn(t *testing.T) {
+	hub := newGameHub()
+	baseTime := time.Date(2026, time.April, 21, 12, 0, 0, 0, time.UTC)
+	targetX := 8.0
+	targetY := -6.0
+	playerID := buildPlayerID("beekeeper")
+	player := &playerState{
+		ID:        playerID,
+		Username:  "beekeeper",
+		X:         11.0,
+		Y:         -9.0,
+		TargetX:   &targetX,
+		TargetY:   &targetY,
+		Speed:     defaultPlayerSpeed,
+		UpdatedAt: baseTime.Add(-time.Second),
+	}
+
+	hub.players[playerID] = player
+	hub.profiles["beekeeper"] = player
+	hub.clients[playerID] = &clientSession{
+		id:         playerID,
+		profileKey: "beekeeper",
+	}
+	hub.now = func() time.Time {
+		return baseTime
+	}
+
+	if ok := hub.respawnPlayer(playerID); !ok {
+		t.Fatalf("expected respawn to succeed")
+	}
+
+	expectedSpawnX, expectedSpawnY := profileSpawnPosition("beekeeper")
+	if math.Abs(player.X-expectedSpawnX) > 0.001 || math.Abs(player.Y-expectedSpawnY) > 0.001 {
+		t.Fatalf("expected respawn position %.1f,%.1f, got %.1f,%.1f", expectedSpawnX, expectedSpawnY, player.X, player.Y)
+	}
+
+	if player.TargetX != nil || player.TargetY != nil {
+		t.Fatalf("expected respawn to clear active target")
+	}
+
+	if !player.UpdatedAt.Equal(baseTime) {
+		t.Fatalf("expected updatedAt %v, got %v", baseTime, player.UpdatedAt)
+	}
+
+	if hub.tick != 1 {
+		t.Fatalf("expected tick 1 after respawn, got %d", hub.tick)
+	}
+}
+
+func TestWebSocketRespawnBroadcastsState(t *testing.T) {
+	hub := newGameHub()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", hub.handleWebSocket)
+	testServer := httptest.NewServer(mux)
+	defer testServer.Close()
+
+	websocketURL := "ws" + strings.TrimPrefix(testServer.URL, "http") + "/ws"
+	connection := openGameSocket(t, websocketURL, "beekeeper")
+	defer connection.Close()
+
+	var session sessionMessage
+	if err := connection.ReadJSON(&session); err != nil {
+		t.Fatalf("read session: %v", err)
+	}
+
+	var initialState worldStateMessage
+	if err := connection.ReadJSON(&initialState); err != nil {
+		t.Fatalf("read initial state: %v", err)
+	}
+
+	hub.mu.Lock()
+	player := hub.players[session.PlayerID]
+	targetX := 14.0
+	targetY := -11.0
+	player.X = 9.5
+	player.Y = -8.0
+	player.TargetX = &targetX
+	player.TargetY = &targetY
+	hub.mu.Unlock()
+
+	if err := connection.WriteJSON(playerAction{Type: "respawn"}); err != nil {
+		t.Fatalf("send respawn action: %v", err)
+	}
+
+	var updatedState worldStateMessage
+	if err := connection.ReadJSON(&updatedState); err != nil {
+		t.Fatalf("read updated state: %v", err)
+	}
+
+	if updatedState.Tick <= initialState.Tick {
+		t.Fatalf("expected updated tick greater than %d, got %d", initialState.Tick, updatedState.Tick)
+	}
+
+	if len(updatedState.Players) != 1 {
+		t.Fatalf("expected one player in updated state, got %d", len(updatedState.Players))
+	}
+
+	expectedSpawnX, expectedSpawnY := profileSpawnPosition("beekeeper")
+	if math.Abs(updatedState.Players[0].X-expectedSpawnX) > 0.001 || math.Abs(updatedState.Players[0].Y-expectedSpawnY) > 0.001 {
+		t.Fatalf("expected respawn position %.1f,%.1f, got %.1f,%.1f", expectedSpawnX, expectedSpawnY, updatedState.Players[0].X, updatedState.Players[0].Y)
+	}
+
+	if updatedState.Players[0].TargetX != nil || updatedState.Players[0].TargetY != nil {
+		t.Fatalf("expected respawn snapshot to clear active target")
+	}
+}
+
 func TestAdvancePlayerLockedMovesTowardTargetAtConstantSpeed(t *testing.T) {
 	hub := newGameHub()
 	baseTime := time.Date(2026, time.April, 21, 12, 0, 0, 0, time.UTC)

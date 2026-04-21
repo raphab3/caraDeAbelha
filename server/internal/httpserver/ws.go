@@ -181,6 +181,8 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			ok = hub.movePlayer(client.id, action.Dir)
 		case "move_to":
 			ok = hub.movePlayerTo(client.id, action.X, action.Z)
+		case "respawn":
+			ok = hub.respawnPlayer(client.id)
 		default:
 			continue
 		}
@@ -295,6 +297,34 @@ func (hub *gameHub) movePlayerTo(clientID string, x float64, z float64) bool {
 	now := hub.now()
 	hub.advanceActivePlayersLocked(now)
 	hub.setPlayerTargetLocked(player, clampToWorld(x), clampToWorld(z), now)
+	hub.tick++
+
+	return true
+}
+
+func (hub *gameHub) respawnPlayer(clientID string) bool {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	player, ok := hub.players[clientID]
+	if !ok {
+		return false
+	}
+
+	client, ok := hub.clients[clientID]
+	if !ok {
+		return false
+	}
+
+	now := hub.now()
+	hub.advanceActivePlayersLocked(now)
+
+	spawnX, spawnY := profileSpawnPosition(client.profileKey)
+	player.X = spawnX
+	player.Y = spawnY
+	player.TargetX = nil
+	player.TargetY = nil
+	player.UpdatedAt = now
 	hub.tick++
 
 	return true

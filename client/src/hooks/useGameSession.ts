@@ -318,8 +318,15 @@ export function useGameSession(username?: string): GameSessionController {
     });
   };
 
+  const respawn = () => {
+    clientRef.current?.send({
+      type: "respawn",
+    });
+  };
+
   return {
     ...gameSession,
     moveToTarget,
+    respawn,
   };
 }

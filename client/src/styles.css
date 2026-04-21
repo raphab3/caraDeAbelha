@@ -412,6 +412,39 @@ body::after {
   gap: 6px;
 }
 
+.mini-map__respawn {
+  width: 100%;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 224, 150, 0.48);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 231, 140, 0.94), rgba(255, 171, 68, 0.92));
+  color: #30200d;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  pointer-events: all;
+  box-shadow: 0 12px 24px rgba(18, 10, 2, 0.28);
+  transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+}
+
+.mini-map__respawn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+  box-shadow: 0 16px 28px rgba(18, 10, 2, 0.32);
+}
+
+.mini-map__respawn:focus-visible {
+  outline: 2px solid rgba(255, 232, 176, 0.94);
+  outline-offset: 3px;
+}
+
 .mini-map__coordinates {
   display: flex;
   align-items: center;

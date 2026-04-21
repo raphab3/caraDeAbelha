@@ -32,12 +32,16 @@ const TARGET_REACHED_DISTANCE = 0.22;
 const BEE_HEIGHT = 0.48;
 const RENDER_CORRECTION_DISTANCE = WORLD_TO_SCENE_SCALE * 0.9;
 const SKY_COLOR = "#dff4ff";
-const FOG_COLOR = "#d6e7c4";
-const FOG_NEAR = 58;
-const FOG_FAR = 176;
+const FOG_COLOR = SKY_COLOR;
 const GROUND_HEIGHT = -1.15;
 const DEFAULT_CAMERA_FOV = 56;
 const MIN_CAMERA_DISTANCE = 6;
+const MIN_MAX_CAMERA_DISTANCE = 30;
+const MAX_CAMERA_DISTANCE_PADDING = 10;
+const SCENE_EDGE_CAMERA_DISTANCE_RATIO = 0.44;
+const FOG_NEAR_RATIO = 0.58;
+const FOG_FAR_PADDING = 10;
+const BEE_TURN_RESPONSE = 10;
 
 const beeBodyGeometry = new SphereGeometry(0.62, 32, 32);
 const beeStripeGeometry = new BoxGeometry(0.12, 0.9, 1.18);
@@ -121,17 +125,21 @@ function resolveViewportScale(chunkSize: number, renderDistance: number): {
     return {
       cameraDistance: 18,
       groundInputSize: 960,
-      maxCameraDistance: 50,
+      maxCameraDistance: MIN_MAX_CAMERA_DISTANCE,
     };
   }
 
   const chunkSpan = chunkSize * (renderDistance * 2 + 1);
   const sceneSpan = toSceneAxis(chunkSpan);
+  const cameraDistance = Math.max(18, sceneSpan * 0.3);
 
   return {
-    cameraDistance: Math.max(18, sceneSpan * 0.3),
+    cameraDistance,
     groundInputSize: Math.max(960, sceneSpan * 3),
-    maxCameraDistance: Math.max(70, sceneSpan * 1.2),
+    maxCameraDistance: Math.max(
+      MIN_MAX_CAMERA_DISTANCE,
+      Math.max(cameraDistance + MAX_CAMERA_DISTANCE_PADDING, sceneSpan * SCENE_EDGE_CAMERA_DISTANCE_RATIO),
+    ),
   };
 }
 
@@ -176,6 +184,26 @@ function moveTowards(currentPosition: Vector3, targetPosition: Vector3, maxStep:
   currentPosition.x += deltaX * ratio;
   currentPosition.z += deltaZ * ratio;
   return distance - maxStep;
+}
+
+function resolveFogDistances(maxCameraDistance: number): { near: number; far: number } {
+  return {
+    near: Math.max(16, maxCameraDistance * FOG_NEAR_RATIO),
+    far: maxCameraDistance + FOG_FAR_PADDING,
+  };
+}
+
+function resolveTargetYaw(deltaX: number, deltaZ: number): number | null {
+  if (Math.abs(deltaX) <= 0.001 && Math.abs(deltaZ) <= 0.001) {
+    return null;
+  }
+
+  return Math.atan2(deltaX, deltaZ);
+}
+
+function smoothYawRotation(currentYaw: number, targetYaw: number, delta: number): number {
+  const shortestArc = Math.atan2(Math.sin(targetYaw - currentYaw), Math.cos(targetYaw - currentYaw));
+  return currentYaw + shortestArc * (1 - Math.exp(-delta * BEE_TURN_RESPONSE));
 }
 
 interface BeeActorProps {
@@ -256,9 +284,10 @@ function BeeActor({ player, drift, accentColor, isLocal, trackedPositionRef }: B
       : authoritativePositionRef.current;
     const lookDeltaX = lookTarget.x - currentPosition.x;
     const lookDeltaZ = lookTarget.z - currentPosition.z;
+    const targetYaw = resolveTargetYaw(lookDeltaX, lookDeltaZ);
 
-    if (Math.abs(lookDeltaX) > 0.001 || Math.abs(lookDeltaZ) > 0.001) {
-      groupRef.current.rotation.y = Math.atan2(lookDeltaX, lookDeltaZ);
+    if (targetYaw !== null) {
+      groupRef.current.rotation.y = smoothYawRotation(groupRef.current.rotation.y, targetYaw, delta);
     }
 
     trackedPositionRef?.current.copy(groupRef.current.position);
@@ -351,6 +380,7 @@ function RemoteBeesInstanced({ players }: { players: WorldPlayerState[] }) {
       const authoritativeZ = toSceneAxis(player.y);
       const desiredX = hasMoveTarget(player) ? toSceneAxis(player.targetX) : authoritativeX;
       const desiredZ = hasMoveTarget(player) ? toSceneAxis(player.targetY) : authoritativeZ;
+      const initialYaw = resolveTargetYaw(desiredX - authoritativeX, desiredZ - authoritativeZ) ?? 0;
 
       if (previous) {
         previous.player = player;
@@ -364,7 +394,7 @@ function RemoteBeesInstanced({ players }: { players: WorldPlayerState[] }) {
         currentPosition: new Vector3(authoritativeX, BEE_HEIGHT, authoritativeZ),
         authoritativePosition: new Vector3(authoritativeX, BEE_HEIGHT, authoritativeZ),
         desiredTargetPosition: new Vector3(desiredX, BEE_HEIGHT, desiredZ),
-        rotationY: 0,
+        rotationY: initialYaw,
         drift: index * 0.9,
       };
     });
@@ -431,9 +461,10 @@ function RemoteBeesInstanced({ players }: { players: WorldPlayerState[] }) {
       const lookTarget = hasMoveTarget(player) ? desiredTargetPosition : authoritativePosition;
       const lookDeltaX = lookTarget.x - currentPosition.x;
       const lookDeltaZ = lookTarget.z - currentPosition.z;
+      const targetYaw = resolveTargetYaw(lookDeltaX, lookDeltaZ);
 
-      if (Math.abs(lookDeltaX) > 0.001 || Math.abs(lookDeltaZ) > 0.001) {
-        instance.rotationY = Math.atan2(lookDeltaX, lookDeltaZ);
+      if (targetYaw !== null) {
+        instance.rotationY = smoothYawRotation(instance.rotationY, targetYaw, delta);
       }
 
       bodyDummy.position.copy(currentPosition);
@@ -682,6 +713,8 @@ interface HiveCoreProps {
   chunks: WorldChunkState[];
   chunkSize: number;
   connectionState: GameSessionState["connectionState"];
+  fogFar: number;
+  fogNear: number;
   groundInputSize: number;
   localPlayerId?: string;
   localPlayerPositionRef: MutableRefObject<Vector3>;
@@ -693,6 +726,8 @@ function HiveCore({
   chunks,
   chunkSize,
   connectionState,
+  fogFar,
+  fogNear,
   groundInputSize,
   localPlayerId,
   localPlayerPositionRef,
@@ -776,7 +811,7 @@ function HiveCore({
         sunPosition={[120, 28, -80]}
         turbidity={7}
       />
-      <fog attach="fog" args={[FOG_COLOR, FOG_NEAR, FOG_FAR]} />
+      <fog attach="fog" args={[FOG_COLOR, fogNear, fogFar]} />
       <ambientLight intensity={1} />
       <hemisphereLight color="#fff8d4" groundColor="#6b9035" intensity={0.64} />
       <directionalLight
@@ -839,6 +874,7 @@ interface GameViewportProps {
   localPlayerId?: string;
   onPerformanceChange: (snapshot: RenderPerformanceSnapshot) => void;
   onMoveToTarget: (x: number, z: number) => void;
+  onRespawn: () => void;
 }
 
 function toChunkCoord(worldPos: number, chunkSize: number): number {
@@ -854,6 +890,7 @@ export function GameViewport({
   localPlayerId,
   onPerformanceChange,
   onMoveToTarget,
+  onRespawn,
 }: GameViewportProps) {
   const localPlayer = useMemo(
     () => players.find((player) => player.id === localPlayerId),
@@ -863,6 +900,10 @@ export function GameViewport({
   const viewportScale = useMemo(
     () => resolveViewportScale(chunkSize, renderDistance),
     [chunkSize, renderDistance],
+  );
+  const fogDistances = useMemo(
+    () => resolveFogDistances(viewportScale.maxCameraDistance),
+    [viewportScale.maxCameraDistance],
   );
   const defaultCameraPosition = useMemo(
     () => [viewportScale.cameraDistance, viewportScale.cameraDistance * 0.34, viewportScale.cameraDistance * 1.08] as const,
@@ -900,6 +941,8 @@ export function GameViewport({
           chunks={chunks}
           chunkSize={chunkSize}
           connectionState={connectionState}
+          fogFar={fogDistances.far}
+          fogNear={fogDistances.near}
           groundInputSize={viewportScale.groundInputSize}
           localPlayerId={localPlayerId}
           localPlayerPositionRef={localPlayerPositionRef}
@@ -912,6 +955,7 @@ export function GameViewport({
         localPlayerId={localPlayerId}
         players={players}
         onPlayerClick={onMoveToTarget}
+        onRespawn={onRespawn}
       />
     </div>
   );
