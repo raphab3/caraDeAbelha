@@ -1,0 +1,211 @@
+:root {
+  color: #1f140c;
+  background:
+    radial-gradient(circle at top, rgba(255, 238, 165, 0.88) 0%, rgba(255, 201, 82, 0.96) 34%, #d88b18 100%);
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: auto;
+  border-radius: 999px;
+  pointer-events: none;
+  filter: blur(40px);
+  opacity: 0.55;
+}
+
+body::before {
+  width: 260px;
+  height: 260px;
+  top: 48px;
+  left: 5vw;
+  background: rgba(255, 249, 196, 0.72);
+}
+
+body::after {
+  width: 320px;
+  height: 320px;
+  right: 6vw;
+  bottom: 24px;
+  background: rgba(112, 148, 46, 0.28);
+}
+
+#app {
+  padding: 28px;
+}
+
+.app-shell {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+}
+
+.hero-copy {
+  max-width: 720px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  font-size: 0.76rem;
+  color: rgba(61, 39, 10, 0.72);
+}
+
+.hero-copy h1 {
+  margin: 0;
+  font-size: clamp(2.8rem, 7vw, 4.9rem);
+  line-height: 0.96;
+  color: #20150d;
+}
+
+.hero-text {
+  margin: 14px 0 0;
+  max-width: 58ch;
+  font-size: 1.06rem;
+  line-height: 1.7;
+  color: rgba(47, 29, 13, 0.86);
+}
+
+.experience-card {
+  display: grid;
+  gap: 18px;
+}
+
+.viewport-shell {
+  width: 100%;
+  min-height: 540px;
+  border: 1px solid rgba(70, 42, 9, 0.18);
+  border-radius: 28px;
+  overflow: hidden;
+  background: linear-gradient(155deg, rgba(255, 245, 214, 0.56), rgba(161, 126, 38, 0.16));
+  box-shadow: 0 28px 58px rgba(80, 45, 6, 0.2);
+  backdrop-filter: blur(12px);
+}
+
+.viewport-shell canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.status-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.status-pill {
+  width: fit-content;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(63, 41, 11, 0.18);
+  background: rgba(255, 252, 238, 0.76);
+  color: #322010;
+  font-weight: 600;
+  box-shadow: 0 12px 24px rgba(64, 38, 9, 0.08);
+}
+
+.status-pill--online {
+  background: rgba(227, 255, 206, 0.78);
+  color: #1a4c1b;
+}
+
+.status-pill--offline {
+  background: rgba(255, 223, 214, 0.84);
+  color: #7d1c1c;
+}
+
+.status-pill--loading {
+  background: rgba(255, 247, 211, 0.84);
+  color: #6e5316;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.status-card {
+  min-height: 128px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(63, 41, 11, 0.12);
+  background: rgba(255, 250, 231, 0.72);
+  box-shadow: 0 18px 36px rgba(80, 45, 6, 0.1);
+  backdrop-filter: blur(8px);
+}
+
+.status-card h2 {
+  margin: 0 0 8px;
+  font-size: 0.94rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(62, 40, 13, 0.74);
+}
+
+.status-card p {
+  margin: 0 0 8px;
+  font-size: 0.98rem;
+  line-height: 1.6;
+  color: #2d1c0f;
+  overflow-wrap: anywhere;
+}
+
+.status-card p:last-child {
+	margin-bottom: 0;
+}
+
+@media (max-width: 960px) {
+  #app {
+    padding: 18px;
+  }
+
+  .viewport-shell {
+    min-height: 420px;
+  }
+
+  .status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-copy h1 {
+    font-size: clamp(2.4rem, 14vw, 3.5rem);
+  }
+
+  .hero-text {
+    font-size: 1rem;
+  }
+
+  .viewport-shell {
+    min-height: 340px;
+  }
+
+  .status-grid {
+    grid-template-columns: 1fr;
+  }
+}

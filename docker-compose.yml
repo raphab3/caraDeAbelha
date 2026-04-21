@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: cara-de-abelha-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cara_de_abelha}
+      POSTGRES_USER: ${POSTGRES_USER:-bee}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bee}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bee} -d ${POSTGRES_DB:-cara_de_abelha}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+
+  server:
+    build:
+      context: ./server
+    container_name: cara-de-abelha-server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      SERVER_READ_TIMEOUT_SECONDS: ${SERVER_READ_TIMEOUT_SECONDS:-10}
+      SERVER_WRITE_TIMEOUT_SECONDS: ${SERVER_WRITE_TIMEOUT_SECONDS:-10}
+      SERVER_IDLE_TIMEOUT_SECONDS: ${SERVER_IDLE_TIMEOUT_SECONDS:-60}
+      SERVER_SHUTDOWN_TIMEOUT_SECONDS: ${SERVER_SHUTDOWN_TIMEOUT_SECONDS:-10}
+      DATABASE_URL: ${DATABASE_URL:-postgres://bee:bee@db:5432/cara_de_abelha?sslmode=disable}
+    ports:
+      - "8080:8080"
+
+  client:
+    build:
+      context: ./client
+    container_name: cara-de-abelha-client
+    restart: unless-stopped
+    depends_on:
+      server:
+        condition: service_started
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+      VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:8080/ws}
+    ports:
+      - "3000:3000"
+    command: npm run dev -- --host 0.0.0.0 --port 3000
+    volumes:
+      - ./client:/app
+      - client-node-modules:/app/node_modules
+
+volumes:
+  postgres-data:
+  client-node-modules:
