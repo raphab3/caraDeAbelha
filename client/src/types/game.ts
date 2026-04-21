@@ -25,6 +25,7 @@ export interface WorldFlowerState {
   id: string;
   x: number;
   y: number;
+  groundY?: number;
   scale: number;
   petalColor: string;
   coreColor: string;
@@ -34,16 +35,35 @@ export interface WorldHiveState {
   id: string;
   x: number;
   y: number;
+  groundY?: number;
   scale: number;
   toneColor: string;
   glowColor: string;
+}
+
+export interface WorldTileState {
+  id: string;
+  x: number;
+  y: number;
+  z: number;
+  type: "grass" | "water" | "stone";
+}
+
+export interface WorldTreeState {
+  id: string;
+  x: number;
+  y: number;
+  groundY?: number;
+  scale: number;
 }
 
 export interface WorldChunkState {
   key: string;
   x: number;
   y: number;
+  tiles: WorldTileState[];
   flowers: WorldFlowerState[];
+  trees: WorldTreeState[];
   hives: WorldHiveState[];
 }
 

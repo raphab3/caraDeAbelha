@@ -39,7 +39,7 @@ function getConnectionLabel(gameSession: GameSessionState): string {
 export function StatusPanel({ backendHealth, gameSession, apiUrl, renderPerformance, wsUrl }: StatusPanelProps) {
   const statusClassName = `status-pill status-pill--${backendHealth.state}`;
   const activeWorldObjects = gameSession.chunks.reduce(
-    (total, chunk) => total + chunk.flowers.length + chunk.hives.length,
+    (total, chunk) => total + chunk.flowers.length + chunk.trees.length + chunk.hives.length,
     0,
   );
 
@@ -77,7 +77,7 @@ export function StatusPanel({ backendHealth, gameSession, apiUrl, renderPerforma
 
         <article className="status-card">
           <h2>Mundo visivel</h2>
-          <p>{activeWorldObjects} flores e colmeias renderizadas agora</p>
+          <p>{activeWorldObjects} props do mapa renderizadas agora</p>
         </article>
 
         <article className="status-card">

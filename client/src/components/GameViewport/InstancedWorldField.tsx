@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef } from "react";
 import { useGLTF } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
 import {
+	BoxGeometry,
 	type BufferGeometry,
 	type Material,
 	Group,
 	InstancedMesh,
 	Mesh,
+	MeshStandardMaterial,
 	Object3D,
 } from "three";
 
@@ -21,6 +23,8 @@ const TERRAIN_BLOCK_CENTER_Y = TERRAIN_SURFACE_HEIGHT - TERRAIN_BLOCK_SCALE * 0.
 const TERRAIN_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/block-grass.glb";
 const FLOWERS_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/flowers.glb";
 const HIVE_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/barrel.glb";
+const TREE_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/tree-pine-small.glb";
+const WATER_LAYER_THICKNESS = TERRAIN_BLOCK_SCALE * 0.18;
 
 interface InstanceConfig {
 	position: [number, number, number];
@@ -29,8 +33,11 @@ interface InstanceConfig {
 }
 
 interface WorldFieldBuild {
-	terrainModelInstances: InstanceConfig[];
+	grassTerrainInstances: InstanceConfig[];
+	stoneTerrainInstances: InstanceConfig[];
+	waterTerrainInstances: InstanceConfig[];
 	flowerModelInstances: InstanceConfig[];
+	treeModelInstances: InstanceConfig[];
 	hiveModelInstances: InstanceConfig[];
 }
 
@@ -43,26 +50,48 @@ function toSceneAxis(value: number): number {
 	return value * WORLD_TO_SCENE_SCALE;
 }
 
-function buildWorldField(chunks: WorldChunkState[], chunkSize: number): WorldFieldBuild {
-	const terrainModelInstances: InstanceConfig[] = [];
+function toTerrainBlockCenterY(elevation: number): number {
+	return TERRAIN_BLOCK_CENTER_Y + elevation * WORLD_TO_SCENE_SCALE;
+}
+
+function toTerrainSurfaceY(elevation: number): number {
+	return TERRAIN_SURFACE_HEIGHT + elevation * WORLD_TO_SCENE_SCALE;
+}
+
+function buildWorldField(chunks: WorldChunkState[]): WorldFieldBuild {
+	const grassTerrainInstances: InstanceConfig[] = [];
+	const stoneTerrainInstances: InstanceConfig[] = [];
+	const waterTerrainInstances: InstanceConfig[] = [];
 	const flowerModelInstances: InstanceConfig[] = [];
+	const treeModelInstances: InstanceConfig[] = [];
 	const hiveModelInstances: InstanceConfig[] = [];
 
 	for (const chunk of chunks) {
-		const chunkOriginX = chunk.x * chunkSize;
-		const chunkOriginY = chunk.y * chunkSize;
+		for (const tile of chunk.tiles) {
+			const baseX = toSceneAxis(tile.x);
+			const baseZ = toSceneAxis(tile.z);
+			const terrainCenterY = toTerrainBlockCenterY(tile.y);
 
-		for (let cellX = 0; cellX < chunkSize; cellX += 1) {
-			for (let cellY = 0; cellY < chunkSize; cellY += 1) {
-				terrainModelInstances.push({
-					position: [
-						toSceneAxis(chunkOriginX + cellX + 0.5),
-						TERRAIN_BLOCK_CENTER_Y,
-						toSceneAxis(chunkOriginY + cellY + 0.5),
-					],
+			if (tile.type === "grass") {
+				grassTerrainInstances.push({
+					position: [baseX, terrainCenterY, baseZ],
 					scale: TERRAIN_BLOCK_SCALE,
 				});
+				continue;
 			}
+
+			if (tile.type === "stone") {
+				stoneTerrainInstances.push({
+					position: [baseX, terrainCenterY, baseZ],
+					scale: [TERRAIN_BLOCK_SCALE, TERRAIN_BLOCK_SCALE, TERRAIN_BLOCK_SCALE],
+				});
+				continue;
+			}
+
+			waterTerrainInstances.push({
+				position: [baseX, toTerrainSurfaceY(tile.y) - WATER_LAYER_THICKNESS * 0.5, baseZ],
+				scale: [TERRAIN_BLOCK_SCALE, WATER_LAYER_THICKNESS, TERRAIN_BLOCK_SCALE],
+			});
 		}
 
 		for (const flower of chunk.flowers) {
@@ -70,9 +99,20 @@ function buildWorldField(chunks: WorldChunkState[], chunkSize: number): WorldFie
 			const baseZ = toSceneAxis(flower.y);
 
 			flowerModelInstances.push({
-				position: [baseX, TERRAIN_SURFACE_HEIGHT + 0.02, baseZ],
+				position: [baseX, toTerrainSurfaceY(flower.groundY ?? 0) + 0.02, baseZ],
 				rotation: [0, (baseX + baseZ) * 0.05, 0],
 				scale: 0.36 * flower.scale,
+			});
+		}
+
+		for (const tree of chunk.trees) {
+			const baseX = toSceneAxis(tree.x);
+			const baseZ = toSceneAxis(tree.y);
+
+			treeModelInstances.push({
+				position: [baseX, toTerrainSurfaceY(tree.groundY ?? 0) + 0.1, baseZ],
+				rotation: [0, (baseX - baseZ) * 0.03, 0],
+				scale: 0.54 * tree.scale,
 			});
 		}
 
@@ -81,7 +121,7 @@ function buildWorldField(chunks: WorldChunkState[], chunkSize: number): WorldFie
 			const baseZ = toSceneAxis(hive.y);
 
 			hiveModelInstances.push({
-				position: [baseX, TERRAIN_SURFACE_HEIGHT + 0.04, baseZ],
+				position: [baseX, toTerrainSurfaceY(hive.groundY ?? 0) + 0.04, baseZ],
 				rotation: [0, (baseX - baseZ) * 0.03, 0],
 				scale: 0.78 * hive.scale,
 			});
@@ -89,8 +129,11 @@ function buildWorldField(chunks: WorldChunkState[], chunkSize: number): WorldFie
 	}
 
 	return {
-		terrainModelInstances,
+		grassTerrainInstances,
+		stoneTerrainInstances,
+		waterTerrainInstances,
 		flowerModelInstances,
+		treeModelInstances,
 		hiveModelInstances,
 	};
 }
@@ -192,10 +235,27 @@ export function InstancedWorldField({
 	chunkSize: number;
 	onTerrainPointerDown?: (event: ThreeEvent<PointerEvent>) => void;
 }) {
-	const worldField = useMemo(() => buildWorldField(chunks, chunkSize), [chunkSize, chunks]);
+	const worldField = useMemo(() => buildWorldField(chunks), [chunks]);
 	const terrainModel = useGLTF(TERRAIN_MODEL_PATH);
 	const flowersModel = useGLTF(FLOWERS_MODEL_PATH);
 	const hiveModel = useGLTF(HIVE_MODEL_PATH);
+	const treeModel = useGLTF(TREE_MODEL_PATH);
+	const terrainBoxGeometry = useMemo(() => new BoxGeometry(1, 1, 1), []);
+	const stoneMaterial = useMemo(
+		() => new MeshStandardMaterial({ color: "#7c8797", roughness: 0.94, metalness: 0.06 }),
+		[],
+	);
+	const waterMaterial = useMemo(
+		() =>
+			new MeshStandardMaterial({
+				color: "#38bdf8",
+				transparent: true,
+				opacity: 0.82,
+				roughness: 0.2,
+				metalness: 0.04,
+			}),
+		[],
+	);
 	const terrainMeshSources = useMemo(
 		() => collectInstancedModelMeshes(terrainModel.scene),
 		[terrainModel.scene],
@@ -208,6 +268,18 @@ export function InstancedWorldField({
 		() => collectInstancedModelMeshes(hiveModel.scene),
 		[hiveModel.scene],
 	);
+	const treeMeshSources = useMemo(
+		() => collectInstancedModelMeshes(treeModel.scene),
+		[treeModel.scene],
+	);
+
+	useEffect(() => {
+		return () => {
+			terrainBoxGeometry.dispose();
+			stoneMaterial.dispose();
+			waterMaterial.dispose();
+		};
+	}, [stoneMaterial, terrainBoxGeometry, waterMaterial]);
 
 	if (chunkSize <= 0) {
 		return null;
@@ -221,11 +293,28 @@ export function InstancedWorldField({
 					castShadow
 					receiveShadow
 					geometry={source.geometry}
-					instances={worldField.terrainModelInstances}
+					instances={worldField.grassTerrainInstances}
 					material={source.material}
 					onPointerDown={onTerrainPointerDown}
 				/>
 			))}
+
+			<InstancedLayer
+				castShadow
+				receiveShadow
+				geometry={terrainBoxGeometry}
+				instances={worldField.stoneTerrainInstances}
+				material={stoneMaterial}
+				onPointerDown={onTerrainPointerDown}
+			/>
+
+			<InstancedLayer
+				receiveShadow
+				geometry={terrainBoxGeometry}
+				instances={worldField.waterTerrainInstances}
+				material={waterMaterial}
+				onPointerDown={onTerrainPointerDown}
+			/>
 
 			{flowerMeshSources.map((source, index) => (
 				<InstancedLayer
@@ -233,6 +322,17 @@ export function InstancedWorldField({
 					castShadow
 					geometry={source.geometry}
 					instances={worldField.flowerModelInstances}
+					material={source.material}
+				/>
+			))}
+
+			{treeMeshSources.map((source, index) => (
+				<InstancedLayer
+					key={`tree-model:${index}`}
+					castShadow
+					receiveShadow
+					geometry={source.geometry}
+					instances={worldField.treeModelInstances}
 					material={source.material}
 				/>
 			))}
@@ -254,3 +354,4 @@ export function InstancedWorldField({
 useGLTF.preload(TERRAIN_MODEL_PATH);
 useGLTF.preload(FLOWERS_MODEL_PATH);
 useGLTF.preload(HIVE_MODEL_PATH);
+useGLTF.preload(TREE_MODEL_PATH);

@@ -13,7 +13,10 @@ FROM alpine:3.22
 
 RUN apk add --no-cache ca-certificates
 
+WORKDIR /app
+
 COPY --from=builder /bin/cara-de-abelha-server /usr/local/bin/cara-de-abelha-server
+COPY --from=builder /app/maps /app/maps
 
 EXPOSE 8080
 
