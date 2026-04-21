@@ -129,9 +129,6 @@ export default function PlayerExperience() {
       <section className="hero-copy" aria-label="Resumo do jogo">
         <p className="eyebrow">MMORPG de navegador</p>
         <h1>Cara de Abelha</h1>
-        <p className="hero-text">
-          Entre com seu username, confira a arena inicial em formato compacto e use o clique de entrada para abrir a aventura em tela cheia quando estiver pronto.
-        </p>
       </section>
 
       <section className="experience-card" aria-label="Entrada do jogador">
