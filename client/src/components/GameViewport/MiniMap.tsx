@@ -27,6 +27,11 @@ interface MiniMapMarker extends WorldPlayerState {
   top: number;
 }
 
+interface CoordinateReadout {
+  latitudeLabel: string;
+  longitudeLabel: string;
+}
+
 function clampPercent(value: number): number {
   return Math.min(100, Math.max(0, value));
 }
@@ -40,6 +45,26 @@ function expandBounds(min: number, max: number): { min: number; max: number } {
     min: center - halfSpan,
     max: center + halfSpan,
   };
+}
+
+function formatLatitude(value: number): string {
+  const rounded = Math.round(value);
+
+  if (rounded === 0) {
+    return "0 N";
+  }
+
+  return `${Math.abs(rounded)} ${rounded > 0 ? "N" : "S"}`;
+}
+
+function formatLongitude(value: number): string {
+  const rounded = Math.round(value);
+
+  if (rounded === 0) {
+    return "0 E";
+  }
+
+  return `${Math.abs(rounded)} ${rounded > 0 ? "E" : "O"}`;
 }
 
 function resolveBounds(
@@ -130,6 +155,12 @@ export function MiniMap({ players, chunks, chunkSize, localPlayerId }: MiniMapPr
 
   const nearbyPlayers = markers.filter((player) => !player.isLocal);
   const showLabels = markers.length <= 5;
+  const localCoordinates = useMemo<CoordinateReadout>(() => {
+    return {
+      latitudeLabel: formatLatitude(localPlayer?.y ?? 0),
+      longitudeLabel: formatLongitude(localPlayer?.x ?? 0),
+    };
+  }, [localPlayer?.x, localPlayer?.y]);
 
   return (
     <aside className="mini-map" aria-label="Mini mapa dos jogadores">
@@ -143,6 +174,10 @@ export function MiniMap({ players, chunks, chunkSize, localPlayerId }: MiniMapPr
 
       <div className="mini-map__surface" aria-hidden="true">
         <div className="mini-map__grid" />
+        <span className="mini-map__axis mini-map__axis--top">lat {formatLatitude(bounds.maxY)}</span>
+        <span className="mini-map__axis mini-map__axis--bottom">lat {formatLatitude(bounds.minY)}</span>
+        <span className="mini-map__axis mini-map__axis--left">long {formatLongitude(bounds.minX)}</span>
+        <span className="mini-map__axis mini-map__axis--right">long {formatLongitude(bounds.maxX)}</span>
 
         {markers.map((player) => (
           <div
@@ -154,6 +189,11 @@ export function MiniMap({ players, chunks, chunkSize, localPlayerId }: MiniMapPr
             {showLabels ? <span className="mini-map__label">{player.username}</span> : null}
           </div>
         ))}
+      </div>
+
+      <div className="mini-map__coordinates" aria-label="Coordenadas atuais">
+        <span>lat {localCoordinates.latitudeLabel}</span>
+        <span>long {localCoordinates.longitudeLabel}</span>
       </div>
 
       <p className="mini-map__summary">
