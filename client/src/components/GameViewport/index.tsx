@@ -1,4 +1,4 @@
-import { Html, OrbitControls, Sky } from "@react-three/drei";
+import { Html, OrbitControls } from "@react-three/drei";
 import { Canvas, ThreeEvent, useFrame, useThree } from "@react-three/fiber";
 import { Suspense, type ElementRef, type MutableRefObject, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -19,6 +19,7 @@ import {
 import type { Group, Mesh } from "three";
 
 import { InstancedWorldField } from "./InstancedWorldField";
+import { AtmosphereBackdrop } from "./AtmosphereBackdrop";
 import { MiniMap } from "./MiniMap";
 import type {
   GameSessionState,
@@ -39,16 +40,17 @@ import {
 
 const TARGET_REACHED_DISTANCE = 0.22;
 const RENDER_CORRECTION_DISTANCE = WORLD_TO_SCENE_SCALE * 0.9;
-const SKY_COLOR = "#d8efff";
-const FOG_COLOR = "#cee8fb";
+const SKY_COLOR = "#eff8ff";
+const FOG_COLOR = "#d8eaf4";
 const DEFAULT_CAMERA_FOV = 56;
 const MIN_CAMERA_DISTANCE = 6;
 const MIN_MAX_CAMERA_DISTANCE = 30;
 const MAX_CAMERA_DISTANCE_PADDING = 10;
 const SCENE_EDGE_CAMERA_DISTANCE_RATIO = 0.44;
-const FOG_NEAR_RATIO = 0.58;
-const FOG_FAR_PADDING = 10;
+const FOG_NEAR_RATIO = 0.62;
+const FOG_FAR_PADDING = 4;
 const BEE_TURN_RESPONSE = 10;
+const BEE_MODEL_FORWARD_YAW_OFFSET = Math.PI / 2;
 
 const beeBodyGeometry = new SphereGeometry(0.62, 32, 32);
 const beeStripeGeometry = new BoxGeometry(0.12, 0.9, 1.18);
@@ -92,6 +94,12 @@ const disconnectedBeaconMaterial = new MeshStandardMaterial({
   emissive: "#ff6b3d",
   emissiveIntensity: 0.8,
 });
+
+const BEE_LEFT_STRIPE_OFFSET = new Vector3(-0.35, 0, 0);
+const BEE_RIGHT_STRIPE_OFFSET = new Vector3(0.35, 0, 0);
+const BEE_HEAD_OFFSET = new Vector3(0.7, 0, 0);
+const BEE_LEFT_WING_OFFSET = new Vector3(-0.08, 0.44, -0.3);
+const BEE_RIGHT_WING_OFFSET = new Vector3(-0.08, 0.44, 0.3);
 
 const beeBodyMaterialCache = new Map<string, MeshStandardMaterial>();
 
@@ -192,7 +200,7 @@ function moveTowards(currentPosition: Vector3, targetPosition: Vector3, maxStep:
 
 function resolveFogDistances(maxCameraDistance: number): { near: number; far: number } {
   return {
-    near: Math.max(16, maxCameraDistance * FOG_NEAR_RATIO),
+    near: Math.max(14, maxCameraDistance * FOG_NEAR_RATIO),
     far: maxCameraDistance + FOG_FAR_PADDING,
   };
 }
@@ -202,12 +210,33 @@ function resolveTargetYaw(deltaX: number, deltaZ: number): number | null {
     return null;
   }
 
-  return Math.atan2(deltaX, deltaZ);
+  return Math.atan2(deltaX, deltaZ) + BEE_MODEL_FORWARD_YAW_OFFSET;
 }
 
 function smoothYawRotation(currentYaw: number, targetYaw: number, delta: number): number {
   const shortestArc = Math.atan2(Math.sin(targetYaw - currentYaw), Math.cos(targetYaw - currentYaw));
   return currentYaw + shortestArc * (1 - Math.exp(-delta * BEE_TURN_RESPONSE));
+}
+
+function applyBeePartTransform(
+  dummy: Object3D,
+  anchorPosition: Vector3,
+  localOffset: Vector3,
+  rotationY: number,
+  rotationX = 0,
+  rotationZ = 0,
+): void {
+  const sinYaw = Math.sin(rotationY);
+  const cosYaw = Math.cos(rotationY);
+
+  dummy.position.set(
+    anchorPosition.x + localOffset.x * cosYaw + localOffset.z * sinYaw,
+    anchorPosition.y + localOffset.y,
+    anchorPosition.z - localOffset.x * sinYaw + localOffset.z * cosYaw,
+  );
+  dummy.rotation.set(rotationX, rotationY, rotationZ);
+  dummy.scale.set(1, 1, 1);
+  dummy.updateMatrix();
 }
 
 interface BeeActorProps {
@@ -314,7 +343,7 @@ function BeeActor({ player, drift, accentColor, isLocal, surfaceIndex, trackedPo
   });
 
   return (
-    <group ref={groupRef} position={initialPosition}>
+    <group ref={groupRef} position={initialPosition} rotation={[0, BEE_MODEL_FORWARD_YAW_OFFSET, 0]}>
       {isLocal ? (
         <mesh position={[0, -0.56, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <primitive attach="geometry" object={localMarkerGeometry} />
@@ -405,7 +434,7 @@ function RemoteBeesInstanced({ players, surfaceIndex }: { players: WorldPlayerSt
       const authoritativeZ = toSceneAxis(player.y);
       const desiredX = hasMoveTarget(player) ? toSceneAxis(player.targetX) : authoritativeX;
       const desiredZ = hasMoveTarget(player) ? toSceneAxis(player.targetY) : authoritativeZ;
-      const initialYaw = resolveTargetYaw(desiredX - authoritativeX, desiredZ - authoritativeZ) ?? 0;
+      const initialYaw = resolveTargetYaw(desiredX - authoritativeX, desiredZ - authoritativeZ) ?? BEE_MODEL_FORWARD_YAW_OFFSET;
       const initialHeight = resolveBeeSceneHeight(surfaceIndex, player.x, player.y, 0, index * 0.9);
 
       if (previous) {
@@ -508,10 +537,7 @@ function RemoteBeesInstanced({ players, surfaceIndex }: { players: WorldPlayerSt
       bodyDummy.updateMatrix();
       bodyMesh.setMatrixAt(index, bodyDummy.matrix);
 
-      stripeLeftDummy.position.set(currentPosition.x - 0.35, currentPosition.y, currentPosition.z);
-      stripeLeftDummy.rotation.set(0, instance.rotationY, 0);
-      stripeLeftDummy.scale.set(1, 1, 1);
-      stripeLeftDummy.updateMatrix();
+      applyBeePartTransform(stripeLeftDummy, currentPosition, BEE_LEFT_STRIPE_OFFSET, instance.rotationY);
       stripeLeftMesh.setMatrixAt(index, stripeLeftDummy.matrix);
 
       stripeCenterDummy.position.copy(currentPosition);
@@ -520,28 +546,30 @@ function RemoteBeesInstanced({ players, surfaceIndex }: { players: WorldPlayerSt
       stripeCenterDummy.updateMatrix();
       stripeCenterMesh.setMatrixAt(index, stripeCenterDummy.matrix);
 
-      stripeRightDummy.position.set(currentPosition.x + 0.35, currentPosition.y, currentPosition.z);
-      stripeRightDummy.rotation.set(0, instance.rotationY, 0);
-      stripeRightDummy.scale.set(1, 1, 1);
-      stripeRightDummy.updateMatrix();
+      applyBeePartTransform(stripeRightDummy, currentPosition, BEE_RIGHT_STRIPE_OFFSET, instance.rotationY);
       stripeRightMesh.setMatrixAt(index, stripeRightDummy.matrix);
 
-      headDummy.position.set(currentPosition.x + 0.7, currentPosition.y, currentPosition.z);
-      headDummy.rotation.set(0, instance.rotationY, 0);
-      headDummy.scale.set(1, 1, 1);
-      headDummy.updateMatrix();
+      applyBeePartTransform(headDummy, currentPosition, BEE_HEAD_OFFSET, instance.rotationY);
       headMesh.setMatrixAt(index, headDummy.matrix);
 
-      leftWingDummy.position.set(currentPosition.x - 0.08, currentPosition.y + 0.44, currentPosition.z - 0.3);
-      leftWingDummy.rotation.set(0.2, instance.rotationY, 0.15 + Math.sin(time * 18) * 0.3);
-      leftWingDummy.scale.set(1, 1, 1);
-      leftWingDummy.updateMatrix();
+      applyBeePartTransform(
+        leftWingDummy,
+        currentPosition,
+        BEE_LEFT_WING_OFFSET,
+        instance.rotationY,
+        0.2,
+        0.15 + Math.sin(time * 18) * 0.3,
+      );
       leftWingMesh.setMatrixAt(index, leftWingDummy.matrix);
 
-      rightWingDummy.position.set(currentPosition.x - 0.08, currentPosition.y + 0.44, currentPosition.z + 0.3);
-      rightWingDummy.rotation.set(-0.2, instance.rotationY, -0.15 - Math.sin(time * 18) * 0.3);
-      rightWingDummy.scale.set(1, 1, 1);
-      rightWingDummy.updateMatrix();
+      applyBeePartTransform(
+        rightWingDummy,
+        currentPosition,
+        BEE_RIGHT_WING_OFFSET,
+        instance.rotationY,
+        -0.2,
+        -0.15 - Math.sin(time * 18) * 0.3,
+      );
       rightWingMesh.setMatrixAt(index, rightWingDummy.matrix);
     }
 
@@ -778,6 +806,10 @@ function HiveCore({
     () => players.filter((player) => player.id !== localPlayerId),
     [localPlayerId, players],
   );
+  const detailFocus = useMemo(
+    () => (localPlayer ? { x: localPlayer.x, y: localPlayer.y } : undefined),
+    [localPlayer],
+  );
 
   useEffect(() => {
     if (connectionState !== "connected" || !localPlayerId) {
@@ -839,24 +871,15 @@ function HiveCore({
 
   return (
     <group>
-      <Sky
-        azimuth={0.08}
-        distance={450000}
-        inclination={0.58}
-        mieCoefficient={0.0025}
-        mieDirectionalG={0.74}
-        rayleigh={2.05}
-        sunPosition={[32, 118, -18]}
-        turbidity={4.2}
-      />
+      <AtmosphereBackdrop />
       <fog attach="fog" args={[FOG_COLOR, fogNear, fogFar]} />
-      <ambientLight intensity={0.92} />
-      <hemisphereLight color="#f3fbff" groundColor="#7aa990" intensity={0.72} />
+      <ambientLight intensity={0.96} />
+      <hemisphereLight color="#eef8ff" groundColor="#7fa38e" intensity={0.78} />
       <directionalLight
         castShadow
-        color="#fffdf2"
-        intensity={1.55}
-        position={[14, 20, 6]}
+        color="#fffef7"
+        intensity={1.48}
+        position={[16, 22, 10]}
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-camera-bottom={-18}
@@ -875,6 +898,7 @@ function HiveCore({
         <InstancedWorldField
           chunkSize={chunkSize}
           chunks={chunks}
+          detailFocus={detailFocus}
           onTerrainPointerDown={handleGroundPointerDown}
         />
       </Suspense>

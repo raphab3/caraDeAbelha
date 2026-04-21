@@ -249,27 +249,6 @@ export function MiniMap({ players, localPlayerId, onPlayerClick, onRespawn }: Mi
 									: `Lat ${localCoordinates.latitudeLabel}, Long ${localCoordinates.longitudeLabel}`}
 							</span>
 						</div>
-
-						<p className="mini-map__summary">
-							{nearbyPlayers.length > 0 ? (
-								<>
-									Procure por{" "}
-									{nearbyPlayers.map((player, index) => (
-										<button
-											key={player.id}
-											type="button"
-											className="mini-map__name-link"
-											onClick={() => onPlayerClick?.(player.x, player.y)}
-										>
-											{player.username}
-											{index < nearbyPlayers.length - 1 ? ", " : "."}
-										</button>
-									))}
-								</>
-							) : (
-								"Nenhum outro jogador entrou no seu radar ainda."
-							)}
-						</p>
 					</div>
 				</>
 			) : null}

@@ -8,6 +8,7 @@ import {
 	Group,
 	InstancedMesh,
 	Mesh,
+	MeshBasicMaterial,
 	MeshStandardMaterial,
 	Object3D,
 } from "three";
@@ -25,6 +26,14 @@ const FLOWERS_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/flowers.glb
 const HIVE_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/barrel.glb";
 const TREE_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/tree-pine-small.glb";
 const WATER_LAYER_THICKNESS = TERRAIN_BLOCK_SCALE * 0.18;
+const FLOWER_DETAIL_DISTANCE = 16;
+const TREE_DETAIL_DISTANCE = 24;
+const HIVE_DETAIL_DISTANCE = 28;
+
+interface DetailFocus {
+	x: number;
+	y: number;
+}
 
 interface InstanceConfig {
 	position: [number, number, number];
@@ -46,7 +55,20 @@ interface InstancedModelMeshSource {
 	material: Material;
 }
 
-function buildWorldField(chunks: WorldChunkState[]): WorldFieldBuild {
+function isWithinDetailRange(
+	detailFocus: DetailFocus | undefined,
+	worldX: number,
+	worldY: number,
+	maxDistance: number,
+): boolean {
+	if (!detailFocus) {
+		return true;
+	}
+
+	return Math.hypot(worldX - detailFocus.x, worldY - detailFocus.y) <= maxDistance;
+}
+
+function buildWorldField(chunks: WorldChunkState[], detailFocus?: DetailFocus): WorldFieldBuild {
 	const grassTerrainInstances: InstanceConfig[] = [];
 	const stoneTerrainInstances: InstanceConfig[] = [];
 	const waterTerrainInstances: InstanceConfig[] = [];
@@ -83,6 +105,10 @@ function buildWorldField(chunks: WorldChunkState[]): WorldFieldBuild {
 		}
 
 		for (const flower of chunk.flowers) {
+			if (!isWithinDetailRange(detailFocus, flower.x, flower.y, FLOWER_DETAIL_DISTANCE)) {
+				continue;
+			}
+
 			const baseX = toSceneAxis(flower.x);
 			const baseZ = toSceneAxis(flower.y);
 
@@ -94,6 +120,10 @@ function buildWorldField(chunks: WorldChunkState[]): WorldFieldBuild {
 		}
 
 		for (const tree of chunk.trees) {
+			if (!isWithinDetailRange(detailFocus, tree.x, tree.y, TREE_DETAIL_DISTANCE)) {
+				continue;
+			}
+
 			const baseX = toSceneAxis(tree.x);
 			const baseZ = toSceneAxis(tree.y);
 
@@ -105,6 +135,10 @@ function buildWorldField(chunks: WorldChunkState[]): WorldFieldBuild {
 		}
 
 		for (const hive of chunk.hives) {
+			if (!isWithinDetailRange(detailFocus, hive.x, hive.y, HIVE_DETAIL_DISTANCE)) {
+				continue;
+			}
+
 			const baseX = toSceneAxis(hive.x);
 			const baseZ = toSceneAxis(hive.y);
 
@@ -217,13 +251,18 @@ function InstancedLayer({
 export function InstancedWorldField({
 	chunks,
 	chunkSize,
+	detailFocus,
 	onTerrainPointerDown,
 }: {
 	chunks: WorldChunkState[];
 	chunkSize: number;
+	detailFocus?: DetailFocus;
 	onTerrainPointerDown?: (event: ThreeEvent<PointerEvent>) => void;
 }) {
-	const worldField = useMemo(() => buildWorldField(chunks), [chunks]);
+	const worldField = useMemo(
+		() => buildWorldField(chunks, detailFocus),
+		[chunks, detailFocus?.x, detailFocus?.y],
+	);
 	const terrainModel = useGLTF(TERRAIN_MODEL_PATH);
 	const flowersModel = useGLTF(FLOWERS_MODEL_PATH);
 	const hiveModel = useGLTF(HIVE_MODEL_PATH);
@@ -235,14 +274,10 @@ export function InstancedWorldField({
 	);
 	const waterMaterial = useMemo(
 		() =>
-			new MeshStandardMaterial({
-				color: "#5ac8fa",
-				emissive: "#0f5f8f",
-				emissiveIntensity: 0.18,
+			new MeshBasicMaterial({
+				color: "#76d5ff",
 				transparent: true,
-				opacity: 0.9,
-				roughness: 0.34,
-				metalness: 0.02,
+				opacity: 0.88,
 			}),
 		[],
 	);
