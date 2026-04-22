@@ -164,3 +164,65 @@ func TestRespawnFlowersLockedReactivatesFlower(t *testing.T) {
 		t.Fatalf("expected respawn timestamp to be cleared after reactivation")
 	}
 }
+
+func TestProcessWorldInteractionsAwardsXPWithFullBag(t *testing.T) {
+	baseTime := time.Date(2026, time.April, 22, 15, 15, 0, 0, time.UTC)
+	hub := newRuntimeTestHub(baseTime)
+	flower := firstActiveFlower(t, hub)
+	playerID := "player:test:fullbag"
+	player := &playerState{
+		ID:         playerID,
+		Username:   "fullbag",
+		X:          flower.Node.X,
+		Y:          flower.Node.Y,
+		Speed:      defaultPlayerSpeed,
+		UpdatedAt:  baseTime,
+		LastSeenAt: baseTime,
+	}
+	hub.players[playerID] = player
+	hub.profiles["fullbag"] = player
+	progress := hub.ensurePlayerProgressLocked(playerID)
+	progress.PollenCarried = progress.PollenCapacity
+
+	hub.processWorldInteractionsLocked(baseTime)
+	collection := hub.activeCollections[playerID]
+	if collection == nil {
+		t.Fatalf("expected collection to start even with full bag")
+	}
+
+	if changed := hub.processWorldInteractionsLocked(collection.CompleteAt); !changed {
+		t.Fatalf("expected full-bag collection to still mutate world state")
+	}
+
+	if progress.PollenCarried != progress.PollenCapacity {
+		t.Fatalf("expected pollen to stay capped at %d, got %d", progress.PollenCapacity, progress.PollenCarried)
+	}
+
+	if progress.XP <= 0 {
+		t.Fatalf("expected XP gain with full bag, got %d", progress.XP)
+	}
+
+	if flower.Available {
+		t.Fatalf("expected flower to be consumed even when only XP is gained")
+	}
+}
+
+func TestInitializeWorldEntitiesAddsCollectorHiveNearSpawn(t *testing.T) {
+	hub := newRuntimeTestHub(time.Date(2026, time.April, 22, 15, 20, 0, 0, time.UTC))
+	hive := hub.activeHives[collectorHiveID]
+	if hive == nil {
+		t.Fatalf("expected collector hive to be created")
+	}
+
+	if hive.State.Scale != collectorHiveScale {
+		t.Fatalf("expected collector hive scale %.1f, got %.1f", collectorHiveScale, hive.State.Scale)
+	}
+
+	if hive.Node.DepositRadius != collectorHiveDepositRadius {
+		t.Fatalf("expected collector hive radius %.2f, got %.2f", collectorHiveDepositRadius, hive.Node.DepositRadius)
+	}
+
+	if hive.State.X != collectorHiveX || hive.State.Y != collectorHiveY {
+		t.Fatalf("expected collector hive at %.1f,%.1f got %.1f,%.1f", collectorHiveX, collectorHiveY, hive.State.X, hive.State.Y)
+	}
+}

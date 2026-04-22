@@ -15,6 +15,11 @@ const defaultHiveDepositRadius = 0.8
 const defaultHoneyConversionRate = 10
 const flowerRespawnMinSeconds = 15
 const flowerRespawnMaxSeconds = 45
+const collectorHiveID = "hive:collector"
+const collectorHiveX = 0.5
+const collectorHiveY = 0.5
+const collectorHiveScale = 2.4
+const collectorHiveDepositRadius = 1.75
 
 type flowerSpawnSlot struct {
 	ID       string
@@ -169,6 +174,8 @@ func (hub *gameHub) initializeWorldEntities() {
 			Available: true,
 		}
 	}
+
+	hub.ensureCollectorHive()
 }
 
 func (hub *gameHub) buildVisibleChunksLocked(centerChunkX int, centerChunkY int) []worldChunkState {
@@ -290,26 +297,30 @@ func (hub *gameHub) processFlowerCollectionLocked(player *playerState, progress 
 		}
 
 		delete(hub.activeCollections, player.ID)
-		pollenCollected, err := hub.loopbase.CollectFlowerPollen(progress, flower.Node, player.X, player.Y)
-		if err != nil || pollenCollected <= 0 {
-			if err != nil {
-				hub.sendInteractionResult(hub.clients[player.ID], "collect_flower", false, 0, err.Error())
+		client := hub.clients[player.ID]
+		pollenCollected := 0
+		if progress.PollenCarried < progress.PollenCapacity {
+			collected, err := hub.loopbase.CollectFlowerPollen(progress, flower.Node, player.X, player.Y)
+			if err != nil || collected <= 0 {
+				if err != nil {
+					hub.sendInteractionResult(client, "collect_flower", false, 0, err.Error())
+				}
+				return false
 			}
-			return false
+			pollenCollected = collected
 		}
 
 		hub.scheduleFlowerRespawnLocked(flower, now)
-		client := hub.clients[player.ID]
-		hub.sendInteractionResult(client, "collect_flower", true, pollenCollected, fmt.Sprintf("Flor nivel %d coletada", flower.Level))
+		reason := fmt.Sprintf("Flor nivel %d coletada", flower.Level)
+		if pollenCollected == 0 {
+			reason = fmt.Sprintf("Mochila cheia: flor nivel %d estudada, XP ganho", flower.Level)
+		}
+		hub.sendInteractionResult(client, "collect_flower", true, pollenCollected, reason)
 		if hub.addXPToProgressLocked(progress, flowerXPForLevel(flower.Level)) {
 			hub.sendInteractionResult(client, "level_up", true, progress.Level, fmt.Sprintf("Nivel %d alcancado", progress.Level))
 		}
 		hub.sendPlayerStatus(client, progress)
 		return true
-	}
-
-	if progress.PollenCarried >= progress.PollenCapacity {
-		return false
 	}
 
 	flower := hub.findFlowerInRangeLocked(player.X, player.Y)
@@ -525,4 +536,43 @@ func flowerCollectDuration(level int) time.Duration {
 
 func positionKey(x float64, y float64) string {
 	return fmt.Sprintf("%d:%d", quantizeMapCoord(x), quantizeMapCoord(y))
+}
+
+func (hub *gameHub) ensureCollectorHive() {
+	if hub == nil {
+		return
+	}
+
+	if existing := hub.activeHives[collectorHiveID]; existing != nil {
+		existing.State.X = collectorHiveX
+		existing.State.Y = collectorHiveY
+		existing.State.Scale = collectorHiveScale
+		existing.Node.X = collectorHiveX
+		existing.Node.Y = collectorHiveY
+		existing.Node.DepositRadius = collectorHiveDepositRadius
+		return
+	}
+
+	chunkKey := buildChunkKey(worldAxisToChunk(collectorHiveX), worldAxisToChunk(collectorHiveY))
+	hub.activeHives[collectorHiveID] = &activeHiveRuntime{
+		ChunkKey: chunkKey,
+		State: worldHiveState{
+			ID:        collectorHiveID,
+			X:         collectorHiveX,
+			Y:         collectorHiveY,
+			GroundY:   0,
+			Scale:     collectorHiveScale,
+			ToneColor: hiveTonePalette[0],
+			GlowColor: hiveGlowPalette[2],
+		},
+		Node: &loopbase.HiveNode{
+			ID:             collectorHiveID,
+			X:              collectorHiveX,
+			Y:              collectorHiveY,
+			GroundY:        0,
+			ZoneID:         hub.world.zoneIDAt(collectorHiveX, collectorHiveY),
+			DepositRadius:  collectorHiveDepositRadius,
+			ConversionRate: defaultHoneyConversionRate,
+		},
+	}
 }

@@ -27,6 +27,7 @@ import type {
   GameSessionState,
   RenderPerformanceSnapshot,
   WorldChunkState,
+  WorldFlowerState,
   WorldPlayerState,
 } from "../../types/game";
 import { usePlayerControls } from "../../hooks/usePlayerControls";
@@ -973,7 +974,7 @@ interface HiveCoreProps {
   localPlayerId?: string;
   localPlayerPositionRef: MutableRefObject<Vector3>;
   onMoveToTarget: (x: number, z: number) => void;
-  onFlowerClick?: (flowerId: string) => void;
+  onFlowerClick?: (flower: WorldFlowerState) => void;
   onHiveClick?: () => void;
   tapTargetingConfig?: Partial<TapTargetingConfig>;
 }
@@ -1180,7 +1181,7 @@ interface GameViewportProps {
   onPerformanceChange: (snapshot: RenderPerformanceSnapshot) => void;
   onMoveToTarget: (x: number, z: number) => void;
   onRespawn: () => void;
-  onFlowerClick?: (flowerId: string) => void;
+  onFlowerClick?: (flower: WorldFlowerState) => void;
   onHiveClick?: () => void;
   tapTargetingConfig?: Partial<TapTargetingConfig>;
 }

@@ -13,7 +13,7 @@ import {
 	Object3D,
 } from "three";
 
-import type { MapZone, PlayerProgressState, WorldChunkState } from "../../types/game";
+import type { MapZone, PlayerProgressState, WorldChunkState, WorldFlowerState } from "../../types/game";
 import {
 	TERRAIN_BLOCK_SCALE,
 	toSceneAxis,
@@ -219,7 +219,7 @@ export function InstancedWorldField({
 	chunkSize: number;
 	detailFocus?: DetailFocus;
 	terrainPointerHandlers?: TapTargetingHandlers;
-	onFlowerClick?: (flowerId: string) => void;
+	onFlowerClick?: (flower: WorldFlowerState) => void;
 	onHiveClick?: (hiveId: string) => void;
 	zones?: MapZone[];
 	playerProgress?: PlayerProgressState;
@@ -259,7 +259,7 @@ export function InstancedWorldField({
 	// Capped to 200 nearest flowers to keep per-mesh draw calls manageable.
 	const MAX_VISIBLE_FLOWERS = 200;
 	const visibleFlowers = useMemo(() => {
-		const flowers = [];
+		const flowers: WorldFlowerState[] = [];
 
 		for (const chunk of chunks) {
 			for (const flower of chunk.flowers || []) {
@@ -293,9 +293,13 @@ export function InstancedWorldField({
 	// Stable callbacks so FlowerVisual/HiveVisual memo stays effective across ticks.
 	const handleFlowerClick = useCallback(
 		(_event: ThreeEvent<PointerEvent>, flowerId: string, _index: number) => {
-			onFlowerClick?.(flowerId);
+			const flower = visibleFlowers.find((item) => item.id === flowerId);
+			if (!flower) {
+				return;
+			}
+			onFlowerClick?.(flower);
 		},
-		[onFlowerClick],
+		[onFlowerClick, visibleFlowers],
 	);
 	const handleHiveClick = useCallback(
 		(_event: ThreeEvent<PointerEvent>, hiveId: string, _index: number) => {

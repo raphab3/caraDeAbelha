@@ -77,6 +77,7 @@ export default function PlayerExperience() {
               chunkSize={gameSession.chunkSize}
               connectionState={gameSession.connectionState}
               localPlayerId={gameSession.localPlayerId}
+              onFlowerClick={(flower) => gameSession.moveToTarget(flower.x, flower.y)}
               onMoveToTarget={gameSession.moveToTarget}
               onPerformanceChange={ignoreRenderPerformance}
               onRespawn={gameSession.respawn}

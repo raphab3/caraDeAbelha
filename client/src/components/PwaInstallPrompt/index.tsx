@@ -2,8 +2,32 @@ import { useState } from "react";
 
 import { usePwaInstallPrompt } from "../../hooks/usePwaInstallPrompt";
 
+const DISMISS_STORAGE_KEY = "cara-de-abelha.installPromptDismissedUntil";
+const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+
+function readDismissedState(): boolean {
+  const storedValue = window.localStorage.getItem(DISMISS_STORAGE_KEY);
+
+  if (!storedValue) {
+    return false;
+  }
+
+  const dismissedUntil = Number(storedValue);
+
+  if (!Number.isFinite(dismissedUntil) || dismissedUntil <= Date.now()) {
+    window.localStorage.removeItem(DISMISS_STORAGE_KEY);
+    return false;
+  }
+
+  return true;
+}
+
+function persistDismissal(): void {
+  window.localStorage.setItem(DISMISS_STORAGE_KEY, String(Date.now() + DISMISS_DURATION_MS));
+}
+
 export function PwaInstallPrompt() {
-  const [isDismissed, setIsDismissed] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(readDismissedState);
   const [isPrompting, setIsPrompting] = useState(false);
   const { canInstall, isInstalled, isIosManualInstall, promptInstall } = usePwaInstallPrompt();
 
@@ -53,6 +77,7 @@ export function PwaInstallPrompt() {
         <button
           className="player-install-banner__dismiss"
           onClick={() => {
+            persistDismissal();
             setIsDismissed(true);
           }}
           type="button"
