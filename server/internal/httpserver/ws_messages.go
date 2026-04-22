@@ -9,6 +9,11 @@ type playerAction struct {
 	Z    float64 `json:"z,omitempty"`
 }
 
+type collectFlowerAction struct {
+	Type     string `json:"type"`
+	FlowerID string `json:"flowerId"`
+}
+
 type playerState struct {
 	ID         string    `json:"id"`
 	Username   string    `json:"username"`

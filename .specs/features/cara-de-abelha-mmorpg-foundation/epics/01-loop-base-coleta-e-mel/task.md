@@ -5,9 +5,9 @@ Epic ID: EPIC-CDAM-01
 
 ## Task list
 
-- [ ] `TASK-CDAM-01-01` Modelar `PlayerProgress`, `FlowerNode` e `HiveNode` no backend com estado minimo para polen, capacidade, mel e raios de interacao.
+- [x] `TASK-CDAM-01-01` Modelar `PlayerProgress`, `FlowerNode` e `HiveNode` no backend com estado minimo para polen, capacidade, mel e raios de interacao.
 - [ ] `TASK-CDAM-01-02` Promover flores e colmeias do mundo atual para entidades interativas do servidor, preservando o snapshot visual existente.
-- [ ] `TASK-CDAM-01-03` Adicionar a acao `collect_flower` no protocolo e validar distancia, existencia da flor, capacidade da mochila e disponibilidade de polen.
+- [x] `TASK-CDAM-01-03` Adicionar a acao `collect_flower` no protocolo e validar distancia, existencia da flor, capacidade da mochila e disponibilidade de polen.
 - [ ] `TASK-CDAM-01-04` Implementar a regra de deposito automatico ao entrar na area da colmeia, com conversao autoritativa de polen em mel.
 - [ ] `TASK-CDAM-01-05` Adicionar mensagens `player_status` e `interaction_result` sem misturar todo o HUD dentro de `state`.
 - [ ] `TASK-CDAM-01-06` Estender `client/src/types/game.ts` e `client/src/hooks/useGameSession.ts` para armazenar progresso local e feedback efemero.

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/loopbase"
 )
 
 const maxUsernameLength = 24
@@ -36,6 +37,7 @@ type gameHub struct {
 	players    map[string]*playerState
 	profiles   map[string]*playerState
 	world      worldLayout
+	loopbase   *loopbase.LoopBaseService
 	tick       uint64
 	now        func() time.Time
 	pingPeriod time.Duration
@@ -54,6 +56,7 @@ func newGameHub() *gameHub {
 		players:    make(map[string]*playerState),
 		profiles:   make(map[string]*playerState),
 		world:      loadWorldLayout(),
+		loopbase:   loopbase.NewLoopBaseService(),
 		now:        time.Now,
 		pingPeriod: websocketPingPeriod,
 		pongWait:   websocketPongWait,
