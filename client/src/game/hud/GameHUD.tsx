@@ -1,4 +1,4 @@
-import type { GameSessionController, InteractionResult, PlayerProgressState } from "../../types/game";
+import type { FlowerInteractionState, GameSessionController, InteractionResult, PlayerProgressState } from "../../types/game";
 import { ResourceRibbon } from "./ResourceRibbon";
 import { ObjectivePanel } from "./ObjectivePanel";
 import { InteractionFeed } from "./InteractionFeed";
@@ -7,6 +7,7 @@ import { ZoneUnlockPanel } from "./ZoneUnlockPanel";
 export interface GameHUDProps {
   playerProgress: PlayerProgressState | undefined;
   lastInteraction: InteractionResult | undefined;
+  flowerInteraction: FlowerInteractionState | undefined;
   gameSessionController: GameSessionController | undefined;
   lockedZoneId: string | undefined;
 }
@@ -22,6 +23,7 @@ export interface GameHUDProps {
 export const GameHUD = ({
   playerProgress,
   lastInteraction,
+  flowerInteraction,
   gameSessionController,
   lockedZoneId,
 }: GameHUDProps) => {
@@ -29,7 +31,11 @@ export const GameHUD = ({
     <>
       {/* Top Ribbon with Resources */}
       <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none">
-        <ResourceRibbon playerProgress={playerProgress} lastInteraction={lastInteraction} />
+        <ResourceRibbon
+          playerProgress={playerProgress}
+          lastInteraction={lastInteraction}
+          flowerInteraction={flowerInteraction}
+        />
       </div>
 
       {/* Left Panel with Objectives */}

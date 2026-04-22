@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import type { InteractionResult, PlayerProgressState } from "../../types/game";
+import type { FlowerInteractionState, InteractionResult, PlayerProgressState } from "../../types/game";
 
 export interface ResourceRibbonProps {
   playerProgress: PlayerProgressState | undefined;
   lastInteraction: InteractionResult | undefined;
+  flowerInteraction: FlowerInteractionState | undefined;
 }
 
 /**
@@ -14,7 +15,7 @@ export interface ResourceRibbonProps {
  * - XP progress bar
  * - Brief flash feedback on interaction (e.g., "+5 pollen", "+2 honey")
  */
-export const ResourceRibbon = ({ playerProgress, lastInteraction }: ResourceRibbonProps) => {
+export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteraction }: ResourceRibbonProps) => {
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
 
   // Show flash message on interaction
@@ -54,6 +55,16 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction }: ResourceRibb
   const pollenPercent = (playerProgress.pollenCarried / playerProgress.pollenCapacity) * 100;
   // Estimate XP bar (assuming level progression)
   const xpPercent = (playerProgress.xp % 100); // Placeholder: 0-100 per level
+  const flowerInteractionLabel =
+    flowerInteraction?.phase === "collecting"
+      ? "Coletando flor"
+      : flowerInteraction
+        ? "Indo coletar"
+        : null;
+  const flowerInteractionTone =
+    flowerInteraction?.phase === "collecting"
+      ? "from-emerald-500/90 to-lime-400/90 border-emerald-200/60 text-emerald-50"
+      : "from-sky-500/90 to-cyan-400/90 border-sky-200/60 text-sky-50";
 
   return (
     <div className="px-4 py-4 flex items-start justify-between pointer-events-none">
@@ -108,6 +119,24 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction }: ResourceRibb
           </div>
         </div>
       </div>
+
+      {flowerInteractionLabel ? (
+        <div className="pointer-events-none flex items-start justify-end">
+          <div
+            className={`min-h-11 rounded-full border bg-gradient-to-r px-4 py-2 shadow-xl backdrop-blur-md ${flowerInteractionTone}`}
+            role="status"
+            aria-live="polite"
+          >
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-2.5 w-2.5 rounded-full bg-current opacity-90 animate-pulse" />
+              <div className="flex flex-col leading-none">
+                <span className="text-[10px] font-bold uppercase tracking-[0.24em] opacity-85">Flor alvo</span>
+                <span className="mt-1 text-sm font-black">{flowerInteractionLabel}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Flash Feedback */}
       {flashMessage && (

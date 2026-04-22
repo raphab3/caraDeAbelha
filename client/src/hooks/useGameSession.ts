@@ -4,18 +4,25 @@ import { WS_URL } from "../game/env";
 import { WSClient } from "../game/WSClient";
 import type {
   ClientMessage,
+  FlowerInteractionState,
   GameSessionController,
   GameSessionState,
   InteractionResult,
   PlayerStatusMessage,
   SessionMessage,
   WorldStateMessage,
+  WorldChunkState,
+  WorldFlowerState,
+  WorldPlayerState,
   ZoneStateMessage,
 } from "../types/game";
 
 const DEFAULT_DISCONNECT_ERROR = "A conexao com o jardim ficou sem resposta. Tente reconectar.";
 const OFFLINE_DISCONNECT_ERROR = "Sua internet ficou offline. Tente reconectar para voltar ao jardim.";
 const WS_CONNECT_ERROR = "Falha ao conectar no websocket do jogo.";
+const FLOWER_COLLECT_RADIUS = 0.65;
+const FLOWER_TARGET_SNAP_DISTANCE = 0.45;
+const FLOWER_TARGET_GRACE_MS = 1200;
 
 function createDefaultPlayerProgress() {
   return {
@@ -90,6 +97,75 @@ function isZoneStateMessage(message: unknown): message is ZoneStateMessage {
 function resolveDisconnectError(reason?: string): string {
   const normalizedReason = reason?.trim();
   return normalizedReason ? normalizedReason : DEFAULT_DISCONNECT_ERROR;
+}
+
+function hasMoveTarget(player: WorldPlayerState): player is WorldPlayerState & { targetX: number; targetY: number } {
+  return player.targetX !== undefined && player.targetY !== undefined;
+}
+
+function findFlowerById(chunks: WorldChunkState[], flowerId: string): WorldFlowerState | undefined {
+  for (const chunk of chunks) {
+    const flower = chunk.flowers.find((item) => item.id === flowerId);
+    if (flower) {
+      return flower;
+    }
+  }
+
+  return undefined;
+}
+
+function resolveFlowerInteraction(
+  current: FlowerInteractionState | undefined,
+  localPlayerId: string | undefined,
+  players: WorldPlayerState[],
+  chunks: WorldChunkState[],
+): FlowerInteractionState | undefined {
+  if (!current || !localPlayerId) {
+    return undefined;
+  }
+
+  const localPlayer = players.find((player) => player.id === localPlayerId);
+  if (!localPlayer) {
+    return current;
+  }
+
+  const flower = findFlowerById(chunks, current.flowerId);
+  if (!flower) {
+    return undefined;
+  }
+
+  const distanceToFlower = Math.hypot(localPlayer.x - flower.x, localPlayer.y - flower.y);
+  if (distanceToFlower <= FLOWER_COLLECT_RADIUS) {
+    return {
+      ...current,
+      flowerX: flower.x,
+      flowerY: flower.y,
+      phase: "collecting",
+    };
+  }
+
+  if (hasMoveTarget(localPlayer)) {
+    const distanceToTarget = Math.hypot(localPlayer.targetX - flower.x, localPlayer.targetY - flower.y);
+    if (distanceToTarget <= FLOWER_TARGET_SNAP_DISTANCE) {
+      return {
+        ...current,
+        flowerX: flower.x,
+        flowerY: flower.y,
+        phase: "moving",
+      };
+    }
+  }
+
+  if (Date.now() - current.startedAt <= FLOWER_TARGET_GRACE_MS) {
+    return {
+      ...current,
+      flowerX: flower.x,
+      flowerY: flower.y,
+      phase: "moving",
+    };
+  }
+
+  return undefined;
 }
 
 export function useGameSession(username?: string, reconnectKey = 0): GameSessionController {
@@ -186,6 +262,10 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
         if (isInteractionResultMessage(message)) {
           setGameSession((current) => ({
             ...current,
+            flowerInteraction:
+              message.action === "collect_flower" || message.action === "failed_collection"
+                ? undefined
+                : current.flowerInteraction,
             lastInteraction: message,
           }));
 
@@ -224,6 +304,12 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
           renderDistance: message.renderDistance,
           chunkSize: message.chunkSize,
           tick: message.tick,
+          flowerInteraction: resolveFlowerInteraction(
+            current.flowerInteraction,
+            current.localPlayerId,
+            message.players,
+            message.chunks,
+          ),
           error: undefined,
         }));
       },
@@ -270,6 +356,21 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
     });
   };
 
+  const targetFlower = (flower: WorldFlowerState) => {
+    setGameSession((current) => ({
+      ...current,
+      flowerInteraction: {
+        flowerId: flower.id,
+        flowerX: flower.x,
+        flowerY: flower.y,
+        startedAt: Date.now(),
+        phase: "moving",
+      },
+    }));
+
+    moveToTarget(flower.x, flower.y);
+  };
+
   const respawn = () => {
     clientRef.current?.send({
       type: "respawn",
@@ -283,6 +384,7 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
   return {
     ...gameSession,
     moveToTarget,
+    targetFlower,
     respawn,
     sendAction,
   };

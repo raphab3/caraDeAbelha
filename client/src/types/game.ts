@@ -206,6 +206,14 @@ export interface InteractionResult {
   timestamp: number; // Unix milliseconds
 }
 
+export interface FlowerInteractionState {
+  flowerId: string;
+  flowerX: number;
+  flowerY: number;
+  startedAt: number;
+  phase: "moving" | "collecting";
+}
+
 // Player status update from server
 export interface PlayerStatusMessage {
   type: "player_status";
@@ -255,6 +263,7 @@ export interface GameSessionState {
   tick: number;
   playerProgress?: PlayerProgressState;
   lastInteraction?: InteractionResult;
+  flowerInteraction?: FlowerInteractionState;
   zones?: MapZone[];
   transitions?: MapTransition[];
   zoneState?: ZoneStateMessage;
@@ -263,6 +272,7 @@ export interface GameSessionState {
 
 export interface GameSessionController extends GameSessionState {
   moveToTarget: (x: number, z: number) => void;
+  targetFlower: (flower: WorldFlowerState) => void;
   respawn: () => void;
   sendAction: (action: ClientMessage) => void;
 }

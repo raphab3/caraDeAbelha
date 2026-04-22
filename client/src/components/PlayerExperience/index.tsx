@@ -77,7 +77,7 @@ export default function PlayerExperience() {
               chunkSize={gameSession.chunkSize}
               connectionState={gameSession.connectionState}
               localPlayerId={gameSession.localPlayerId}
-              onFlowerClick={(flower) => gameSession.moveToTarget(flower.x, flower.y)}
+              onFlowerClick={gameSession.targetFlower}
               onMoveToTarget={gameSession.moveToTarget}
               onPerformanceChange={ignoreRenderPerformance}
               onRespawn={gameSession.respawn}
@@ -138,6 +138,7 @@ export default function PlayerExperience() {
 
         {showGameHud ? (
           <GameHUD
+            flowerInteraction={gameSession.flowerInteraction}
             gameSessionController={gameSession}
             lastInteraction={gameSession.lastInteraction}
             lockedZoneId={undefined}
