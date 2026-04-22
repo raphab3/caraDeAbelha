@@ -130,8 +130,6 @@ const disconnectedBeaconMaterial = new MeshStandardMaterial({
   emissiveIntensity: 0.8,
 });
 
-const COLLECTOR_HIVE_ID = "hive:collector";
-
 const BEE_LEFT_STRIPE_OFFSET = new Vector3(-0.35, 0, 0);
 const BEE_RIGHT_STRIPE_OFFSET = new Vector3(0.35, 0, 0);
 const BEE_STINGER_OFFSET = new Vector3(0.84, 0, 0);
