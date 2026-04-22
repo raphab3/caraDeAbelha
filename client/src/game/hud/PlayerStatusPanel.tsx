@@ -2,6 +2,7 @@ import type { PlayerProgressState } from "../../types/game";
 
 export interface PlayerStatusPanelProps {
   currentZoneName: string;
+  isMobile: boolean;
   isOpen: boolean;
   onClose: () => void;
   playerProgress: PlayerProgressState;
@@ -11,22 +12,21 @@ function getXpRequiredForLevel(level: number): number {
   return Math.max(level * 100, 100);
 }
 
-export const PlayerStatusPanel = ({ currentZoneName, isOpen, onClose, playerProgress }: PlayerStatusPanelProps) => {
+interface PlayerStatusPanelContentProps {
+  currentZoneName: string;
+  playerProgress: PlayerProgressState;
+  onClose: () => void;
+}
+
+function PlayerStatusPanelContent({ currentZoneName, onClose, playerProgress }: PlayerStatusPanelContentProps) {
   const xpRequired = getXpRequiredForLevel(playerProgress.level);
   const xpProgress = Math.min((playerProgress.xp / xpRequired) * 100, 100);
   const pollenProgress = playerProgress.pollenCapacity > 0
     ? Math.min((playerProgress.pollenCarried / playerProgress.pollenCapacity) * 100, 100)
     : 0;
 
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <section
-      aria-label="Status do jogador"
-      className="w-[22rem] max-w-[calc(100vw-2rem)] rounded-[28px] border border-slate-700/70 bg-slate-950/88 p-4 text-slate-50 shadow-[0_24px_80px_rgba(15,23,42,0.48)] backdrop-blur-xl"
-    >
+    <>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-cyan-200/70">Status</p>
@@ -36,7 +36,7 @@ export const PlayerStatusPanel = ({ currentZoneName, isOpen, onClose, playerProg
 
         <button
           aria-label="Fechar status do jogador"
-          className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-700/80 bg-slate-900/70 text-slate-200 transition hover:border-cyan-300/60 hover:text-white"
+          className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-700/80 bg-slate-900/70 text-slate-200 transition hover:border-cyan-300/60 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
           onClick={onClose}
           type="button"
         >
@@ -119,6 +119,53 @@ export const PlayerStatusPanel = ({ currentZoneName, isOpen, onClose, playerProg
           </div>
         </div>
       </div>
+    </>
+  );
+}
+
+export const PlayerStatusPanel = ({ currentZoneName, isMobile, isOpen, onClose, playerProgress }: PlayerStatusPanelProps) => {
+
+  if (!isOpen) {
+    return null;
+  }
+
+  if (isMobile) {
+    return (
+      <div className="fixed inset-0 z-50 md:hidden">
+        <button
+          aria-label="Fechar status do jogador"
+          className="absolute inset-0 bg-slate-950/70 backdrop-blur-[2px]"
+          onClick={onClose}
+          type="button"
+        />
+
+        <section
+          aria-label="Status do jogador"
+          aria-modal="true"
+          className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-[32px] border border-slate-700/70 bg-slate-950/95 p-4 pb-6 text-slate-50 shadow-[0_-24px_80px_rgba(15,23,42,0.56)] backdrop-blur-xl"
+          role="dialog"
+        >
+          <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-slate-700/90" />
+          <PlayerStatusPanelContent
+            currentZoneName={currentZoneName}
+            onClose={onClose}
+            playerProgress={playerProgress}
+          />
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <section
+      aria-label="Status do jogador"
+      className="w-[22rem] max-w-[calc(100vw-2rem)] rounded-[28px] border border-slate-700/70 bg-slate-950/88 p-4 text-slate-50 shadow-[0_24px_80px_rgba(15,23,42,0.48)] backdrop-blur-xl"
+    >
+      <PlayerStatusPanelContent
+        currentZoneName={currentZoneName}
+        onClose={onClose}
+        playerProgress={playerProgress}
+      />
     </section>
   );
 };

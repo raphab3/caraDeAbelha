@@ -14,6 +14,7 @@ export interface ObjectivePanelProps {
  */
 export const ObjectivePanel = ({ playerProgress }: ObjectivePanelProps) => {
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(() => window.matchMedia("(max-width: 767px)").matches);
 
   // Zone name mapping (placeholder - would come from server in production)
   const zoneNames: Record<string, string> = {
@@ -29,12 +30,39 @@ export const ObjectivePanel = ({ playerProgress }: ObjectivePanelProps) => {
   };
 
   useEffect(() => {
-    if (!isStatusOpen) {
-      return;
-    }
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const handleChange = (event: MediaQueryListEvent) => {
+      setIsMobileViewport(event.matches);
+    };
 
+    setIsMobileViewport(mediaQuery.matches);
+    mediaQuery.addEventListener("change", handleChange);
+
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+    };
+  }, []);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return;
+      }
+
+      const normalizedKey = event.key.toLowerCase();
+      if (normalizedKey === "c") {
+        event.preventDefault();
+        setIsStatusOpen((current) => !current);
+        return;
+      }
+
+      if (normalizedKey === "escape") {
         setIsStatusOpen(false);
       }
     };
@@ -44,7 +72,7 @@ export const ObjectivePanel = ({ playerProgress }: ObjectivePanelProps) => {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isStatusOpen]);
+  }, []);
 
   if (!playerProgress) return null;
 
@@ -83,7 +111,8 @@ export const ObjectivePanel = ({ playerProgress }: ObjectivePanelProps) => {
       <button
         aria-controls="player-status-panel"
         aria-expanded={isStatusOpen}
-        className="min-h-11 self-start rounded-full border border-slate-700/60 bg-slate-900/72 px-4 py-2.5 text-left shadow-lg backdrop-blur-md transition hover:border-cyan-300/60 hover:bg-slate-900/82 pointer-events-auto"
+        aria-keyshortcuts="C"
+        className="min-h-11 self-start rounded-full border border-slate-700/60 bg-slate-900/72 px-4 py-2.5 text-left shadow-lg backdrop-blur-md transition hover:border-cyan-300/60 hover:bg-slate-900/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70 pointer-events-auto"
         onClick={() => {
           setIsStatusOpen((current) => !current);
         }}
@@ -103,6 +132,9 @@ export const ObjectivePanel = ({ playerProgress }: ObjectivePanelProps) => {
             <span className="text-sm font-black text-white">
               {isStatusOpen ? "Fechar status" : "Abrir status"}
             </span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+              tecla C
+            </span>
           </span>
         </span>
       </button>
@@ -110,6 +142,7 @@ export const ObjectivePanel = ({ playerProgress }: ObjectivePanelProps) => {
       <div id="player-status-panel" className="pointer-events-auto self-start">
         <PlayerStatusPanel
           currentZoneName={currentZoneName}
+          isMobile={isMobileViewport}
           isOpen={isStatusOpen}
           onClose={() => {
             setIsStatusOpen(false);
