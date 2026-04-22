@@ -489,3 +489,441 @@ O proximo passo operacional e abrir o epic do loop base com implementacao de:
 4. HUD de recursos e objetivo atual
 
 Isso valida o coracao economico do jogo sem antecipar combate, pets ou world boss.
+
+## Addendum de Design - Epic 07: Cidade-Colmeia Compartilhada e Comercio Basico
+
+Status: approved
+
+Este addendum usa `EPIC-CDAM-07` como fonte obrigatoria de produto para detalhar a primeira versao da super colmeia compartilhada.
+
+### Escopo
+
+Esta fase cobre:
+
+- a arquitetura da `zone:hive_city` como hub compartilhado e sempre acessivel
+- o desenho de respawn e reconexao com retorno oficial para a cidade
+- o modelo autoritativo de NPCs vendedores e catalogo basico de compras com mel
+- as regras de zona segura no hub
+- a direcao visual e de UX da cidade, do fluxo de compra e dos estados de interface
+
+Nao cobre:
+
+- trade entre jogadores
+- marketplace ou leilao
+- inventario completo de itens tradicionais
+- quest hub completo
+- guildas, chat global ou party system
+
+### Contexto Atual
+
+#### Codebase
+
+- `server/internal/httpserver/world_runtime.go` ja controla entidades interativas runtime, inclusive a colmeia coletora adicionada fora do mapa base. Isso prova que o hub pode nascer com entidades especiais sem reescrever o mundo inteiro.
+- `server/internal/httpserver/world_map.go` ja suporta `zones` e `transitions`, mas os `props` do mapa ainda aceitam apenas `flower`, `tree` e `hive`. NPC vendedor fisico ainda nao existe no formato do mapa.
+- `server/internal/httpserver/ws_player.go` ainda trata `respawn` usando `profileSpawnPosition(profileKey)`, e `register(...)` restaura posicao persistida do jogador. Isso conflita diretamente com a decisao aprovada de sempre retornar para a cidade em respawn e reconexao.
+- `server/internal/httpserver/persistence.go` ja persiste economia e posicao do jogador. O estado atual e suficiente para salvar progresso, mas ainda nao diferencia `ultimo ponto do mundo` de `ponto oficial de entrada no hub`.
+- `server/internal/httpserver/ws_messages.go` ja define o padrao de acoes transacionais curtas como `collect_flower`, `unlock_zone`, `player_status` e `interaction_result`. O comercio do hub deve seguir esse mesmo modelo.
+- `client/src/hooks/useGameSession.ts` ja separa `state`, `player_status`, `interaction_result` e `zone_state`, o que reduz o custo de adicionar um contrato de vendedores sem inflar o snapshot publico.
+- `client/src/components/GameViewport/index.tsx` continua sendo o palco 3D principal com `MiniMap` e overlays de HUD em volta do canvas. Isso favorece uma cidade integrada ao mesmo mundo, nao uma tela paralela fora do viewport.
+- `client/src/game/hud/ResourceRibbon.tsx` ja demonstra uma direcao visual mais apropriada para gameplay, com copy curta e leitura rapida. Esse padrao deve ser seguido pelo fluxo de compra.
+
+#### Docs
+
+- `ARCHITECTURE.md` reafirma a arquitetura server-authoritative e lista `ZoneGateRenderer`, `ZoneUnlockPanel` e `ZoneService` como superfícies do ecossistema, o que combina com um hub que convive com progressao territorial sem substitui-la.
+- `docs/main.md` continua tratando mel como recurso central do loop e posiciona o jogo como multiplayer 3D compartilhado, o que reforca a necessidade de um centro social legivel.
+- o `epic.md` do Epic 07 ja travou as decisoes centrais: cidade sempre acessivel, respawn e reconexao no hub, NPCs fisicos e comercio basico autoritativo.
+
+#### Context7
+
+- a documentacao do React Three Fiber reforca que o hub deve reutilizar geometria, materiais e `InstancedMesh` para elementos repetidos, evitando remontagem desnecessaria.
+- a mesma documentacao reforca que atualizacoes frequentes de cena e presenca multiplayer devem continuar fora de `setState` em loops quentes, privilegiando mutacao controlada e estruturas estaveis.
+
+#### Web
+
+- a pagina oficial de pitfalls do R3F reforca tres restricoes relevantes para a cidade: evitar mount/unmount de partes inteiras da cena, nao criar objetos novos em loops de frame e nao mover atualizacao rapida para React state.
+
+#### Incerteza Explicita
+
+- ainda nao esta fechado se o jogador sempre retornara para a cidade em toda reconexao futura ou apenas na primeira versao; este design assume o retorno sempre para simplificar consistencia e onboarding.
+- o catalogo inicial ainda nao tem tabela final de precos; o design precisa preservar rebalanceamento facil.
+- o jogo ainda nao tem inventario geral. Isso muda materialmente como os "consumiveis" devem ser modelados na primeira fatia.
+
+### Decisao Principal
+
+Implementar a super colmeia como uma zona fisica do mesmo mundo autoritativo, `zone:hive_city`, e nao como cena separada, tela de menu ou instancia especial.
+
+Essa zona sera:
+
+- sempre acessivel
+- segura
+- compartilhada entre jogadores de todos os niveis
+- ponto oficial de respawn e reconexao
+- sede dos primeiros NPCs vendedores com compras autoritativas em mel
+
+### Por Que Esta Decisao
+
+- o codebase atual ja trabalha com mundo unico, chunks visiveis e snapshots por jogador; inserir a cidade no mesmo mundo exige menos risco do que abrir um segundo modo de cena
+- a cidade precisa parecer parte do mundo, nao overlay de lobby
+- manter tudo no mesmo protocolo simplifica presenca de outros jogadores, minimapa, transicoes e retorno ao jardim
+- isso preserva o papel do Epic 02: a cidade e o centro social e comercial; as zonas continuam sendo o centro de progressao territorial
+
+### Decisoes Nao Obvias
+
+1. cidade no mesmo mundo, nao em instancia separada
+
+- reduz custo arquitetural
+- reaproveita chunks, camera, viewport e snapshot atual
+- mantem a leitura de MMO sem troca brusca de modo
+
+2. consumiveis sem inventario completo na primeira fatia
+
+- o projeto ainda nao possui bolsa de itens, stack persistente ou slot de uso
+- portanto, os consumiveis iniciais nao devem abrir um sistema de inventario acidentalmente
+- eles serao compras de efeito imediato ou temporario, com semantica de consumivel, mas sem exigir backpack de itens
+
+3. reconexao volta para a cidade, mesmo com posicao persistida
+
+- a persistencia atual guarda coordenadas do mundo
+- neste epic, a cidade precisa funcionar como ponto de retorno previsivel e de reentrada segura
+- portanto, progresso economico continua sendo persistido, mas a entrada de sessao deve priorizar o spawn oficial da `zone:hive_city`
+
+### Arquitetura Proposta
+
+#### Backend
+
+##### Mapa e zona da cidade
+
+- adicionar `zone:hive_city` ao mapa autoritativo com bounds dedicados e transicoes claras para o mundo de coleta
+- a cidade deve ficar em uma area curada do mapa, nao procedural, para controlar legibilidade, fluxo e densidade social
+- os pontos de retorno do hub devem ser definidos como coordenadas autoritativas do mundo, separadas do `profileSpawnPosition(profileKey)` atual
+
+##### Entidades do hub
+
+Introduzir um novo tipo runtime e um novo estado publico minimo:
+
+```go
+type worldVendorState struct {
+    ID            string  `json:"id"`
+    X             float64 `json:"x"`
+    Y             float64 `json:"y"`
+    GroundY       float64 `json:"groundY"`
+    ZoneID        string  `json:"zoneId"`
+    DisplayName   string  `json:"displayName"`
+    CatalogID     string  `json:"catalogId"`
+    Role          string  `json:"role"`
+    InteractRadius float64 `json:"interactRadius"`
+}
+```
+
+Escolha arquitetural:
+
+- vendedores devem existir como entidades de mundo, nao apenas botoes de HUD
+- o mapa pode evoluir para aceitar `vendor` como prop autoritativo
+- se isso atrasar demais a primeira fatia, a mesma estrategia usada para `collectorHive` pode ser usada para injetar vendedores runtime enquanto o formato do mapa e ampliado
+
+##### Comercio autoritativo
+
+Adicionar contrato transacional alinhado ao padrao atual:
+
+```ts
+interface PurchaseVendorItemAction {
+  type: "purchase_vendor_item";
+  vendorId: string;
+  itemId: string;
+  quantity?: number;
+}
+```
+
+Mensagem de catalogo recomendada:
+
+```ts
+interface VendorCatalogMessage {
+  type: "vendor_catalog";
+  vendors: {
+    vendorId: string;
+    displayName: string;
+    role: string;
+    catalogId: string;
+    entries: {
+      itemId: string;
+      displayName: string;
+      description: string;
+      priceHoney: number;
+      fulfillment: "instant_effect" | "temporary_buff" | "permanent_upgrade";
+    }[];
+  }[];
+}
+```
+
+Regras:
+
+- o servidor valida distancia ate o NPC, saldo em mel e disponibilidade do item
+- a compra desconta mel uma unica vez
+- o resultado continua sendo comunicado com `interaction_result`
+- `player_status` e enviado em seguida quando a compra muda estado persistente do jogador
+
+##### Catalogo da primeira fatia
+
+Para evitar invadir inventario e builds completos, a primeira fatia deve usar apenas dois fulfillment modes praticos:
+
+- `temporary_buff`
+  - exemplo: `Nectar Corrido`
+  - efeito: bonus curto de velocidade para a sessao atual
+- `permanent_upgrade`
+  - exemplo: `Reforco de Mochila I`
+  - efeito: `pollenCapacity +10`
+
+Isso atende a decisao de vender consumiveis e upgrades permanentes simples sem exigir uma mochila de itens tradicional antes da hora.
+
+##### Respawn e reconexao
+
+O design recomendado e separar duas ideias que hoje estao misturadas:
+
+- estado persistido de progresso
+- ponto oficial de entrada na sessao
+
+Regra desta fase:
+
+- ao registrar ou reconectar, o jogador entra em `zone:hive_city`
+- ao usar `respawn`, o jogador volta para `zone:hive_city`
+- a posicao persistida do mundo pode continuar sendo salva para analise ou uso futuro, mas nao dirige a entrada da sessao nesta fatia
+
+##### Zona segura
+
+Dentro da `zone:hive_city`:
+
+- negar `collect_flower`
+- negar deposito automatico em colmeias de progressao
+- negar desbloqueio territorial por proximidade ou gate local
+- permitir apenas locomocao, interacao com NPCs e leitura social do hub
+
+#### Frontend
+
+##### Estado e protocolo
+
+`useGameSession` deve continuar separando:
+
+- `state` para cena compartilhada
+- `player_status` para economia e stats do jogador
+- `interaction_result` para feedback efemero
+- `vendor_catalog` para UI de compras
+
+Nao empurrar o catalogo inteiro para dentro do snapshot `state` principal.
+
+##### Viewport e entidades
+
+- `GameViewport` continua como palco unico
+- `InstancedWorldField` ou renderer vizinho deve ganhar suporte a vendedores como entidades clicaveis
+- NPCs vendedores devem ser visiveis e interagiveis no 3D antes da abertura da UI
+- o hub deve privilegiar objetos estaveis e reuso de materiais, evitando mount/unmount de grandes blocos da cidade conforme o jogador se move
+
+##### Superficie de compra
+
+Direcao de UX:
+
+- no desktop, a compra abre painel lateral leve ou cartela ancorada proxima ao NPC, nao tela cheia desconectada do mundo
+- no mobile, a compra abre bottom sheet curta com titulo, preco, efeito e CTA
+- o jogador deve continuar percebendo o mundo e o NPC por tras da interface
+
+##### HUD e minimapa
+
+- o minimapa deve sinalizar a cidade como hub seguro
+- vendedores aparecem como POIs distintos
+- a cidade precisa de uma leitura de retorno clara, equivalente ou superior ao botao atual de respawn
+- feedbacks de compra entram no mesmo ecossistema visual de `ResourceRibbon` e `InteractionFeed`, sem introduzir paineis administrativos pesados
+
+### Hierarquia da Cidade
+
+Direcao visual do hub:
+
+- regiao principal: praca central monumental com um grande nucleo de favo e leitura imediata de ponto seguro
+- regiao de apoio 1: anel de mercado com dois NPCs facilmente distinguiveis
+- regiao de apoio 2: eixos de saida para jardim e zonas futuras, como tuneis ou rampas de voo
+- regiao de apoio 3: marcos visuais altos para orientacao rapida em multiplayer
+
+O jogador deve entender a cidade em poucos segundos: aqui eu retorno, aqui eu encontro gente, aqui eu compro, daqui eu parto.
+
+### Componentes de Destaque
+
+1. `HiveCityArrivalBanner`
+
+- aparece de forma curta ao entrar ou reconectar
+- reforca que o jogador voltou para a cidade central
+
+2. `VendorPrompt`
+
+- mostra nome do NPC, funcao e CTA de interacao quando o jogador entra no raio util
+
+3. `VendorSheet`
+
+- lista curta de ofertas, preco em mel e efeito resumido
+- a primeira fatia deve caber em uma unica leitura, sem scroll denso obrigatorio
+
+4. `SafeZoneHint`
+
+- deixa claro que a cidade e um ponto de preparo, nao de coleta
+
+### Estrategia de Copy
+
+Copy recomendada pelo fluxo atual:
+
+- titulo da cidade: `Colmeia Central`
+- CTA do vendedor: `Ver ofertas`
+- prompt curto: `Conversar`
+- vendedor de consumiveis: `Loja de Provisoes`
+- vendedor de upgrades: `Oficina de Melhorias`
+- loading do catalogo: `Carregando ofertas...`
+- vazio: `Nada disponivel no momento.`
+- sucesso: `Compra concluida!`
+- erro de saldo: `Mel insuficiente.`
+- chegada ao reconectar: `De volta a Colmeia Central.`
+- hint de seguranca: `Zona segura. Sem combate.`
+
+Tom:
+
+- curto
+- legivel
+- tematico sem caricatura
+- sem linguagem tecnica de sistema
+
+### Loading, Empty e Error States
+
+- ao entrar na cidade pela primeira vez: mostrar chegada curta, nao modal bloqueador
+- ao abrir vendedor sem catalogo carregado: `Carregando ofertas...`
+- se um catalogo vier vazio por regra ou erro controlado: `Nada disponivel no momento.`
+- falha por saldo insuficiente usa feedback curto, sem modal de erro global
+- se a sessao cair, `DisconnectModal` continua sendo a superficie bloqueadora primaria
+
+### Responsividade
+
+Desktop:
+
+- painel de compra lateral ou proximo ao NPC
+- vendors visiveis no mundo e no minimapa
+- outros jogadores visiveis como parte da atmosfera social
+
+Mobile:
+
+- bottom sheet compacta
+- CTA grande para compra
+- texto em uma ou duas linhas por oferta
+- touch target minimo de 44x44px para NPC e botoes de compra
+
+### O Que Evita Placeholder Generico
+
+- a cidade nao pode ser uma sala vazia com dois botoes e meia duzia de jogadores espalhados
+- precisa de eixo monumental central, circulacao clara e leitura social imediata
+- os NPCs devem parecer moradores e prestadores de servico da colmeia, nao quiosques abstratos
+- o mercado deve parecer parte da arquitetura do hub, nao modal solto por cima do canvas
+
+### Reuso Confirmado
+
+Reaproveitar diretamente:
+
+- `GameViewport` como palco 3D unico
+- `MiniMap` como superficie secundaria para POIs e retorno
+- `useGameSession` para roteamento das novas mensagens
+- `player_status` e `interaction_result` como base de feedback apos compra
+- a estrategia runtime de entidade especial ja validada pela colmeia coletora
+
+Adaptar:
+
+- `world_map.go` para suportar `vendor` como prop ou fonte equivalente de NPCs
+- `ws_player.go` para mover respawn e reconexao para a cidade
+- `persistence.go` para separar progresso persistido de ponto oficial de entrada
+- `InstancedWorldField` para hit targets e render de vendedores
+
+Evitar agora:
+
+- sistema completo de inventario
+- tela independente de loja fora do viewport
+- qualquer fluxo que transforme a cidade em lobby morto ou menu principal glorificado
+
+### Mudancas Estruturais Esperadas
+
+#### Backend
+
+- `server/internal/httpserver/world_map.go`
+  - adicionar `vendor` como entidade de mapa ou registrar vendedores runtime da cidade
+
+- `server/internal/httpserver/ws_messages.go`
+  - adicionar `PurchaseVendorItemAction`
+  - adicionar `VendorCatalogMessage`
+  - adicionar `worldVendorState` ou estrutura equivalente exposta ao client
+
+- `server/internal/httpserver/ws_connection.go`
+  - rotear `purchase_vendor_item`
+
+- `server/internal/httpserver/ws_player.go`
+  - redefinir respawn e entrada da sessao para `zone:hive_city`
+
+- `server/internal/httpserver/persistence.go`
+  - continuar persistindo progresso
+  - nao depender de coordenada persistida para spawn de reconexao nesta fase
+
+#### Frontend
+
+- `client/src/types/game.ts`
+  - adicionar tipos de vendedor, catalogo e compra
+
+- `client/src/hooks/useGameSession.ts`
+  - armazenar `vendor_catalog`
+  - expor action creator para compra em NPC
+
+- `client/src/components/GameViewport/*`
+  - renderizar NPCs vendedores e pontos de interacao
+
+- `client/src/game/hud/*`
+  - adicionar prompt e sheet de compra dentro da linguagem visual ja usada no HUD
+
+### Erros e Falhas
+
+Casos tratados:
+
+- compra com mel insuficiente
+- tentativa de comprar longe do NPC
+- vendedor inexistente ou fora da zona atual
+- catalogo desatualizado no client
+- jogador tentando coletar dentro da cidade
+- reconexao durante compra
+
+Tratamento esperado:
+
+- falhas de compra viram `interaction_result` curto e especifico
+- `player_status` so e atualizado quando a compra altera o estado autoritativo
+- se o catalogo do client estiver stale, o servidor rejeita e o client deve aceitar o estado corrigido
+
+### Riscos
+
+- se a cidade virar unica entrada e unica saida sem leitura espacial clara, ela vira atrito e nao hub
+- se consumiveis exigirem inventario persistente cedo demais, o epic explode de escopo
+- se NPCs forem renderizados como entidades totalmente independentes sem reuso de assets, a cidade perde desempenho quando muitos jogadores se acumularem
+
+### Validacao
+
+#### Backend
+
+- teste de login e reconexao entrando na `zone:hive_city`
+- teste de `respawn` retornando para a cidade
+- teste de compra valida em vendedor dentro do alcance
+- teste de compra invalida por saldo insuficiente
+- teste de negacao de coleta dentro da cidade
+
+#### Frontend
+
+- `pnpm build`
+- validacao manual em desktop com multiplos jogadores na cidade
+- validacao manual em mobile do fluxo `aproximar NPC -> abrir ofertas -> comprar`
+- validacao visual para garantir que a UI de loja nao desconecta o jogador do mundo 3D
+
+### Proximo Passo Recomendado
+
+O primeiro slice operacional do Epic 07 deve entrar nesta ordem:
+
+1. `zone:hive_city` como ponto oficial de entrada e respawn
+2. entidade de vendedor fisico no mundo
+3. contrato `purchase_vendor_item` e catalogo autoritativo
+4. um buff temporario e um upgrade permanente simples
+5. sheet de compra leve no client
+
+Essa ordem prova o valor do hub sem antecipar inventario completo, marketplace ou sistema social pesado.
