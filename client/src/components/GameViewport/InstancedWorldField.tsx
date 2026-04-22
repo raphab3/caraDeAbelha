@@ -260,6 +260,7 @@ export function InstancedWorldField({
 	const MAX_VISIBLE_FLOWERS = 200;
 	const visibleFlowers = useMemo(() => {
 		const flowers = [];
+
 		for (const chunk of chunks) {
 			for (const flower of chunk.flowers || []) {
 				flowers.push(flower);
