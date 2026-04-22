@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/loopbase"
+	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/zones"
 )
 
 type playerAction struct {
@@ -21,6 +22,11 @@ type collectFlowerAction struct {
 type depositAction struct {
 	Type   string `json:"type"`
 	HiveID string `json:"hiveId"`
+}
+
+type unlockZoneAction struct {
+	Type   string `json:"type"`
+	ZoneID string `json:"zoneId"`
 }
 
 type playerState struct {
@@ -126,6 +132,29 @@ type interactionResultMessage struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
+// zoneInfoMessage represents metadata and unlock status for a single zone.
+// Included in zoneStateMessage to provide zone details to the client.
+type zoneInfoMessage struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	CostHoney      int    `json:"costHoney"`
+	IsUnlocked     bool   `json:"isUnlocked"`
+	Prerequisites  []string `json:"prerequisites"`
+	BoundaryX1     float32 `json:"boundaryX1"`
+	BoundaryX2     float32 `json:"boundaryX2"`
+	BoundaryY1     float32 `json:"boundaryY1"`
+	BoundaryY2     float32 `json:"boundaryY2"`
+}
+
+// zoneStateMessage exposes the minimal zone state to clients.
+// Contains metadata and unlock status for all zones and the player's unlocked zones.
+// Sent on login (after sessionMessage) and when a zone is unlocked.
+type zoneStateMessage struct {
+	Type           string              `json:"type"`
+	Zones          []zoneInfoMessage   `json:"zones"`
+	UnlockedZoneIDs []string           `json:"unlockedZoneIds"`
+}
+
 type clientSnapshot struct {
 	client  *clientSession
 	message worldStateMessage
@@ -169,5 +198,54 @@ func newInteractionResultMessage(action string, success bool, amount int, reason
 		Amount:    amount,
 		Reason:    reason,
 		Timestamp: timestamp,
+	}
+}
+
+// newZoneStateMessage creates a zoneStateMessage containing all zone metadata and unlock status.
+// Called on player login and when a zone is unlocked.
+// zones: slice of zone definitions from ZoneRegistry
+// unlockedZoneIDs: list of zone IDs unlocked by the player
+// now: current time for checking zone unlock status
+func newZoneStateMessage(zoneList []*zones.ZoneState, unlockedZoneIDs []string, now time.Time) zoneStateMessage {
+	zoneInfos := make([]zoneInfoMessage, 0, len(zoneList))
+
+	for _, zone := range zoneList {
+		if zone == nil {
+			continue
+		}
+
+		// Check if this zone is unlocked for the player
+		isUnlocked := zone.IsUnlocked(now)
+
+		// Ensure prerequisites is not nil (use empty slice instead)
+		prerequisites := zone.Prerequisites
+		if prerequisites == nil {
+			prerequisites = []string{}
+		}
+
+		zoneInfo := zoneInfoMessage{
+			ID:            zone.ID,
+			Name:          zone.Name,
+			CostHoney:     zone.CostHoney,
+			IsUnlocked:    isUnlocked,
+			Prerequisites: prerequisites,
+			BoundaryX1:    zone.BoundaryX1,
+			BoundaryX2:    zone.BoundaryX2,
+			BoundaryY1:    zone.BoundaryY1,
+			BoundaryY2:    zone.BoundaryY2,
+		}
+
+		zoneInfos = append(zoneInfos, zoneInfo)
+	}
+
+	// Ensure unlockedZoneIDs is not nil
+	if unlockedZoneIDs == nil {
+		unlockedZoneIDs = []string{}
+	}
+
+	return zoneStateMessage{
+		Type:            "zone_state",
+		Zones:           zoneInfos,
+		UnlockedZoneIDs: unlockedZoneIDs,
 	}
 }

@@ -1563,6 +1563,424 @@ func TestDepositPreservesExistingHoney(t *testing.T) {
 	}
 }
 
+// TestCanCollectFlowerWithZoneAccess validates that collection succeeds with zone access enabled.
+func TestCanCollectFlowerWithZoneAccess(t *testing.T) {
+	service := NewLoopBaseService()
+	flowers := service.GetFlowersByZone("zone:start")
+	
+	if len(flowers) == 0 {
+		t.Fatal("expected at least one flower in zone:start")
+	}
+
+	flower := flowers[0]
+	playerProgress := &PlayerProgress{
+		PlayerID:        "player:test:1",
+		PollenCarried:   0,
+		PollenCapacity:  50,
+		UnlockedZoneIDs: []string{"zone:start"}, // Player has zone unlocked
+	}
+
+	// Create a mock zone checker that allows access to zone:start
+	mockChecker := &mockZoneChecker{
+		allowedZones: map[string]bool{"zone:start": true},
+	}
+	service.SetZoneChecker(mockChecker)
+
+	canCollect, reason := service.CanCollectFlower(playerProgress, flower, 5.0, 5.0)
+
+	if !canCollect {
+		t.Errorf("expected CanCollectFlower to return true with zone access, got false: %s", reason)
+	}
+
+	if reason != "" {
+		t.Errorf("expected empty reason, got: %s", reason)
+	}
+}
+
+// TestCanCollectFlowerWithZoneLocked validates that collection fails when zone is locked.
+func TestCanCollectFlowerWithZoneLocked(t *testing.T) {
+	service := NewLoopBaseService()
+	flowers := service.GetFlowersByZone("zone:start")
+	
+	if len(flowers) == 0 {
+		t.Fatal("expected at least one flower in zone:start")
+	}
+
+	flower := flowers[0]
+	playerProgress := &PlayerProgress{
+		PlayerID:        "player:test:1",
+		PollenCarried:   0,
+		PollenCapacity:  50,
+		UnlockedZoneIDs: []string{}, // Player has no zones unlocked
+	}
+
+	// Create a mock zone checker that denies access to zone:start
+	mockChecker := &mockZoneChecker{
+		allowedZones: map[string]bool{"zone:start": false},
+	}
+	service.SetZoneChecker(mockChecker)
+
+	canCollect, reason := service.CanCollectFlower(playerProgress, flower, 5.0, 5.0)
+
+	if canCollect {
+		t.Error("expected CanCollectFlower to return false with zone locked")
+	}
+
+	if reason != "zone_locked" {
+		t.Errorf("expected 'zone_locked' reason, got: %s", reason)
+	}
+}
+
+// TestCanCollectFlowerWithZoneNotFound validates that collection fails when zone doesn't exist.
+func TestCanCollectFlowerWithZoneNotFound(t *testing.T) {
+	service := NewLoopBaseService()
+	flowers := service.GetFlowersByZone("zone:start")
+	
+	if len(flowers) == 0 {
+		t.Fatal("expected at least one flower in zone:start")
+	}
+
+	flower := flowers[0]
+	flower.ZoneID = "zone:nonexistent" // Assign nonexistent zone
+	
+	playerProgress := &PlayerProgress{
+		PlayerID:        "player:test:1",
+		PollenCarried:   0,
+		PollenCapacity:  50,
+		UnlockedZoneIDs: []string{"zone:start"},
+	}
+
+	// Create a mock zone checker that returns zone_not_found
+	mockChecker := &mockZoneChecker{
+		allowedZones: map[string]bool{},
+		returnNotFound: true,
+	}
+	service.SetZoneChecker(mockChecker)
+
+	canCollect, reason := service.CanCollectFlower(playerProgress, flower, 5.0, 5.0)
+
+	if canCollect {
+		t.Error("expected CanCollectFlower to return false with zone not found")
+	}
+
+	if reason != "zone_not_found" {
+		t.Errorf("expected 'zone_not_found' reason, got: %s", reason)
+	}
+}
+
+// TestCanDepositAtHiveWithZoneAccess validates that deposit succeeds with zone access enabled.
+func TestCanDepositAtHiveWithZoneAccess(t *testing.T) {
+	service := NewLoopBaseService()
+	hives := service.GetHivesByZone("zone:start")
+	
+	if len(hives) == 0 {
+		t.Fatal("expected at least one hive in zone:start")
+	}
+
+	hive := hives[0]
+	playerProgress := &PlayerProgress{
+		PlayerID:        "player:test:1",
+		PollenCarried:   50,
+		PollenCapacity:  100,
+		Honey:           0,
+		UnlockedZoneIDs: []string{"zone:start"},
+	}
+
+	// Create a mock zone checker that allows access to zone:start
+	mockChecker := &mockZoneChecker{
+		allowedZones: map[string]bool{"zone:start": true},
+	}
+	service.SetZoneChecker(mockChecker)
+
+	canDeposit, reason := service.CanDepositAtHive(playerProgress, hive)
+
+	if !canDeposit {
+		t.Errorf("expected CanDepositAtHive to return true with zone access, got false: %s", reason)
+	}
+
+	if reason != "" {
+		t.Errorf("expected empty reason, got: %s", reason)
+	}
+}
+
+// TestCanDepositAtHiveWithZoneLocked validates that deposit fails when zone is locked.
+func TestCanDepositAtHiveWithZoneLocked(t *testing.T) {
+	service := NewLoopBaseService()
+	hives := service.GetHivesByZone("zone:start")
+	
+	if len(hives) == 0 {
+		t.Fatal("expected at least one hive in zone:start")
+	}
+
+	hive := hives[0]
+	playerProgress := &PlayerProgress{
+		PlayerID:        "player:test:1",
+		PollenCarried:   50,
+		PollenCapacity:  100,
+		Honey:           0,
+		UnlockedZoneIDs: []string{},
+	}
+
+	// Create a mock zone checker that denies access to zone:start
+	mockChecker := &mockZoneChecker{
+		allowedZones: map[string]bool{"zone:start": false},
+	}
+	service.SetZoneChecker(mockChecker)
+
+	canDeposit, reason := service.CanDepositAtHive(playerProgress, hive)
+
+	if canDeposit {
+		t.Error("expected CanDepositAtHive to return false with zone locked")
+	}
+
+	if reason != "zone_locked" {
+		t.Errorf("expected 'zone_locked' reason, got: %s", reason)
+	}
+}
+
+// TestCollectFlowerPollenWithZoneLockedFails validates that pollen collection fails when zone is locked.
+func TestCollectFlowerPollenWithZoneLockedFails(t *testing.T) {
+	service := NewLoopBaseService()
+	flowers := service.GetFlowersByZone("zone:start")
+	
+	if len(flowers) == 0 {
+		t.Fatal("expected at least one flower in zone:start")
+	}
+
+	flower := flowers[0]
+	initialPollenAvailable := flower.PollenAvailable
+	
+	playerProgress := &PlayerProgress{
+		PlayerID:        "player:test:1",
+		PollenCarried:   0,
+		PollenCapacity:  50,
+		UnlockedZoneIDs: []string{},
+	}
+
+	// Create a mock zone checker that denies access
+	mockChecker := &mockZoneChecker{
+		allowedZones: map[string]bool{"zone:start": false},
+	}
+	service.SetZoneChecker(mockChecker)
+
+	pollenCollected, err := service.CollectFlowerPollen(playerProgress, flower, 5.0, 5.0)
+
+	if err == nil {
+		t.Error("expected error when collecting from locked zone")
+	}
+
+	if pollenCollected != 0 {
+		t.Errorf("expected 0 pollen collected, got %d", pollenCollected)
+	}
+
+	// Verify state didn't change
+	if playerProgress.PollenCarried != 0 {
+		t.Errorf("expected player pollen to remain 0, got %d", playerProgress.PollenCarried)
+	}
+
+	if flower.PollenAvailable != initialPollenAvailable {
+		t.Errorf("expected flower pollen to remain %d, got %d", initialPollenAvailable, flower.PollenAvailable)
+	}
+}
+
+// TestDepositPollenToHoneyWithZoneLockedFails validates that honey deposit fails when zone is locked.
+func TestDepositPollenToHoneyWithZoneLockedFails(t *testing.T) {
+	service := NewLoopBaseService()
+	hives := service.GetHivesByZone("zone:start")
+	
+	if len(hives) == 0 {
+		t.Fatal("expected at least one hive in zone:start")
+	}
+
+	hive := hives[0]
+	playerProgress := &PlayerProgress{
+		PlayerID:        "player:test:1",
+		PollenCarried:   50,
+		PollenCapacity:  100,
+		Honey:           0,
+		UnlockedZoneIDs: []string{},
+	}
+
+	// Create a mock zone checker that denies access
+	mockChecker := &mockZoneChecker{
+		allowedZones: map[string]bool{"zone:start": false},
+	}
+	service.SetZoneChecker(mockChecker)
+
+	honeyGained, err := service.DepositPollenToHoney(playerProgress, hive)
+
+	if err == nil {
+		t.Error("expected error when depositing to locked zone")
+	}
+
+	if honeyGained != 0 {
+		t.Errorf("expected 0 honey gained, got %d", honeyGained)
+	}
+
+	// Verify state didn't change
+	if playerProgress.PollenCarried != 50 {
+		t.Errorf("expected player pollen to remain 50, got %d", playerProgress.PollenCarried)
+	}
+
+	if playerProgress.Honey != 0 {
+		t.Errorf("expected player honey to remain 0, got %d", playerProgress.Honey)
+	}
+}
+
+// TestMultipleZoneAccess validates that zone access works correctly with multiple zones.
+func TestMultipleZoneAccess(t *testing.T) {
+	service := NewLoopBaseService()
+
+	// Create flowers in different zones
+	flower1 := &FlowerNode{
+		ID:              "flower:zone1:1",
+		X:               15.0,
+		Y:               15.0,
+		ZoneID:          "zone:1",
+		PollenAvailable: 100,
+		PollenCapacity:  100,
+		CollectRadius:   2.5,
+		YieldPerClick:   5,
+	}
+
+	flower2 := &FlowerNode{
+		ID:              "flower:zone2:1",
+		X:               35.0,
+		Y:               35.0,
+		ZoneID:          "zone:2",
+		PollenAvailable: 100,
+		PollenCapacity:  100,
+		CollectRadius:   2.5,
+		YieldPerClick:   5,
+	}
+
+	service.AddFlowerToZone("zone:1", flower1)
+	service.AddFlowerToZone("zone:2", flower2)
+
+	playerProgress := &PlayerProgress{
+		PlayerID:        "player:test:1",
+		PollenCarried:   0,
+		PollenCapacity:  50,
+		UnlockedZoneIDs: []string{"zone:1"}, // Only zone:1 is unlocked
+	}
+
+	// Create a mock zone checker
+	mockChecker := &mockZoneChecker{
+		allowedZones: map[string]bool{
+			"zone:1": true,  // Allow zone:1
+			"zone:2": false, // Deny zone:2
+		},
+	}
+	service.SetZoneChecker(mockChecker)
+
+	// Should be able to collect from zone:1
+	canCollect1, reason1 := service.CanCollectFlower(playerProgress, flower1, 15.0, 15.0)
+	if !canCollect1 {
+		t.Errorf("expected CanCollectFlower to return true for zone:1, got false: %s", reason1)
+	}
+
+	// Should NOT be able to collect from zone:2
+	canCollect2, reason2 := service.CanCollectFlower(playerProgress, flower2, 35.0, 35.0)
+	if canCollect2 {
+		t.Error("expected CanCollectFlower to return false for zone:2")
+	}
+
+	if reason2 != "zone_locked" {
+		t.Errorf("expected 'zone_locked' reason for zone:2, got: %s", reason2)
+	}
+}
+
+// TestZoneTransition validates zone access when player transitions between zones.
+func TestZoneTransition(t *testing.T) {
+	service := NewLoopBaseService()
+
+	// Create flowers in starting zone and next zone
+	startFlower := &FlowerNode{
+		ID:              "flower:start:test",
+		X:               5.0,
+		Y:               5.0,
+		ZoneID:          "zone_0",
+		PollenAvailable: 100,
+		PollenCapacity:  100,
+		CollectRadius:   2.5,
+		YieldPerClick:   5,
+	}
+
+	nextFlower := &FlowerNode{
+		ID:              "flower:zone_1:test",
+		X:               60.0,
+		Y:               25.0,
+		ZoneID:          "zone_1",
+		PollenAvailable: 100,
+		PollenCapacity:  100,
+		CollectRadius:   2.5,
+		YieldPerClick:   5,
+	}
+
+	service.AddFlowerToZone("zone_0", startFlower)
+	service.AddFlowerToZone("zone_1", nextFlower)
+
+	playerProgress := &PlayerProgress{
+		PlayerID:        "player:test:1",
+		PollenCarried:   0,
+		PollenCapacity:  50,
+		UnlockedZoneIDs: []string{"zone_0"},
+	}
+
+	// Create a mock zone checker for initial state
+	mockChecker := &mockZoneChecker{
+		allowedZones: map[string]bool{
+			"zone_0": true,  // Starting zone unlocked
+			"zone_1": false, // Next zone locked
+		},
+	}
+	service.SetZoneChecker(mockChecker)
+
+	// Can collect in starting zone
+	canCollectStart, _ := service.CanCollectFlower(playerProgress, startFlower, 5.0, 5.0)
+	if !canCollectStart {
+		t.Error("expected to collect in starting zone")
+	}
+
+	// Cannot collect in next zone
+	canCollectNext, _ := service.CanCollectFlower(playerProgress, nextFlower, 60.0, 25.0)
+	if canCollectNext {
+		t.Error("expected not to collect in locked zone")
+	}
+
+	// Now unlock next zone
+	playerProgress.UnlockedZoneIDs = []string{"zone_0", "zone_1"}
+	mockChecker.allowedZones["zone_1"] = true
+
+	// Now can collect in next zone
+	canCollectNext2, _ := service.CanCollectFlower(playerProgress, nextFlower, 60.0, 25.0)
+	if !canCollectNext2 {
+		t.Error("expected to collect in unlocked zone after transition")
+	}
+}
+
+// mockZoneChecker is a test helper that implements ZoneAccessChecker interface
+type mockZoneChecker struct {
+	allowedZones  map[string]bool
+	returnNotFound bool
+}
+
+func (m *mockZoneChecker) CanAccessZone(player *PlayerProgress, zoneID string) (bool, string) {
+	if m.returnNotFound {
+		return false, "zone_not_found"
+	}
+
+	if allowed, exists := m.allowedZones[zoneID]; exists {
+		if allowed {
+			return true, ""
+		}
+		return false, "zone_locked"
+	}
+
+	// Default to locked if zone not in map
+	return false, "zone_locked"
+}
+
 // containsString is a helper function to check if a string contains a substring.
 func containsString(haystack, needle string) bool {
 	return len(haystack) > 0 && len(needle) > 0 && haystack == needle || (len(haystack) > 0 && len(needle) > 0 && contains(haystack, needle))

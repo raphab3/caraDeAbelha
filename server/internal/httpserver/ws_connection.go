@@ -53,6 +53,10 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		PlayerID: client.id,
 		Username: username,
 	})
+	
+	// Send zone state to player on login
+	hub.sendZoneState(client, client.id)
+	
 	hub.broadcast()
 
 	defer func() {
@@ -65,8 +69,8 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	for {
-		var action playerAction
-		if err := connection.ReadJSON(&action); err != nil {
+		var raw map[string]interface{}
+		if err := connection.ReadJSON(&raw); err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				log.Printf("websocket read failed for %s: %v", client.id, err)
 			}
@@ -80,20 +84,46 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var ok bool
+		actionType, ok := raw["type"].(string)
+		if !ok {
+			continue
+		}
 
-		switch action.Type {
+		var shouldBroadcast bool
+
+		switch actionType {
 		case "move":
-			ok = hub.movePlayer(client.id, action.Dir)
+			action := playerAction{}
+			if dir, ok := raw["dir"].(string); ok {
+				action.Dir = dir
+			}
+			shouldBroadcast = hub.movePlayer(client.id, action.Dir)
+
 		case "move_to":
-			ok = hub.movePlayerTo(client.id, action.X, action.Z)
+			var x, z float64
+			if xVal, ok := raw["x"].(float64); ok {
+				x = xVal
+			}
+			if zVal, ok := raw["z"].(float64); ok {
+				z = zVal
+			}
+			shouldBroadcast = hub.movePlayerTo(client.id, x, z)
+
 		case "respawn":
-			ok = hub.respawnPlayer(client.id)
+			shouldBroadcast = hub.respawnPlayer(client.id)
+
+		case "unlock_zone":
+			zoneID, ok := raw["zoneId"].(string)
+			if !ok {
+				continue
+			}
+			shouldBroadcast = hub.unlockZone(client.id, zoneID)
+
 		default:
 			continue
 		}
 
-		if !ok {
+		if !shouldBroadcast {
 			continue
 		}
 
@@ -139,6 +169,30 @@ func (hub *gameHub) sendInteractionResult(client *clientSession, action string, 
 
 	timestamp := hub.now().UnixMilli()
 	message := newInteractionResultMessage(action, success, amount, reason, timestamp)
+	if err := hub.writeJSON(client, message); err != nil {
+		log.Printf("websocket write failed for %s: %v", client.id, err)
+	}
+}
+
+// sendZoneState sends zone metadata and unlock status to a client.
+// Called on player login and when a zone is unlocked.
+func (hub *gameHub) sendZoneState(client *clientSession, playerID string) {
+	if client == nil || playerID == "" {
+		return
+	}
+
+	hub.mu.Lock()
+	progress := hub.playerProgress[playerID]
+	hub.mu.Unlock()
+
+	if progress == nil {
+		return
+	}
+
+	zoneList := hub.zones.GetZoneState()
+	now := hub.now()
+	message := newZoneStateMessage(zoneList, progress.UnlockedZoneIDs, now)
+
 	if err := hub.writeJSON(client, message); err != nil {
 		log.Printf("websocket write failed for %s: %v", client.id, err)
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/loopbase"
+	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/zones"
 )
 
 const maxUsernameLength = 24
@@ -31,36 +32,46 @@ type clientSession struct {
 }
 
 type gameHub struct {
-	mu         sync.Mutex
-	upgrader   websocket.Upgrader
-	clients    map[string]*clientSession
-	players    map[string]*playerState
-	profiles   map[string]*playerState
-	world      worldLayout
-	loopbase   *loopbase.LoopBaseService
-	tick       uint64
-	now        func() time.Time
-	pingPeriod time.Duration
-	pongWait   time.Duration
-	writeWait  time.Duration
+	mu              sync.Mutex
+	upgrader        websocket.Upgrader
+	clients         map[string]*clientSession
+	players         map[string]*playerState
+	profiles        map[string]*playerState
+	playerProgress  map[string]*loopbase.PlayerProgress // Player economy state: pollen, honey, level, zones
+	world           worldLayout
+	loopbase        *loopbase.LoopBaseService
+	zones           *zones.ZoneService
+	tick            uint64
+	now             func() time.Time
+	pingPeriod      time.Duration
+	pongWait        time.Duration
+	writeWait       time.Duration
 }
 
 func newGameHub() *gameHub {
+	loopbaseService := loopbase.NewLoopBaseService()
+	zonesService := zones.NewZoneService()
+	
+	// Connect zones service to loopbase for zone access validation
+	loopbaseService.SetZoneChecker(zonesService)
+	
 	hub := &gameHub{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(_ *http.Request) bool {
 				return true
 			},
 		},
-		clients:    make(map[string]*clientSession),
-		players:    make(map[string]*playerState),
-		profiles:   make(map[string]*playerState),
-		world:      loadWorldLayout(),
-		loopbase:   loopbase.NewLoopBaseService(),
-		now:        time.Now,
-		pingPeriod: websocketPingPeriod,
-		pongWait:   websocketPongWait,
-		writeWait:  websocketWriteTimeout,
+		clients:        make(map[string]*clientSession),
+		players:        make(map[string]*playerState),
+		profiles:       make(map[string]*playerState),
+		playerProgress: make(map[string]*loopbase.PlayerProgress),
+		world:          loadWorldLayout(),
+		loopbase:       loopbaseService,
+		zones:          zonesService,
+		now:            time.Now,
+		pingPeriod:     websocketPingPeriod,
+		pongWait:       websocketPongWait,
+		writeWait:      websocketWriteTimeout,
 	}
 
 	go hub.runMovementLoop(worldTickInterval)

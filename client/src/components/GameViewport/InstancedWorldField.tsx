@@ -13,7 +13,7 @@ import {
 	Object3D,
 } from "three";
 
-import type { WorldChunkState } from "../../types/game";
+import type { MapZone, PlayerProgressState, WorldChunkState } from "../../types/game";
 import {
 	TERRAIN_BLOCK_SCALE,
 	toSceneAxis,
@@ -23,6 +23,7 @@ import {
 import type { TapTargetingHandlers } from "./useTapTargeting";
 import { FlowerRenderer } from "./FlowerRenderer";
 import { HiveRenderer } from "./HiveRenderer";
+import { ZoneGateRenderer } from "./ZoneGateRenderer";
 
 const TERRAIN_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/block-grass.glb";
 const TREE_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/tree-pine-small.glb";
@@ -229,6 +230,8 @@ export function InstancedWorldField({
 	terrainPointerHandlers,
 	onFlowerClick,
 	onHiveClick,
+	zones,
+	playerProgress,
 }: {
 	chunks: WorldChunkState[];
 	chunkSize: number;
@@ -236,6 +239,8 @@ export function InstancedWorldField({
 	terrainPointerHandlers?: TapTargetingHandlers;
 	onFlowerClick?: (flowerId: string) => void;
 	onHiveClick?: (hiveId: string) => void;
+	zones?: MapZone[];
+	playerProgress?: PlayerProgressState;
 }) {
 	const worldField = useMemo(
 		() => buildWorldField(chunks, detailFocus),
@@ -374,6 +379,13 @@ export function InstancedWorldField({
 						? (_event: ThreeEvent<PointerEvent>, hiveId: string, _index: number) => onHiveClick(hiveId)
 						: undefined
 				}
+			/>
+
+			{/* Zone gate renderer: gates for locked zones */}
+			<ZoneGateRenderer
+				zones={zones}
+				playerProgress={playerProgress}
+				detailFocus={detailFocus}
 			/>
 		</group>
 	);

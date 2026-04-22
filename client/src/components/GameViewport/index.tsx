@@ -25,6 +25,8 @@ import { MiniMap } from "./MiniMap";
 import { type TapTargetingConfig, type TapTargetingHandlers, useTapTargeting } from "./useTapTargeting";
 import type {
   GameSessionState,
+  MapZone,
+  PlayerProgressState,
   RenderPerformanceSnapshot,
   WorldChunkState,
   WorldPlayerState,
@@ -793,6 +795,8 @@ interface HiveCoreProps {
   localPlayerPositionRef: MutableRefObject<Vector3>;
   onMoveToTarget: (x: number, z: number) => void;
   tapTargetingConfig?: Partial<TapTargetingConfig>;
+  zones?: MapZone[];
+  playerProgress?: PlayerProgressState;
 }
 
 function HiveCore({

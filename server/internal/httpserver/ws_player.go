@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/loopbase"
 )
 
 func (hub *gameHub) register(connection *websocket.Conn, profileKey string, username string) (*clientSession, *clientSession, error) {
@@ -285,4 +286,42 @@ func (hub *gameHub) clampWorldPosition(x float64, y float64) (float64, float64) 
 	}
 
 	return hub.world.clampPosition(x, y)
+}
+
+// unlockZone attempts to unlock a zone for a player using honey as currency.
+// Returns whether the action should trigger a broadcast.
+func (hub *gameHub) unlockZone(clientID string, zoneID string) bool {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	client, ok := hub.clients[clientID]
+	if !ok || client == nil {
+		return false
+	}
+
+	progress, ok := hub.playerProgress[clientID]
+	if !ok || progress == nil {
+		// Initialize player progress if not exists
+		progress = &loopbase.PlayerProgress{
+			PlayerID:        clientID,
+			UnlockedZoneIDs: []string{"zone_0"},
+		}
+		hub.playerProgress[clientID] = progress
+	}
+
+	now := hub.now()
+
+	// Call zone service to unlock zone
+	success, honeyCost, reason := hub.zones.UnlockZone(progress, zoneID, now)
+
+	// Send interaction result feedback (always send, even on failure)
+	hub.sendInteractionResult(client, "unlock_zone", success, honeyCost, reason)
+
+	// If successful, also send updated player status and zone state
+	if success {
+		hub.sendPlayerStatus(client, progress)
+		hub.sendZoneState(client, clientID)
+	}
+
+	return success
 }

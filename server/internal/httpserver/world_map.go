@@ -21,13 +21,39 @@ type worldMapRecord struct {
 	Prop *string `json:"prop"`
 }
 
+type worldZone struct {
+	ID   string  `json:"id"`
+	Name string  `json:"name"`
+	X1   float64 `json:"x1"`
+	X2   float64 `json:"x2"`
+	Z1   float64 `json:"z1"`
+	Z2   float64 `json:"z2"`
+}
+
+type worldTransition struct {
+	FromZone string  `json:"fromZone"`
+	ToZone   string  `json:"toZone"`
+	X        float64 `json:"x"`
+	Z        float64 `json:"z"`
+	Type     string  `json:"type"`
+}
+
+// worldMapContainer supports both legacy (array) and new (object) formats
+type worldMapContainer struct {
+	Tiles       []worldMapRecord  `json:"tiles"`
+	Zones       []worldZone       `json:"zones"`
+	Transitions []worldTransition `json:"transitions"`
+}
+
 type worldLayout struct {
-	chunks    map[string]worldChunkState
-	hasBounds bool
-	minX      float64
-	maxX      float64
-	minY      float64
-	maxY      float64
+	chunks      map[string]worldChunkState
+	zones       []worldZone
+	transitions []worldTransition
+	hasBounds   bool
+	minX        float64
+	maxX        float64
+	minY        float64
+	maxY        float64
 }
 
 func loadWorldLayout() worldLayout {
@@ -95,6 +121,14 @@ func resolveWorldMapPath() (string, error) {
 }
 
 func parseWorldLayout(worldBytes []byte) (worldLayout, error) {
+	// Try to parse as new format (object with tiles, zones, transitions)
+	var container worldMapContainer
+	if err := json.Unmarshal(worldBytes, &container); err == nil && len(container.Tiles) > 0 {
+		// Successfully parsed new format
+		return parseWorldLayoutFromContainer(container)
+	}
+
+	// Fall back to legacy format (array of tiles only)
 	var records []worldMapRecord
 	if err := json.Unmarshal(worldBytes, &records); err != nil {
 		return worldLayout{}, fmt.Errorf("decode world map json: %w", err)
@@ -104,13 +138,28 @@ func parseWorldLayout(worldBytes []byte) (worldLayout, error) {
 		return worldLayout{}, fmt.Errorf("world map is empty")
 	}
 
+	// Wrap legacy records in container format
+	return parseWorldLayoutFromContainer(worldMapContainer{Tiles: records})
+}
+
+func parseWorldLayoutFromContainer(container worldMapContainer) (worldLayout, error) {
+	records := container.Tiles
+	zones := container.Zones
+	transitions := container.Transitions
+
+	if len(records) == 0 {
+		return worldLayout{}, fmt.Errorf("world map is empty")
+	}
+
 	layout := worldLayout{
-		chunks:    make(map[string]worldChunkState),
-		hasBounds: true,
-		minX:      math.Inf(1),
-		maxX:      math.Inf(-1),
-		minY:      math.Inf(1),
-		maxY:      math.Inf(-1),
+		chunks:      make(map[string]worldChunkState),
+		zones:       zones,
+		transitions: transitions,
+		hasBounds:   true,
+		minX:        math.Inf(1),
+		maxX:        math.Inf(-1),
+		minY:        math.Inf(1),
+		maxY:        math.Inf(-1),
 	}
 
 	for _, record := range records {

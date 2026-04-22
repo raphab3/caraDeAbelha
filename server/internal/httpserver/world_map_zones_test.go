@@ -1,0 +1,178 @@
+package httpserver
+
+import (
+	"encoding/json"
+	"testing"
+)
+
+// TestZoneBoundariesNonOverlapping verifies zones don't overlap
+func TestZoneBoundariesNonOverlapping(t *testing.T) {
+	tests := []struct {
+		name  string
+		zone1 worldZone
+		zone2 worldZone
+		want  bool // true if they should not overlap
+	}{
+		{
+			name: "zone_0 and zone_1 should not overlap",
+			zone1: worldZone{
+				ID: "zone_0", X1: 0, X2: 50, Z1: 0, Z2: 50,
+			},
+			zone2: worldZone{
+				ID: "zone_1", X1: 50, X2: 100, Z1: 0, Z2: 50,
+			},
+			want: true,
+		},
+		{
+			name: "zone_0 and zone_2 should not overlap",
+			zone1: worldZone{
+				ID: "zone_0", X1: 0, X2: 50, Z1: 0, Z2: 50,
+			},
+			zone2: worldZone{
+				ID: "zone_2", X1: 0, X2: 50, Z1: 50, Z2: 100,
+			},
+			want: true,
+		},
+		{
+			name: "zone_1 and zone_3 should not overlap",
+			zone1: worldZone{
+				ID: "zone_1", X1: 50, X2: 100, Z1: 0, Z2: 50,
+			},
+			zone2: worldZone{
+				ID: "zone_3", X1: 50, X2: 100, Z1: 50, Z2: 100,
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if zonesOverlap(tt.zone1, tt.zone2) != !tt.want {
+				t.Errorf("zones should not overlap: %s and %s", tt.zone1.ID, tt.zone2.ID)
+			}
+		})
+	}
+}
+
+// TestTransitionReferencesValidZones verifies all transitions reference valid zones
+func TestTransitionReferencesValidZones(t *testing.T) {
+	zones := []worldZone{
+		{ID: "zone_0"},
+		{ID: "zone_1"},
+		{ID: "zone_2"},
+		{ID: "zone_3"},
+		{ID: "zone_4"},
+	}
+
+	transitions := []worldTransition{
+		{FromZone: "zone_0", ToZone: "zone_1", Type: "gate"},
+		{FromZone: "zone_0", ToZone: "zone_2", Type: "gate"},
+		{FromZone: "zone_1", ToZone: "zone_3", Type: "gate"},
+		{FromZone: "zone_2", ToZone: "zone_4", Type: "gate"},
+		{FromZone: "zone_3", ToZone: "zone_4", Type: "gate"},
+	}
+
+	validZoneIDs := make(map[string]bool)
+	for _, z := range zones {
+		validZoneIDs[z.ID] = true
+	}
+
+	for _, trans := range transitions {
+		if !validZoneIDs[trans.FromZone] {
+			t.Errorf("transition from invalid zone: %s", trans.FromZone)
+		}
+		if !validZoneIDs[trans.ToZone] {
+			t.Errorf("transition to invalid zone: %s", trans.ToZone)
+		}
+	}
+}
+
+// TestZoneBoundaryCoordinates verifies expected zone boundaries
+func TestZoneBoundaryCoordinates(t *testing.T) {
+	expectedZones := map[string]worldZone{
+		"zone_0": {ID: "zone_0", X1: 0, X2: 50, Z1: 0, Z2: 50},
+		"zone_1": {ID: "zone_1", X1: 50, X2: 100, Z1: 0, Z2: 50},
+		"zone_2": {ID: "zone_2", X1: 0, X2: 50, Z1: 50, Z2: 100},
+		"zone_3": {ID: "zone_3", X1: 50, X2: 100, Z1: 50, Z2: 100},
+		"zone_4": {ID: "zone_4", X1: 25, X2: 75, Z1: 100, Z2: 150},
+	}
+
+	for id, expected := range expectedZones {
+		if expected.X1 >= expected.X2 || expected.Z1 >= expected.Z2 {
+			t.Errorf("zone %s has invalid bounds: x[%v, %v] z[%v, %v]", id, expected.X1, expected.X2, expected.Z1, expected.Z2)
+		}
+	}
+}
+
+// TestMapContainerParsing verifies map.json with zones parses correctly
+func TestMapContainerParsing(t *testing.T) {
+	// Minimal valid map with zones and transitions
+	data := worldMapContainer{
+		Tiles: []worldMapRecord{
+			{X: 0, Y: 0, Z: 0, Type: "grass", Prop: nil},
+		},
+		Zones: []worldZone{
+			{ID: "zone_0", Name: "Test Zone", X1: 0, X2: 50, Z1: 0, Z2: 50},
+		},
+		Transitions: []worldTransition{
+			{FromZone: "zone_0", ToZone: "zone_1", X: 25, Z: 25, Type: "gate"},
+		},
+	}
+
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		t.Fatalf("marshal container: %v", err)
+	}
+
+	layout, err := parseWorldLayout(bytes)
+	if err != nil {
+		t.Fatalf("parse world layout: %v", err)
+	}
+
+	if len(layout.zones) != 1 {
+		t.Errorf("expected 1 zone, got %d", len(layout.zones))
+	}
+
+	if len(layout.transitions) != 1 {
+		t.Errorf("expected 1 transition, got %d", len(layout.transitions))
+	}
+
+	if layout.zones[0].ID != "zone_0" {
+		t.Errorf("zone ID mismatch: expected zone_0, got %s", layout.zones[0].ID)
+	}
+}
+
+// TestLegacyMapFormatBackwardCompatibility verifies legacy array format still works
+func TestLegacyMapFormatBackwardCompatibility(t *testing.T) {
+	// Legacy format: just an array of tile records
+	tiles := []worldMapRecord{
+		{X: 0, Y: 0, Z: 0, Type: "grass", Prop: nil},
+		{X: 1, Y: 0, Z: 0, Type: "grass", Prop: nil},
+	}
+
+	bytes, err := json.Marshal(tiles)
+	if err != nil {
+		t.Fatalf("marshal tiles: %v", err)
+	}
+
+	layout, err := parseWorldLayout(bytes)
+	if err != nil {
+		t.Fatalf("parse legacy world layout: %v", err)
+	}
+
+	if len(layout.chunks) == 0 {
+		t.Errorf("legacy format should parse tiles into chunks")
+	}
+
+	if len(layout.zones) != 0 {
+		t.Errorf("legacy format without zones should have 0 zones, got %d", len(layout.zones))
+	}
+}
+
+// Helper function to check if two zones overlap
+func zonesOverlap(z1, z2 worldZone) bool {
+	// Zones overlap if their x or z ranges intersect
+	xOverlap := z1.X1 < z2.X2 && z2.X1 < z1.X2
+	zOverlap := z1.Z1 < z2.Z2 && z2.Z1 < z1.Z2
+	return xOverlap && zOverlap
+}

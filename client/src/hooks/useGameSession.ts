@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { WS_URL } from "../game/env";
 import { WSClient } from "../game/WSClient";
 import type {
+  ClientMessage,
   GameSessionController,
   GameSessionState,
   InteractionResult,
@@ -11,6 +12,7 @@ import type {
   SessionMessage,
   WorldPlayerState,
   WorldStateMessage,
+  ZoneStateMessage,
 } from "../types/game";
 
 const DEFAULT_DISCONNECT_ERROR = "A conexao com o jardim ficou sem resposta. Tente reconectar.";
@@ -120,6 +122,14 @@ function isInteractionResultMessage(message: unknown): message is InteractionRes
   }
 
   return "type" in message && message.type === "interaction_result";
+}
+
+function isZoneStateMessage(message: unknown): message is ZoneStateMessage {
+  if (typeof message !== "object" || message === null) {
+    return false;
+  }
+
+  return "type" in message && message.type === "zone_state";
 }
 
 function resolveDisconnectError(reason?: string): string {
@@ -253,6 +263,14 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
           return () => {
             window.clearTimeout(timeoutId);
           };
+        }
+
+        if (isZoneStateMessage(message)) {
+          setGameSession((current) => ({
+            ...current,
+            zoneState: message,
+          }));
+          return;
         }
 
         if (!isWorldStateMessage(message)) {
@@ -409,9 +427,14 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
     });
   };
 
+  const sendAction = (action: ClientMessage) => {
+    clientRef.current?.send(action);
+  };
+
   return {
     ...gameSession,
     moveToTarget,
     respawn,
+    sendAction,
   };
 }

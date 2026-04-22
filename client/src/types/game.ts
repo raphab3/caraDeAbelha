@@ -115,6 +115,25 @@ export interface WorldChunkState {
   hives: WorldHiveState[];
 }
 
+// Map zone metadata - defines spatial boundaries of game regions
+export interface MapZone {
+  id: string;
+  name: string;
+  x1: number;
+  x2: number;
+  z1: number;
+  z2: number;
+}
+
+// Transition point between zones - metadata for progression flow
+export interface MapTransition {
+  fromZone: string;
+  toZone: string;
+  x: number;
+  z: number;
+  type: "gate" | "portal" | "passage";
+}
+
 export interface WorldStateMessage {
   type: "state";
   tick: number;
@@ -149,7 +168,12 @@ export interface RespawnAction {
   type: "respawn";
 }
 
-export type ClientMessage = MoveAction | MoveToAction | RespawnAction;
+export interface UnlockZoneAction {
+  type: "unlock_zone";
+  zoneId: string;
+}
+
+export type ClientMessage = MoveAction | MoveToAction | RespawnAction | UnlockZoneAction;
 
 // Player progression state: economy, levels, zones
 export interface PlayerProgressState {
@@ -187,7 +211,27 @@ export interface PlayerStatusMessage {
   unlockedZoneIds: string[];
 }
 
-export type ServerMessage = SessionMessage | WorldStateMessage | PlayerStatusMessage | InteractionResult;
+// Zone info within zone state - metadata about a zone including unlock cost and boundaries
+export interface ZoneInfo {
+  id: string;
+  name: string;
+  costHoney: number;
+  isUnlocked: boolean;
+  prerequisites: string[];
+  boundaryX1: number;
+  boundaryX2: number;
+  boundaryY1: number;
+  boundaryY2: number;
+}
+
+// Zone state message from server - exposes minimal zone metadata and unlock status
+export interface ZoneStateMessage {
+  type: "zone_state";
+  zones: ZoneInfo[];
+  unlockedZoneIds: string[];
+}
+
+export type ServerMessage = SessionMessage | WorldStateMessage | PlayerStatusMessage | InteractionResult | ZoneStateMessage;
 
 export interface GameSessionState {
   connectionState: "idle" | "connecting" | "connected" | "disconnected";
@@ -202,12 +246,16 @@ export interface GameSessionState {
   tick: number;
   playerProgress?: PlayerProgressState;
   lastInteraction?: InteractionResult;
+  zones?: MapZone[];
+  transitions?: MapTransition[];
+  zoneState?: ZoneStateMessage;
   error?: string;
 }
 
 export interface GameSessionController extends GameSessionState {
   moveToTarget: (x: number, z: number) => void;
   respawn: () => void;
+  sendAction: (action: ClientMessage) => void;
 }
 
 export interface RenderPerformanceSnapshot {

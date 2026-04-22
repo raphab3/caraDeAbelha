@@ -7,21 +7,29 @@ import (
 	"time"
 )
 
+// ZoneAccessChecker defines the interface for zone access validation.
+// This allows LoopBaseService to be decoupled from the zones package.
+type ZoneAccessChecker interface {
+	CanAccessZone(player *PlayerProgress, zoneID string) (bool, string)
+}
+
 // LoopBaseService manages the lifecycle of gameplay entities (flowers and hives) during a session.
 // It maintains collections of FlowerNode and HiveNode instances, initializes them with proper state,
-// and provides distance validation for player interactions.
+// provides distance validation for player interactions, and validates zone access for collections and deposits.
 type LoopBaseService struct {
-	mu     sync.RWMutex
-	flowers map[string][]*FlowerNode // key: zoneID, value: list of flowers
-	hives   map[string][]*HiveNode   // key: zoneID, value: list of hives
+	mu             sync.RWMutex
+	flowers        map[string][]*FlowerNode // key: zoneID, value: list of flowers
+	hives          map[string][]*HiveNode   // key: zoneID, value: list of hives
+	zoneChecker    ZoneAccessChecker        // zone access validator (optional)
 }
 
 // NewLoopBaseService creates a new LoopBaseService with initialized test data.
 // It populates "zone:start" with 2 flowers and 1 hive as baseline gameplay entities.
 func NewLoopBaseService() *LoopBaseService {
 	service := &LoopBaseService{
-		flowers: make(map[string][]*FlowerNode),
-		hives:   make(map[string][]*HiveNode),
+		flowers:     make(map[string][]*FlowerNode),
+		hives:       make(map[string][]*HiveNode),
+		zoneChecker: nil, // Will be set via SetZoneChecker if needed
 	}
 
 	// Initialize zone:start with test data
@@ -68,6 +76,14 @@ func NewLoopBaseService() *LoopBaseService {
 	service.hives["zone:start"] = []*HiveNode{hive1}
 
 	return service
+}
+
+// SetZoneChecker sets the zone access checker for this service.
+// This is typically called during initialization to inject the zones service.
+func (s *LoopBaseService) SetZoneChecker(checker ZoneAccessChecker) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.zoneChecker = checker
 }
 
 // GetFlowersByZone returns all flowers in the specified zone.
@@ -165,12 +181,14 @@ func (s *LoopBaseService) AddHiveToZone(zoneID string, hive *HiveNode) error {
 }
 
 // CanCollectFlower validates whether a player can collect pollen from a flower.
-// It checks four conditions:
-// 1. Player is within the flower's collect radius
-// 2. Flower has pollen available to collect
-// 3. Player has capacity remaining in their mochila (PollenCarried < PollenCapacity)
-// 4. Flower and playerProgress are not nil
+// It checks five conditions:
+// 1. Player has access to the flower's zone (if zone checker is configured)
+// 2. Player is within the flower's collect radius
+// 3. Flower has pollen available to collect
+// 4. Player has capacity remaining in their mochila (PollenCarried < PollenCapacity)
+// 5. Flower and playerProgress are not nil
 // Returns (success bool, reason string) for detailed validation feedback.
+// Possible reasons on failure: "zone_locked", "zone_not_found", "player is out of range", "flower has no pollen available", "mochila is full"
 func (s *LoopBaseService) CanCollectFlower(
 	playerProgress *PlayerProgress,
 	flower *FlowerNode,
@@ -184,6 +202,14 @@ func (s *LoopBaseService) CanCollectFlower(
 
 	if flower == nil {
 		return false, "flower is nil"
+	}
+
+	// Check zone access first (if zone checker is configured)
+	if s.zoneChecker != nil {
+		canAccess, reason := s.zoneChecker.CanAccessZone(playerProgress, flower.ZoneID)
+		if !canAccess {
+			return false, reason
+		}
 	}
 
 	// Check if player is within collection range
@@ -252,10 +278,12 @@ func (s *LoopBaseService) CollectFlowerPollen(
 }
 
 // CanDepositAtHive validates whether a player can deposit pollen at a hive.
-// It checks two conditions:
-// 1. Player has pollen to deposit (PollenCarried > 0)
-// 2. Hive is not nil
+// It checks three conditions:
+// 1. Player has access to the hive's zone (if zone checker is configured)
+// 2. Player has pollen to deposit (PollenCarried > 0)
+// 3. Hive is not nil
 // Returns (success bool, reason string) for detailed validation feedback.
+// Possible reasons on failure: "zone_locked", "zone_not_found", "player has no pollen to deposit"
 func (s *LoopBaseService) CanDepositAtHive(
 	playerProgress *PlayerProgress,
 	hive *HiveNode,
@@ -267,6 +295,14 @@ func (s *LoopBaseService) CanDepositAtHive(
 
 	if hive == nil {
 		return false, "hive is nil"
+	}
+
+	// Check zone access first (if zone checker is configured)
+	if s.zoneChecker != nil {
+		canAccess, reason := s.zoneChecker.CanAccessZone(playerProgress, hive.ZoneID)
+		if !canAccess {
+			return false, reason
+		}
 	}
 
 	// Check if player has pollen to deposit
