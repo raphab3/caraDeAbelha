@@ -8,7 +8,6 @@ import {
 	Group,
 	InstancedMesh,
 	Mesh,
-	MeshBasicMaterial,
 	MeshStandardMaterial,
 	Object3D,
 } from "three";
@@ -25,6 +24,7 @@ import type {
 } from "../../types/game";
 import {
 	TERRAIN_BLOCK_SCALE,
+	buildWorldSurfaceIndex,
 	toSceneAxis,
 	toTerrainBlockCenterY,
 	toTerrainSurfaceY,
@@ -36,8 +36,8 @@ import { StagePropRenderer } from "./StagePropRenderer";
 import { ZoneGateRenderer } from "./ZoneGateRenderer";
 
 const TERRAIN_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/block-grass.glb";
-const TREE_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/tree-pine-small.glb";
-const WATER_LAYER_THICKNESS = TERRAIN_BLOCK_SCALE * 0.18;
+const TREE_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/tree-pine.glb";
+const WATER_LAYER_THICKNESS = TERRAIN_BLOCK_SCALE * 0.42;
 
 interface DetailFocus {
 	x: number;
@@ -52,7 +52,7 @@ interface InstanceConfig {
 
 interface WorldFieldBuild {
 	grassTerrainInstances: InstanceConfig[];
-	stoneTerrainInstances: InstanceConfig[];
+	elevatedTerrainInstances: InstanceConfig[];
 	waterTerrainInstances: InstanceConfig[];
 	treeModelInstances: InstanceConfig[];
 }
@@ -64,7 +64,7 @@ interface InstancedModelMeshSource {
 
 function buildWorldField(chunks: WorldChunkState[]): WorldFieldBuild {
 	const grassTerrainInstances: InstanceConfig[] = [];
-	const stoneTerrainInstances: InstanceConfig[] = [];
+	const elevatedTerrainInstances: InstanceConfig[] = [];
 	const waterTerrainInstances: InstanceConfig[] = [];
 	const treeModelInstances: InstanceConfig[] = [];
 
@@ -83,9 +83,18 @@ function buildWorldField(chunks: WorldChunkState[]): WorldFieldBuild {
 			}
 
 			if (tile.type === "stone") {
-				stoneTerrainInstances.push({
+				const stackedLevels = Math.max(0, Math.ceil(tile.y - 0.001));
+
+				for (let level = 0; level < stackedLevels; level += 1) {
+					elevatedTerrainInstances.push({
+						position: [baseX, toTerrainBlockCenterY(level), baseZ],
+						scale: TERRAIN_BLOCK_SCALE,
+					});
+				}
+
+				elevatedTerrainInstances.push({
 					position: [baseX, terrainCenterY, baseZ],
-					scale: [TERRAIN_BLOCK_SCALE, TERRAIN_BLOCK_SCALE, TERRAIN_BLOCK_SCALE],
+					scale: TERRAIN_BLOCK_SCALE,
 				});
 				continue;
 			}
@@ -101,16 +110,16 @@ function buildWorldField(chunks: WorldChunkState[]): WorldFieldBuild {
 			const baseZ = toSceneAxis(tree.y);
 
 			treeModelInstances.push({
-				position: [baseX, toTerrainSurfaceY(tree.groundY ?? 0) + 0.1, baseZ],
+				position: [baseX, toTerrainSurfaceY(tree.groundY ?? 0) + 0.06, baseZ],
 				rotation: [0, (baseX - baseZ) * 0.03, 0],
-				scale: 0.54 * tree.scale,
+				scale: 1.26 * tree.scale,
 			});
 		}
 	}
 
 	return {
 		grassTerrainInstances,
-		stoneTerrainInstances,
+		elevatedTerrainInstances,
 		waterTerrainInstances,
 		treeModelInstances,
 	};
@@ -252,19 +261,20 @@ export function InstancedWorldField({
 		() => buildWorldField(chunks),
 		[chunks],
 	);
+	const surfaceIndex = useMemo(() => buildWorldSurfaceIndex(chunks), [chunks]);
 	const terrainModel = useGLTF(TERRAIN_MODEL_PATH);
 	const treeModel = useGLTF(TREE_MODEL_PATH);
 	const terrainBoxGeometry = useMemo(() => new BoxGeometry(1, 1, 1), []);
-	const stoneMaterial = useMemo(
-		() => new MeshStandardMaterial({ color: "#7c8797", roughness: 0.94, metalness: 0.06 }),
-		[],
-	);
 	const waterMaterial = useMemo(
 		() =>
-			new MeshBasicMaterial({
-				color: "#76d5ff",
+			new MeshStandardMaterial({
+				color: "#47b8d6",
+				emissive: "#0d6f94",
+				emissiveIntensity: 0.35,
+				metalness: 0.08,
+				roughness: 0.18,
 				transparent: true,
-				opacity: 0.88,
+				opacity: 0.92,
 			}),
 		[],
 	);
@@ -337,10 +347,9 @@ export function InstancedWorldField({
 	useEffect(() => {
 		return () => {
 			terrainBoxGeometry.dispose();
-			stoneMaterial.dispose();
 			waterMaterial.dispose();
 		};
-	}, [stoneMaterial, terrainBoxGeometry, waterMaterial]);
+	}, [terrainBoxGeometry, waterMaterial]);
 
 	if (chunkSize <= 0) {
 		return null;
@@ -350,31 +359,31 @@ export function InstancedWorldField({
 		<group>
 			{/* Terrain layers: grass, stone, water */}
 			{terrainMeshSources.map((source, index) => (
-				<InstancedLayer
-					key={`terrain-model:${index}`}
-					castShadow
-					receiveShadow
-					geometry={source.geometry}
-					instances={worldField.grassTerrainInstances}
-					material={source.material}
-					onPointerCancel={terrainPointerHandlers?.onPointerCancel}
-					onPointerDown={terrainPointerHandlers?.onPointerDown}
-					onPointerMove={terrainPointerHandlers?.onPointerMove}
-					onPointerUp={terrainPointerHandlers?.onPointerUp}
-				/>
+				<group key={`terrain-model:${index}`}>
+					<InstancedLayer
+						castShadow
+						receiveShadow
+						geometry={source.geometry}
+						instances={worldField.grassTerrainInstances}
+						material={source.material}
+						onPointerCancel={terrainPointerHandlers?.onPointerCancel}
+						onPointerDown={terrainPointerHandlers?.onPointerDown}
+						onPointerMove={terrainPointerHandlers?.onPointerMove}
+						onPointerUp={terrainPointerHandlers?.onPointerUp}
+					/>
+					<InstancedLayer
+						castShadow
+						receiveShadow
+						geometry={source.geometry}
+						instances={worldField.elevatedTerrainInstances}
+						material={source.material}
+						onPointerCancel={terrainPointerHandlers?.onPointerCancel}
+						onPointerDown={terrainPointerHandlers?.onPointerDown}
+						onPointerMove={terrainPointerHandlers?.onPointerMove}
+						onPointerUp={terrainPointerHandlers?.onPointerUp}
+					/>
+				</group>
 			))}
-
-			<InstancedLayer
-				castShadow
-				receiveShadow
-				geometry={terrainBoxGeometry}
-				instances={worldField.stoneTerrainInstances}
-				material={stoneMaterial}
-				onPointerCancel={terrainPointerHandlers?.onPointerCancel}
-				onPointerDown={terrainPointerHandlers?.onPointerDown}
-				onPointerMove={terrainPointerHandlers?.onPointerMove}
-				onPointerUp={terrainPointerHandlers?.onPointerUp}
-			/>
 
 			<InstancedLayer
 				receiveShadow
@@ -408,7 +417,7 @@ export function InstancedWorldField({
 				/>
 			))}
 
-			<StagePropRenderer landmarks={landmarks} props={props} />
+			<StagePropRenderer landmarks={landmarks} props={props} surfaceIndex={surfaceIndex} />
 
 			{/* Hive renderer */}
 			<HiveRenderer

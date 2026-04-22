@@ -14,7 +14,13 @@ import {
 } from "three";
 
 import type { WorldLandmarkState, WorldPropState } from "../../types/game";
-import { toSceneAxis, toTerrainSurfaceY } from "./worldSurface";
+import {
+	resolveSurfaceSceneY,
+	toSceneAxis,
+	toTerrainSurfaceY,
+	type WorldSurfaceIndex,
+	WORLD_TO_SCENE_SCALE,
+} from "./worldSurface";
 
 interface InstancedModelMeshSource {
 	geometry: BufferGeometry;
@@ -24,12 +30,23 @@ interface InstancedModelMeshSource {
 interface InstancedAssetLayerProps {
 	assetPath: string;
 	props: WorldPropState[];
+	surfaceIndex: WorldSurfaceIndex;
 }
 
 interface InstancedAssetMeshProps {
 	geometry: BufferGeometry;
 	material: Material;
 	props: WorldPropState[];
+	surfaceIndex: WorldSurfaceIndex;
+}
+
+function resolvePropSceneY(item: WorldPropState, surfaceIndex: WorldSurfaceIndex): number {
+	if (item.tag === "terrain") {
+		const groundedY = resolveSurfaceSceneY(surfaceIndex, item.x, item.z);
+		return groundedY + item.y * WORLD_TO_SCENE_SCALE * 0.38;
+	}
+
+	return toTerrainSurfaceY(item.y);
 }
 
 function normalizeAssetPath(assetPath: string): string {
@@ -54,7 +71,7 @@ function collectInstancedModelMeshes(root: Group): InstancedModelMeshSource[] {
 }
 
 
-function InstancedAssetMesh({ geometry, material, props }: InstancedAssetMeshProps) {
+function InstancedAssetMesh({ geometry, material, props, surfaceIndex }: InstancedAssetMeshProps) {
 	const meshRef = useRef<InstancedMesh>(null);
 	const dummy = useMemo(() => new Object3D(), []);
 
@@ -67,7 +84,7 @@ function InstancedAssetMesh({ geometry, material, props }: InstancedAssetMeshPro
 		mesh.count = props.length;
 		for (let index = 0; index < props.length; index += 1) {
 			const item = props[index];
-			dummy.position.set(toSceneAxis(item.x), toTerrainSurfaceY(item.y), toSceneAxis(item.z));
+			dummy.position.set(toSceneAxis(item.x), resolvePropSceneY(item, surfaceIndex), toSceneAxis(item.z));
 			dummy.rotation.set(0, item.yaw, 0);
 			dummy.scale.setScalar(item.scale);
 			dummy.updateMatrix();
@@ -75,7 +92,7 @@ function InstancedAssetMesh({ geometry, material, props }: InstancedAssetMeshPro
 		}
 
 		mesh.instanceMatrix.needsUpdate = true;
-	}, [dummy, props]);
+	}, [dummy, props, surfaceIndex]);
 
 	return (
 		<instancedMesh
@@ -88,14 +105,20 @@ function InstancedAssetMesh({ geometry, material, props }: InstancedAssetMeshPro
 	);
 }
 
-function InstancedAssetLayer({ assetPath, props }: InstancedAssetLayerProps) {
+function InstancedAssetLayer({ assetPath, props, surfaceIndex }: InstancedAssetLayerProps) {
 	const gltf = useGLTF(normalizeAssetPath(assetPath));
 	const meshSources = useMemo(() => collectInstancedModelMeshes(gltf.scene), [gltf.scene]);
 
 	return (
 		<>
 			{meshSources.map((source, index) => (
-				<InstancedAssetMesh key={`${assetPath}:${index}`} geometry={source.geometry} material={source.material} props={props} />
+				<InstancedAssetMesh
+					key={`${assetPath}:${index}`}
+					geometry={source.geometry}
+					material={source.material}
+					props={props}
+					surfaceIndex={surfaceIndex}
+				/>
 			))}
 		</>
 	);
@@ -112,7 +135,15 @@ function resolveLandmarkColor(tag?: string): string {
 	}
 }
 
-export function StagePropRenderer({ landmarks, props }: { landmarks: WorldLandmarkState[]; props: WorldPropState[] }) {
+export function StagePropRenderer({
+	landmarks,
+	props,
+	surfaceIndex,
+}: {
+	landmarks: WorldLandmarkState[];
+	props: WorldPropState[];
+	surfaceIndex: WorldSurfaceIndex;
+}) {
 	const groupedProps = useMemo(() => {
 		const groups = new Map<string, WorldPropState[]>();
 		for (const item of props) {
@@ -137,7 +168,7 @@ export function StagePropRenderer({ landmarks, props }: { landmarks: WorldLandma
 	return (
 		<group>
 			{groupedProps.map(([assetPath, assetProps]) => (
-				<InstancedAssetLayer key={assetPath} assetPath={assetPath} props={assetProps} />
+				<InstancedAssetLayer key={assetPath} assetPath={assetPath} props={assetProps} surfaceIndex={surfaceIndex} />
 			))}
 
 			{landmarks.map((landmark) => {
@@ -186,7 +217,11 @@ for (const assetPath of [
 	"/kenney_platformer-kit/Models/GLB format/flowers.glb",
 	"/kenney_platformer-kit/Models/GLB format/rocks.glb",
 	"/kenney_platformer-kit/Models/GLB format/fence-broken.glb",
+	"/kenney_platformer-kit/Models/GLB format/fence-straight.glb",
 	"/kenney_platformer-kit/Models/GLB format/sign.glb",
+	"/kenney_platformer-kit/Models/GLB format/platform.glb",
+	"/kenney_platformer-kit/Models/GLB format/platform-ramp.glb",
+	"/kenney_platformer-kit/Models/GLB format/platform-overhang.glb",
 	"/kenney_platformer-kit/Models/GLB format/arrows.glb",
 ]) {
 	useGLTF.preload(assetPath);

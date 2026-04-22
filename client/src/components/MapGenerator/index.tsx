@@ -4,16 +4,44 @@ import { createNoise2D } from "simplex-noise";
 import seedrandom from "seedrandom";
 
 import "./styles.css";
-import type { MapGeneratorSettings, MapStats, MapTile, TerrainProp, TerrainType } from "./types";
+import type { LayoutStyle, MapGeneratorSettings, MapStats, MapTile, TerrainProp, TerrainType } from "./types";
 
 const DEFAULT_SETTINGS: MapGeneratorSettings = {
 	seed: "cara-de-abelha",
 	mapSize: 50,
+	layoutStyle: "noise",
 	scale: 0.09,
 	waterLevel: -0.3,
 	mountainLevel: 0.5,
 	floraDensity: 0.36,
 };
+
+const SCENARIO_PRESETS = [
+	{
+		id: "meadow-river",
+		name: "Prado com Rio",
+		description: "Corredores de agua mais legiveis, relevo suave e clareiras amplas.",
+		settings: { seed: "starter-meadow-river", mapSize: 50, layoutStyle: "noise", scale: 0.072, waterLevel: -0.16, mountainLevel: 0.62, floraDensity: 0.28 },
+	},
+	{
+		id: "sunflower-ridge",
+		name: "Sunflower Ridge",
+		description: "Cristas mais secas, vales longos e bordas de progressao territorial.",
+		settings: { seed: "sunflower-ridge", mapSize: 50, layoutStyle: "noise", scale: 0.092, waterLevel: -0.35, mountainLevel: 0.38, floraDensity: 0.24 },
+	},
+	{
+		id: "wetlands",
+		name: "Pantano Radiante",
+		description: "Mais lagos, rios laterais e bolsões de vegetacao densa.",
+		settings: { seed: "wetlands", mapSize: 50, layoutStyle: "noise", scale: 0.061, waterLevel: -0.08, mountainLevel: 0.7, floraDensity: 0.42 },
+	},
+	{
+		id: "linked-biomes",
+		name: "Biomas Conectados",
+		description: "Ilhas de cenario conectadas por passagens, com nucleos altos e clareiras de travessia.",
+		settings: { seed: "linked-biomes", mapSize: 56, layoutStyle: "connected-islands", scale: 0.08, waterLevel: -0.4, mountainLevel: 0.55, floraDensity: 0.22 },
+	},
+] as const;
 
 const MIN_THRESHOLD_GAP = 0.05;
 
@@ -68,7 +96,213 @@ function sanitizeSeed(seed: string): string {
 	return normalizedSeed.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "mapa";
 }
 
+function buildTileKey(x: number, z: number): string {
+	return `${x}:${z}`;
+}
+
+function createBaseMap(mapSize: number): MapTile[] {
+	const tiles: MapTile[] = [];
+	const origin = getGridOrigin(mapSize);
+	const end = origin + mapSize - 1;
+
+	for (let z = origin; z <= end; z += 1) {
+		for (let x = origin; x <= end; x += 1) {
+			tiles.push({ x, y: -0.5, z, type: "water", prop: null });
+		}
+	}
+
+	return tiles;
+}
+
+function setTile(mapData: MapTile[], mapSize: number, nextTile: MapTile): void {
+	const origin = getGridOrigin(mapSize);
+	const index = (nextTile.z - origin) * mapSize + (nextTile.x - origin);
+	if (index < 0 || index >= mapData.length) {
+		return;
+	}
+	mapData[index] = nextTile;
+}
+
+function paintIsland(
+	mapData: MapTile[],
+	settings: MapGeneratorSettings,
+	shapeNoise: ReturnType<typeof createNoise2D>,
+	centerX: number,
+	centerZ: number,
+	radiusX: number,
+	radiusZ: number,
+	peakHeight: number,
+) {
+	const origin = getGridOrigin(settings.mapSize);
+	const end = origin + settings.mapSize - 1;
+
+	for (let z = origin; z <= end; z += 1) {
+		for (let x = origin; x <= end; x += 1) {
+			const dx = (x - centerX) / radiusX;
+			const dz = (z - centerZ) / radiusZ;
+			const noiseOffset = shapeNoise(x * 0.11 + centerX, z * 0.11 + centerZ) * 0.18;
+			const distance = dx * dx + dz * dz + noiseOffset;
+
+			if (distance > 1.08) {
+				continue;
+			}
+
+			let y = 0;
+			let type: TerrainType = "grass";
+
+			if (distance < 0.28 && peakHeight >= 2) {
+				y = 2;
+				type = "stone";
+			} else if (distance < 0.52 && peakHeight >= 1) {
+				y = 1;
+				type = "stone";
+			}
+
+			setTile(mapData, settings.mapSize, { x, y, z, type, prop: null });
+		}
+	}
+}
+
+function paintBridge(
+	mapData: MapTile[],
+	settings: MapGeneratorSettings,
+	fromX: number,
+	fromZ: number,
+	toX: number,
+	toZ: number,
+	width: number,
+) {
+	const steps = Math.max(Math.abs(toX - fromX), Math.abs(toZ - fromZ));
+
+	for (let step = 0; step <= steps; step += 1) {
+		const progress = steps === 0 ? 0 : step / steps;
+		const bridgeX = Math.round(fromX + (toX - fromX) * progress);
+		const bridgeZ = Math.round(fromZ + (toZ - fromZ) * progress);
+
+		for (let offsetX = -width; offsetX <= width; offsetX += 1) {
+			for (let offsetZ = -width; offsetZ <= width; offsetZ += 1) {
+				if (Math.abs(offsetX) + Math.abs(offsetZ) > width + 1) {
+					continue;
+				}
+
+				setTile(mapData, settings.mapSize, {
+					x: bridgeX + offsetX,
+					y: 0,
+					z: bridgeZ + offsetZ,
+					type: "grass",
+					prop: null,
+				});
+			}
+		}
+	}
+}
+
+function decorateConnectedIslands(mapData: MapTile[], settings: MapGeneratorSettings, baseSeed: string): MapTile[] {
+	const floraPlacementNoise = createNoise2D(seedrandom(`${baseSeed}:connected-flora`));
+	const floraVariantNoise = createNoise2D(seedrandom(`${baseSeed}:connected-variant`));
+
+	return mapData.map((tile) => {
+		if (tile.type !== "grass") {
+			return tile;
+		}
+
+		const floraChance = (floraPlacementNoise(tile.x * 0.21, tile.z * 0.21) + 1) / 2;
+		if (floraChance < 1 - settings.floraDensity) {
+			return tile;
+		}
+
+		const floraVariant = floraVariantNoise(tile.x * 0.33 + 140, tile.z * 0.33 - 140);
+		return { ...tile, prop: floraVariant > 0.12 ? "tree" : "flower" };
+	});
+}
+
+function buildConnectedIslandsMapData(settings: MapGeneratorSettings): MapTile[] {
+	const baseSeed = settings.seed.trim() || DEFAULT_SETTINGS.seed;
+	const shapeNoise = createNoise2D(seedrandom(`${baseSeed}:macro-shapes`));
+	const mapData = createBaseMap(settings.mapSize);
+	const sizeFactor = settings.mapSize / 50;
+	const islands = [
+		{ x: Math.round(-15 * sizeFactor), z: Math.round(8 * sizeFactor), radiusX: Math.round(8 * sizeFactor), radiusZ: Math.round(6 * sizeFactor), peakHeight: 1 },
+		{ x: Math.round(-4 * sizeFactor), z: Math.round(1 * sizeFactor), radiusX: Math.round(7 * sizeFactor), radiusZ: Math.round(5 * sizeFactor), peakHeight: 2 },
+		{ x: Math.round(10 * sizeFactor), z: Math.round(5 * sizeFactor), radiusX: Math.round(8 * sizeFactor), radiusZ: Math.round(6 * sizeFactor), peakHeight: 1 },
+		{ x: Math.round(18 * sizeFactor), z: Math.round(-7 * sizeFactor), radiusX: Math.round(6 * sizeFactor), radiusZ: Math.round(5 * sizeFactor), peakHeight: 2 },
+		{ x: Math.round(-10 * sizeFactor), z: Math.round(-14 * sizeFactor), radiusX: Math.round(6 * sizeFactor), radiusZ: Math.round(4 * sizeFactor), peakHeight: 1 },
+	] as const;
+	const links = [
+		[0, 1],
+		[1, 2],
+		[2, 3],
+		[1, 4],
+	] as const;
+
+	for (const island of islands) {
+		paintIsland(mapData, settings, shapeNoise, island.x, island.z, island.radiusX, island.radiusZ, island.peakHeight);
+	}
+
+	for (const [fromIndex, toIndex] of links) {
+		const from = islands[fromIndex];
+		const to = islands[toIndex];
+		paintBridge(mapData, settings, from.x, from.z, to.x, to.z, 1);
+	}
+
+	return decorateConnectedIslands(mapData, settings, baseSeed);
+}
+
+function polishMapData(mapData: MapTile[]): MapTile[] {
+	const tileIndex = new Map(mapData.map((tile) => [buildTileKey(tile.x, tile.z), tile]));
+	const neighborOffsets = [
+		[-1, -1], [0, -1], [1, -1],
+		[-1, 0],           [1, 0],
+		[-1, 1],  [0, 1],  [1, 1],
+	] as const;
+
+	return mapData.map((tile) => {
+		let sameTypeNeighbors = 0;
+		let waterNeighbors = 0;
+		let stoneNeighbors = 0;
+
+		for (const [offsetX, offsetZ] of neighborOffsets) {
+			const neighbor = tileIndex.get(buildTileKey(tile.x + offsetX, tile.z + offsetZ));
+			if (!neighbor) {
+				continue;
+			}
+
+			if (neighbor.type === tile.type) {
+				sameTypeNeighbors += 1;
+			}
+			if (neighbor.type === "water") {
+				waterNeighbors += 1;
+			}
+			if (neighbor.type === "stone") {
+				stoneNeighbors += 1;
+			}
+		}
+
+		if (tile.type === "stone" && tile.y > 0 && sameTypeNeighbors <= 1) {
+			return { ...tile, type: "grass", y: 0, prop: null };
+		}
+
+		if (tile.type === "grass" && waterNeighbors >= 6) {
+			return { ...tile, type: "water", y: -0.5, prop: null };
+		}
+
+		if (tile.type === "water" && stoneNeighbors >= 5) {
+			return { ...tile, type: "stone", y: 1, prop: null };
+		}
+
+		if (tile.type !== "grass" && tile.prop !== null) {
+			return { ...tile, prop: null };
+		}
+
+		return tile;
+	});
+}
+
 function buildMapData(settings: MapGeneratorSettings): MapTile[] {
+	if (settings.layoutStyle === "connected-islands") {
+		return buildConnectedIslandsMapData(settings);
+	}
+
 	const baseSeed = settings.seed.trim() || DEFAULT_SETTINGS.seed;
 	const terrainNoise = createNoise2D(seedrandom(baseSeed));
 	const floraPlacementNoise = createNoise2D(seedrandom(`${baseSeed}:flora:placement`));
@@ -111,7 +345,7 @@ function buildMapData(settings: MapGeneratorSettings): MapTile[] {
 		}
 	}
 
-	return mapData;
+	return polishMapData(mapData);
 }
 
 function countMapStats(mapData: MapTile[]): MapStats {
@@ -199,9 +433,31 @@ function LegendSwatch({ colorClass, label }: { colorClass: string; label: string
 	);
 }
 
+function applyScenarioPreset(
+	preset: (typeof SCENARIO_PRESETS)[number],
+	setters: {
+		setSeed: (value: string) => void;
+		setMapSize: (value: number) => void;
+		setLayoutStyle: (value: LayoutStyle) => void;
+		setScale: (value: number) => void;
+		setWaterLevel: (value: number) => void;
+		setMountainLevel: (value: number) => void;
+		setFloraDensity: (value: number) => void;
+	},
+) {
+	setters.setSeed(preset.settings.seed ?? DEFAULT_SETTINGS.seed);
+	setters.setMapSize(preset.settings.mapSize ?? DEFAULT_SETTINGS.mapSize);
+	setters.setLayoutStyle(preset.settings.layoutStyle ?? DEFAULT_SETTINGS.layoutStyle);
+	setters.setScale(preset.settings.scale ?? DEFAULT_SETTINGS.scale);
+	setters.setWaterLevel(preset.settings.waterLevel ?? DEFAULT_SETTINGS.waterLevel);
+	setters.setMountainLevel(preset.settings.mountainLevel ?? DEFAULT_SETTINGS.mountainLevel);
+	setters.setFloraDensity(preset.settings.floraDensity ?? DEFAULT_SETTINGS.floraDensity);
+}
+
 export default function MapGenerator({ embedded = false }: MapGeneratorProps) {
 	const [seed, setSeed] = useState(DEFAULT_SETTINGS.seed);
 	const [mapSize, setMapSize] = useState(DEFAULT_SETTINGS.mapSize);
+	const [layoutStyle, setLayoutStyle] = useState<LayoutStyle>(DEFAULT_SETTINGS.layoutStyle);
 	const [scale, setScale] = useState(DEFAULT_SETTINGS.scale);
 	const [waterLevel, setWaterLevel] = useState(DEFAULT_SETTINGS.waterLevel);
 	const [mountainLevel, setMountainLevel] = useState(DEFAULT_SETTINGS.mountainLevel);
@@ -214,16 +470,30 @@ export default function MapGenerator({ embedded = false }: MapGeneratorProps) {
 		() => ({
 			seed,
 			mapSize,
+			layoutStyle,
 			scale,
 			waterLevel,
 			mountainLevel,
 			floraDensity,
 		}),
-		[seed, mapSize, scale, waterLevel, mountainLevel, floraDensity],
+		[seed, mapSize, layoutStyle, scale, waterLevel, mountainLevel, floraDensity],
 	);
 
 	const mapData = useMemo(() => buildMapData(settings), [settings]);
 	const stats = useMemo(() => countMapStats(mapData), [mapData]);
+	const activePresetId = useMemo(
+		() =>
+			SCENARIO_PRESETS.find((preset) =>
+				preset.settings.seed === seed &&
+				preset.settings.mapSize === mapSize &&
+				preset.settings.layoutStyle === layoutStyle &&
+				preset.settings.scale === scale &&
+				preset.settings.waterLevel === waterLevel &&
+				preset.settings.mountainLevel === mountainLevel &&
+				preset.settings.floraDensity === floraDensity,
+			)?.id,
+		[floraDensity, layoutStyle, mapSize, mountainLevel, scale, seed, waterLevel],
+	);
 
 	useEffect(() => {
 		const frame = canvasFrameRef.current;
@@ -387,6 +657,29 @@ export default function MapGenerator({ embedded = false }: MapGeneratorProps) {
 							<p className="mt-2 text-sm leading-6 text-slate-200/86">
 								Painel compacto para afinar parâmetros à esquerda, pré-visualização como foco principal à direita e leitura rápida de densidade nos cartões de apoio.
 							</p>
+							<p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/72">
+								Modo atual: {layoutStyle === "connected-islands" ? "Ilhas conectadas" : "Ruido organico"}
+							</p>
+						</div>
+
+						<div className="mb-4 rounded-[28px] border border-sky-300/16 bg-sky-400/8 p-4">
+							<p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-sky-200/78">Presets de cenário</p>
+							<div className="mt-3 grid gap-3">
+								{SCENARIO_PRESETS.map((preset) => {
+									const isActive = activePresetId === preset.id;
+									return (
+										<button
+											key={preset.id}
+											className={`rounded-3xl border px-4 py-3 text-left transition ${isActive ? "border-sky-200/55 bg-sky-300/15 text-white" : "border-white/8 bg-slate-950/35 text-slate-200/84 hover:border-sky-200/32 hover:bg-slate-900/65"}`}
+											onClick={() => applyScenarioPreset(preset, { setSeed, setMapSize, setLayoutStyle, setScale, setWaterLevel, setMountainLevel, setFloraDensity })}
+											type="button"
+										>
+											<span className="block text-sm font-semibold">{preset.name}</span>
+											<span className="mt-1 block text-xs leading-5 text-slate-300/74">{preset.description}</span>
+										</button>
+									);
+								})}
+							</div>
 						</div>
 
 						<div className="grid gap-4">

@@ -1,5 +1,7 @@
 export type TerrainType = "water" | "grass" | "stone";
 
+export type LayoutStyle = "noise" | "connected-islands";
+
 export type TerrainProp = "flower" | "tree" | null;
 
 export interface MapTile {
@@ -13,6 +15,7 @@ export interface MapTile {
 export interface MapGeneratorSettings {
 	seed: string;
 	mapSize: number;
+	layoutStyle: LayoutStyle;
 	scale: number;
 	waterLevel: number;
 	mountainLevel: number;

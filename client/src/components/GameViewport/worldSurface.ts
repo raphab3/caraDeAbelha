@@ -18,16 +18,32 @@ export function toSceneAxis(value: number): number {
 	return value * WORLD_TO_SCENE_SCALE;
 }
 
+export function resolveTerrainElevation(value: number): number {
+	if (value <= -0.5) {
+		return value * 1.9;
+	}
+
+	if (value <= 0) {
+		return value * 1.2;
+	}
+
+	if (value < 1) {
+		return value * 1.1;
+	}
+
+	return 1.1 + value * 1.45;
+}
+
 export function toWorldAxis(value: number): number {
 	return value / WORLD_TO_SCENE_SCALE;
 }
 
 export function toTerrainBlockCenterY(elevation: number): number {
-	return TERRAIN_BLOCK_CENTER_Y + elevation * WORLD_TO_SCENE_SCALE;
+	return TERRAIN_BLOCK_CENTER_Y + resolveTerrainElevation(elevation) * WORLD_TO_SCENE_SCALE;
 }
 
 export function toTerrainSurfaceY(elevation: number): number {
-	return TERRAIN_SURFACE_HEIGHT + elevation * WORLD_TO_SCENE_SCALE;
+	return TERRAIN_SURFACE_HEIGHT + resolveTerrainElevation(elevation) * WORLD_TO_SCENE_SCALE;
 }
 
 function buildSurfaceKey(worldX: number, worldZ: number): SurfaceKey {

@@ -70026,44 +70026,44 @@
       "id": "prop:ridge-west-cliff",
       "prefabId": "terrain/cliff-high",
       "x": -34,
-      "y": 3,
+      "y": 1.2,
       "z": -18,
       "scale": 1.35,
       "yaw": 20,
-      "zoneId": "zone_0",
+      "zoneId": "zone:starter_meadow",
       "tag": "terrain"
     },
     {
       "id": "prop:ridge-east-cliff",
       "prefabId": "terrain/cliff-high",
       "x": 32,
-      "y": 3,
+      "y": 1.1,
       "z": -12,
       "scale": 1.28,
       "yaw": -18,
-      "zoneId": "zone_0",
+      "zoneId": "zone:starter_meadow",
       "tag": "terrain"
     },
     {
       "id": "prop:north-slope",
       "prefabId": "terrain/slope-wide",
       "x": 10,
-      "y": 1.5,
+      "y": 0.65,
       "z": -28,
       "scale": 1.2,
       "yaw": 180,
-      "zoneId": "zone_0",
+      "zoneId": "zone:starter_meadow",
       "tag": "terrain"
     },
     {
       "id": "prop:south-overhang",
       "prefabId": "terrain/overhang-edge",
       "x": -8,
-      "y": 2,
+      "y": 0.8,
       "z": 24,
       "scale": 1.25,
       "yaw": 0,
-      "zoneId": "zone_0",
+      "zoneId": "zone:starter_meadow",
       "tag": "terrain"
     },
     {
@@ -70074,7 +70074,7 @@
       "z": -6,
       "scale": 1.1,
       "yaw": 35,
-      "zoneId": "zone_0",
+      "zoneId": "zone:starter_meadow",
       "tag": "nature"
     },
     {
@@ -70085,7 +70085,7 @@
       "z": 16,
       "scale": 1.18,
       "yaw": -22,
-      "zoneId": "zone_0",
+      "zoneId": "zone:starter_meadow",
       "tag": "nature"
     },
     {
@@ -70096,7 +70096,7 @@
       "z": 4,
       "scale": 1,
       "yaw": 0,
-      "zoneId": "zone_0",
+      "zoneId": "zone:starter_meadow",
       "tag": "nature"
     },
     {
@@ -70107,7 +70107,7 @@
       "z": 8,
       "scale": 1.08,
       "yaw": 14,
-      "zoneId": "zone_0",
+      "zoneId": "zone:starter_meadow",
       "tag": "nature"
     },
     {
@@ -70118,7 +70118,7 @@
       "z": -10,
       "scale": 1,
       "yaw": 90,
-      "zoneId": "zone_0",
+      "zoneId": "zone:starter_meadow",
       "tag": "setdressing"
     },
     {
@@ -70129,7 +70129,7 @@
       "z": -2,
       "scale": 1,
       "yaw": 45,
-      "zoneId": "zone_0",
+      "zoneId": "zone:starter_meadow",
       "tag": "setdressing"
     },
     {
@@ -70192,7 +70192,7 @@
       "id": "landmark:west-ridge",
       "displayName": "Muralha Verde",
       "x": -34,
-      "y": 3,
+      "y": 1.2,
       "z": -18,
       "zoneId": "zone:starter_meadow",
       "tag": "terrain"
