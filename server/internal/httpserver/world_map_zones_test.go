@@ -2,6 +2,8 @@ package httpserver
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -150,7 +152,7 @@ func TestExpandedStageMapParsing(t *testing.T) {
 			BGM: "assets/rpg-adventure.mp3",
 		},
 		EdgeBehavior: &worldEdgeBehavior{
-			Type: "outlands_return_corridor",
+			Type:           "outlands_return_corridor",
 			PlayableBounds: worldBounds{X1: -10, X2: 10, Z1: -10, Z2: 10},
 			OutlandsBounds: worldBounds{X1: -20, X2: 20, Z1: -20, Z2: 20},
 		},
@@ -198,12 +200,66 @@ func TestExpandedStageMapParsing(t *testing.T) {
 		t.Fatalf("expected one rich prop prefab, got %#v", layout.props)
 	}
 
+	if layout.props[0].Scale != 1.2 {
+		t.Fatalf("expected explicit prefab scale 1.2, got %v", layout.props[0].Scale)
+	}
+
 	if len(layout.landmarks) != 1 || layout.landmarks[0].DisplayName != "Arco de Pedra" {
 		t.Fatalf("expected one landmark, got %#v", layout.landmarks)
 	}
 
 	if layout.maxX < 12 || layout.maxY < 9 {
 		t.Fatalf("expected authored props and landmarks to contribute to bounds, got maxX=%v maxY=%v", layout.maxX, layout.maxY)
+	}
+}
+
+func TestExpandedStageMapParsingDefaultsPrefabScaleAndID(t *testing.T) {
+	data := worldMapContainer{
+		Tiles: []worldMapRecord{{X: 0, Y: 0, Z: 0, Type: "grass", Prop: nil}},
+		Props: []worldPrefabPlacement{{PrefabID: "nature/pine-large", X: 4, Y: 0, Z: 3}},
+	}
+
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		t.Fatalf("marshal container with defaults: %v", err)
+	}
+
+	layout, err := parseWorldLayout(bytes)
+	if err != nil {
+		t.Fatalf("parse layout with prefab defaults: %v", err)
+	}
+
+	if len(layout.props) != 1 {
+		t.Fatalf("expected one prop, got %d", len(layout.props))
+	}
+
+	if layout.props[0].ID == "" {
+		t.Fatalf("expected generated prop ID, got empty string")
+	}
+
+	if layout.props[0].Scale != worldPrefabCatalog["nature/pine-large"].DefaultScale {
+		t.Fatalf("expected default scale %v, got %v", worldPrefabCatalog["nature/pine-large"].DefaultScale, layout.props[0].Scale)
+	}
+}
+
+func TestExpandedStageMapParsingRejectsUnknownPrefab(t *testing.T) {
+	data := worldMapContainer{
+		Tiles: []worldMapRecord{{X: 0, Y: 0, Z: 0, Type: "grass", Prop: nil}},
+		Props: []worldPrefabPlacement{{ID: "broken", PrefabID: "nature/not-found", X: 1, Y: 0, Z: 1}},
+	}
+
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		t.Fatalf("marshal invalid prefab container: %v", err)
+	}
+
+	_, err = parseWorldLayout(bytes)
+	if err == nil {
+		t.Fatalf("expected invalid prefab parsing to fail")
+	}
+
+	if err.Error() != "unsupported prefabId \"nature/not-found\"" {
+		t.Fatalf("unexpected error for invalid prefab: %v", err)
 	}
 }
 
@@ -231,6 +287,47 @@ func TestLegacyMapFormatBackwardCompatibility(t *testing.T) {
 
 	if len(layout.zones) != 0 {
 		t.Errorf("legacy format without zones should have 0 zones, got %d", len(layout.zones))
+	}
+}
+
+func TestCurrentMapFileParses(t *testing.T) {
+	mapPath := filepath.Join("..", "..", "maps", "map.json")
+	worldBytes, err := os.ReadFile(mapPath)
+	if err != nil {
+		t.Fatalf("read current map file: %v", err)
+	}
+
+	layout, err := parseWorldLayout(worldBytes)
+	if err != nil {
+		t.Fatalf("parse current map file: %v", err)
+	}
+
+	if layout.stageID != "stage:starter-basin" {
+		t.Fatalf("expected stage:starter-basin, got %q", layout.stageID)
+	}
+
+	if layout.audio.BGM != "assets/rpg-adventure.mp3" {
+		t.Fatalf("expected authored map BGM, got %q", layout.audio.BGM)
+	}
+
+	if layout.edgeBehavior == nil || layout.edgeBehavior.Type != "outlands_return_corridor" {
+		t.Fatalf("expected authored edge behavior in current map")
+	}
+
+	if len(layout.props) == 0 {
+		t.Fatalf("expected current map to include authored prefab props")
+	}
+
+	if len(layout.landmarks) == 0 {
+		t.Fatalf("expected current map to include landmarks")
+	}
+
+	if len(layout.zones) == 0 {
+		t.Fatalf("expected current map to include explicit zones")
+	}
+
+	if len(layout.chunks) == 0 {
+		t.Fatalf("expected current map to produce chunks")
 	}
 }
 

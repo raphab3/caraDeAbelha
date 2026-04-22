@@ -1,4 +1,25 @@
-[
+{
+  "stageId": "stage:starter-basin",
+  "displayName": "Bacia do Primeiro Voo",
+  "audio": {
+    "bgm": "assets/rpg-adventure.mp3"
+  },
+  "edgeBehavior": {
+    "type": "outlands_return_corridor",
+    "playableBounds": {
+      "x1": -45,
+      "x2": 45,
+      "z1": -45,
+      "z2": 45
+    },
+    "outlandsBounds": {
+      "x1": -120,
+      "x2": 120,
+      "z1": -120,
+      "z2": 120
+    }
+  },
+  "tiles": [
   {
     "x": -50,
     "y": 0,
@@ -69999,4 +70020,176 @@
     "type": "water",
     "prop": null
   }
-]
+  ],
+  "props": [
+    {
+      "id": "prop:ridge-west-cliff",
+      "prefabId": "terrain/cliff-high",
+      "x": -34,
+      "y": 3,
+      "z": -18,
+      "scale": 1.35,
+      "yaw": 20,
+      "zoneId": "zone_0",
+      "tag": "terrain"
+    },
+    {
+      "id": "prop:ridge-east-cliff",
+      "prefabId": "terrain/cliff-high",
+      "x": 32,
+      "y": 3,
+      "z": -12,
+      "scale": 1.28,
+      "yaw": -18,
+      "zoneId": "zone_0",
+      "tag": "terrain"
+    },
+    {
+      "id": "prop:north-slope",
+      "prefabId": "terrain/slope-wide",
+      "x": 10,
+      "y": 1.5,
+      "z": -28,
+      "scale": 1.2,
+      "yaw": 180,
+      "zoneId": "zone_0",
+      "tag": "terrain"
+    },
+    {
+      "id": "prop:south-overhang",
+      "prefabId": "terrain/overhang-edge",
+      "x": -8,
+      "y": 2,
+      "z": 24,
+      "scale": 1.25,
+      "yaw": 0,
+      "zoneId": "zone_0",
+      "tag": "terrain"
+    },
+    {
+      "id": "prop:pine-northwest",
+      "prefabId": "nature/pine-large",
+      "x": -22,
+      "y": 0,
+      "z": -6,
+      "scale": 1.1,
+      "yaw": 35,
+      "zoneId": "zone_0",
+      "tag": "nature"
+    },
+    {
+      "id": "prop:pine-south",
+      "prefabId": "nature/pine-large",
+      "x": 18,
+      "y": 0,
+      "z": 16,
+      "scale": 1.18,
+      "yaw": -22,
+      "zoneId": "zone_0",
+      "tag": "nature"
+    },
+    {
+      "id": "prop:flowers-meadow",
+      "prefabId": "nature/flowers-cluster",
+      "x": -6,
+      "y": 0,
+      "z": 4,
+      "scale": 1,
+      "yaw": 0,
+      "zoneId": "zone_0",
+      "tag": "nature"
+    },
+    {
+      "id": "prop:rocks-watch",
+      "prefabId": "nature/rocks-cluster",
+      "x": 26,
+      "y": 0,
+      "z": 8,
+      "scale": 1.08,
+      "yaw": 14,
+      "zoneId": "zone_0",
+      "tag": "nature"
+    },
+    {
+      "id": "prop:fence-breach",
+      "prefabId": "setdressing/fence-broken",
+      "x": 4,
+      "y": 0,
+      "z": -10,
+      "scale": 1,
+      "yaw": 90,
+      "zoneId": "zone_0",
+      "tag": "setdressing"
+    },
+    {
+      "id": "prop:way-sign",
+      "prefabId": "setdressing/signpost",
+      "x": 2,
+      "y": 0,
+      "z": -2,
+      "scale": 1,
+      "yaw": 45,
+      "zoneId": "zone_0",
+      "tag": "setdressing"
+    },
+    {
+      "id": "prop:wind-gate-east",
+      "prefabId": "border/wind-gate",
+      "x": 44,
+      "y": 0,
+      "z": 0,
+      "scale": 1.6,
+      "yaw": -90,
+      "zoneId": "zone_0",
+      "tag": "border"
+    }
+  ],
+  "zones": [
+    {
+      "id": "zone_0",
+      "name": "Bacia do Primeiro Voo",
+      "x1": -50,
+      "x2": 50,
+      "z1": -50,
+      "z2": 50
+    }
+  ],
+  "transitions": [
+    {
+      "fromZone": "zone_0",
+      "toZone": "outlands:east-wind-lane",
+      "x": 44,
+      "z": 0,
+      "type": "wind_gate"
+    }
+  ],
+  "landmarks": [
+    {
+      "id": "landmark:central-flag",
+      "displayName": "Marco do Enxame",
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "zoneId": "zone_0",
+      "tag": "navigation"
+    },
+    {
+      "id": "landmark:west-ridge",
+      "displayName": "Muralha Verde",
+      "x": -34,
+      "y": 3,
+      "z": -18,
+      "zoneId": "zone_0",
+      "tag": "terrain"
+    },
+    {
+      "id": "landmark:east-wind-lane",
+      "displayName": "Corredor do Vento",
+      "x": 44,
+      "y": 0,
+      "z": 0,
+      "zoneId": "zone_0",
+      "tag": "border"
+    }
+  ]
+}

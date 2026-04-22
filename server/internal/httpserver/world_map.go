@@ -67,6 +67,14 @@ type worldPrefabPlacement struct {
 	Tag      string  `json:"tag"`
 }
 
+type worldPrefabDefinition struct {
+	ID           string
+	AssetPath    string
+	Category     string
+	DefaultScale float64
+	ColliderType string
+}
+
 type worldLandmark struct {
 	ID          string  `json:"id"`
 	DisplayName string  `json:"displayName"`
@@ -109,6 +117,109 @@ type worldLayout struct {
 
 const fallbackSpawnHiveX = 6.5
 const fallbackSpawnHiveY = 1.5
+
+var worldPrefabCatalog = map[string]worldPrefabDefinition{
+	"terrain/cliff-high": {
+		ID:           "terrain/cliff-high",
+		AssetPath:    "kenney_platformer-kit/Models/GLB format/block-grass-large-tall.glb",
+		Category:     "terrain",
+		DefaultScale: 1,
+		ColliderType: "solid",
+	},
+	"terrain/slope-wide": {
+		ID:           "terrain/slope-wide",
+		AssetPath:    "kenney_platformer-kit/Models/GLB format/block-grass-large-slope.glb",
+		Category:     "terrain",
+		DefaultScale: 1,
+		ColliderType: "solid",
+	},
+	"terrain/overhang-edge": {
+		ID:           "terrain/overhang-edge",
+		AssetPath:    "kenney_platformer-kit/Models/GLB format/block-grass-overhang-edge.glb",
+		Category:     "terrain",
+		DefaultScale: 1,
+		ColliderType: "solid",
+	},
+	"nature/pine-large": {
+		ID:           "nature/pine-large",
+		AssetPath:    "kenney_platformer-kit/Models/GLB format/tree-pine.glb",
+		Category:     "nature",
+		DefaultScale: 1,
+		ColliderType: "soft",
+	},
+	"nature/flowers-cluster": {
+		ID:           "nature/flowers-cluster",
+		AssetPath:    "kenney_platformer-kit/Models/GLB format/flowers.glb",
+		Category:     "nature",
+		DefaultScale: 1,
+		ColliderType: "none",
+	},
+	"nature/rocks-cluster": {
+		ID:           "nature/rocks-cluster",
+		AssetPath:    "kenney_platformer-kit/Models/GLB format/rocks.glb",
+		Category:     "nature",
+		DefaultScale: 1,
+		ColliderType: "solid",
+	},
+	"setdressing/fence-broken": {
+		ID:           "setdressing/fence-broken",
+		AssetPath:    "kenney_platformer-kit/Models/GLB format/fence-broken.glb",
+		Category:     "setdressing",
+		DefaultScale: 1,
+		ColliderType: "soft",
+	},
+	"setdressing/signpost": {
+		ID:           "setdressing/signpost",
+		AssetPath:    "kenney_platformer-kit/Models/GLB format/sign.glb",
+		Category:     "setdressing",
+		DefaultScale: 1,
+		ColliderType: "soft",
+	},
+	"landmark/flag-beacon": {
+		ID:           "landmark/flag-beacon",
+		AssetPath:    "kenney_platformer-kit/Models/GLB format/flag.glb",
+		Category:     "landmark",
+		DefaultScale: 1.25,
+		ColliderType: "soft",
+	},
+	"border/wind-gate": {
+		ID:           "border/wind-gate",
+		AssetPath:    "kenney_platformer-kit/Models/GLB format/arrows.glb",
+		Category:     "border",
+		DefaultScale: 1.4,
+		ColliderType: "trigger",
+	},
+}
+
+func resolveWorldPrefabDefinition(prefabID string) (worldPrefabDefinition, bool) {
+	definition, ok := worldPrefabCatalog[strings.TrimSpace(prefabID)]
+	return definition, ok
+}
+
+func normalizeWorldPrefabPlacement(placement worldPrefabPlacement) (worldPrefabPlacement, error) {
+	placement.PrefabID = strings.TrimSpace(placement.PrefabID)
+	if placement.PrefabID == "" {
+		return worldPrefabPlacement{}, fmt.Errorf("prefab placement is missing prefabId")
+	}
+
+	definition, ok := resolveWorldPrefabDefinition(placement.PrefabID)
+	if !ok {
+		return worldPrefabPlacement{}, fmt.Errorf("unsupported prefabId %q", placement.PrefabID)
+	}
+
+	if strings.TrimSpace(placement.ID) == "" {
+		placement.ID = fmt.Sprintf("prefab:%s:%d:%d", strings.ReplaceAll(placement.PrefabID, "/", ":"), quantizeMapCoord(placement.X), quantizeMapCoord(placement.Z))
+	}
+
+	if placement.Scale <= 0 {
+		placement.Scale = definition.DefaultScale
+	}
+
+	placement.ZoneID = strings.TrimSpace(placement.ZoneID)
+	placement.Tag = strings.TrimSpace(placement.Tag)
+
+	return placement, nil
+}
 
 func loadWorldLayout() worldLayout {
 	mapPath, err := resolveWorldMapPath()
@@ -198,13 +309,22 @@ func parseWorldLayout(worldBytes []byte) (worldLayout, error) {
 
 func parseWorldLayoutFromContainer(container worldMapContainer) (worldLayout, error) {
 	records := container.Tiles
-	props := container.Props
+	rawProps := container.Props
 	zones := container.Zones
 	transitions := container.Transitions
 	landmarks := container.Landmarks
 
 	if len(records) == 0 {
 		return worldLayout{}, fmt.Errorf("world map is empty")
+	}
+
+	props := make([]worldPrefabPlacement, 0, len(rawProps))
+	for _, rawProp := range rawProps {
+		normalizedProp, err := normalizeWorldPrefabPlacement(rawProp)
+		if err != nil {
+			return worldLayout{}, err
+		}
+		props = append(props, normalizedProp)
 	}
 
 	layout := worldLayout{
