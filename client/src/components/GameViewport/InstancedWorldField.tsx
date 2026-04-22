@@ -28,9 +28,7 @@ import { ZoneGateRenderer } from "./ZoneGateRenderer";
 const TERRAIN_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/block-grass.glb";
 const TREE_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/tree-pine-small.glb";
 const WATER_LAYER_THICKNESS = TERRAIN_BLOCK_SCALE * 0.18;
-const FLOWER_DETAIL_DISTANCE = 16;
 const TREE_DETAIL_DISTANCE = 24;
-const HIVE_DETAIL_DISTANCE = 28;
 
 interface DetailFocus {
 	x: number;
@@ -276,25 +274,21 @@ export function InstancedWorldField({
 		const flowers = [];
 		for (const chunk of chunks) {
 			for (const flower of chunk.flowers) {
-				if (isWithinDetailRange(detailFocus, flower.x, flower.y, FLOWER_DETAIL_DISTANCE)) {
-					flowers.push(flower);
-				}
+				flowers.push(flower);
 			}
 		}
 		return flowers;
-	}, [chunks, detailFocus?.x, detailFocus?.y]);
+	}, [chunks]);
 
 	const visibleHives = useMemo(() => {
 		const hives = [];
 		for (const chunk of chunks) {
 			for (const hive of chunk.hives) {
-				if (isWithinDetailRange(detailFocus, hive.x, hive.y, HIVE_DETAIL_DISTANCE)) {
-					hives.push(hive);
-				}
+				hives.push(hive);
 			}
 		}
 		return hives;
-	}, [chunks, detailFocus?.x, detailFocus?.y]);
+	}, [chunks]);
 
 	useEffect(() => {
 		return () => {

@@ -4,6 +4,7 @@ import { DisconnectModal } from "../DisconnectModal";
 import { GameViewport } from "../GameViewport";
 import { LoginGate } from "../LoginGate";
 import { PwaInstallPrompt } from "../PwaInstallPrompt";
+import { GameHUD } from "../../game/hud";
 import { useFullscreenTarget } from "../../hooks/useFullscreenTarget";
 import { useGameSession } from "../../hooks/useGameSession";
 
@@ -51,6 +52,8 @@ export default function PlayerExperience() {
   const hasStartedAdventure = Boolean(activeUsername);
   const showDisconnectModal = hasJoinedSession && gameSession.connectionState === "disconnected";
   const showLoginGate = !showDisconnectModal && !gameSession.localPlayerId && !hasJoinedSession;
+  const showGameHud = hasStartedAdventure && !showDisconnectModal;
+  const showHeroCopy = !hasStartedAdventure;
   const shellClassName = [
     "app-shell player-experience",
     hasStartedAdventure ? "player-experience--started" : "",
@@ -124,6 +127,15 @@ export default function PlayerExperience() {
             {isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
           </button>
         ) : null}
+
+        {showGameHud ? (
+          <GameHUD
+            gameSessionController={gameSession}
+            lastInteraction={gameSession.lastInteraction}
+            lockedZoneId={undefined}
+            playerProgress={gameSession.playerProgress}
+          />
+        ) : null}
       </div>
     );
   }
@@ -170,10 +182,12 @@ export default function PlayerExperience() {
 
   return (
     <main className={shellClassName}>
-      <section className="hero-copy" aria-label="Resumo do jogo">
-        <p className="eyebrow">MMORPG de navegador</p>
-        <h1>Cara de Abelha</h1>
-      </section>
+      {showHeroCopy ? (
+        <section className="hero-copy" aria-label="Resumo do jogo">
+          <p className="eyebrow">MMORPG de navegador</p>
+          <h1>Cara de Abelha</h1>
+        </section>
+      ) : null}
 
       <section className="experience-card" aria-label="Entrada do jogador">
         {!isFullscreen ? <PwaInstallPrompt /> : null}

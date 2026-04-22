@@ -39,7 +39,9 @@ export default defineConfig(({ command }) => ({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
       },
       devOptions: {
-        enabled: command === "serve",
+        // Keep service worker disabled in dev to avoid stale runtime state
+        // across local devices/tabs during active implementation.
+        enabled: false,
         resolveTempFolder: () => fileURLToPath(new URL("./.vite/pwa-dev", import.meta.url)),
       },
     }),

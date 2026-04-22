@@ -56,6 +56,9 @@ type worldLayout struct {
 	maxY        float64
 }
 
+const fallbackSpawnHiveX = 6.5
+const fallbackSpawnHiveY = 1.5
+
 func loadWorldLayout() worldLayout {
 	mapPath, err := resolveWorldMapPath()
 	if err != nil {
@@ -171,7 +174,7 @@ func parseWorldLayoutFromContainer(container worldMapContainer) (worldLayout, er
 		propType := ""
 		if record.Prop != nil {
 			propType = strings.ToLower(strings.TrimSpace(*record.Prop))
-			if propType != "" && propType != "flower" && propType != "tree" {
+			if propType != "" && propType != "flower" && propType != "tree" && propType != "hive" {
 				return worldLayout{}, fmt.Errorf("unsupported prop type %q", *record.Prop)
 			}
 		}
@@ -226,6 +229,18 @@ func parseWorldLayoutFromContainer(container worldMapContainer) (worldLayout, er
 				GroundY: record.Y,
 				Scale:   hashRange(0.92, 1.3, seedX, seedY, 67),
 			})
+		case "hive":
+			seedX := quantizeMapCoord(record.X)
+			seedY := quantizeMapCoord(record.Z)
+			chunk.Hives = append(chunk.Hives, worldHiveState{
+				ID:        fmt.Sprintf("hive:%d:%d", seedX, seedY),
+				X:         tileCenterX,
+				Y:         tileCenterY,
+				GroundY:   record.Y,
+				Scale:     hashRange(0.96, 1.12, seedX, seedY, 83),
+				ToneColor: hiveTonePalette[positiveModulo(int(hashUint32(seedX, seedY, 163)), len(hiveTonePalette))],
+				GlowColor: hiveGlowPalette[positiveModulo(int(hashUint32(seedX, seedY, 173)), len(hiveGlowPalette))],
+			})
 		}
 
 		layout.chunks[chunkKey] = chunk
@@ -249,10 +264,51 @@ func parseWorldLayoutFromContainer(container worldMapContainer) (worldLayout, er
 		sort.Slice(chunk.Trees, func(left int, right int) bool {
 			return chunk.Trees[left].ID < chunk.Trees[right].ID
 		})
+		sort.Slice(chunk.Hives, func(left int, right int) bool {
+			return chunk.Hives[left].ID < chunk.Hives[right].ID
+		})
 		layout.chunks[chunkKey] = chunk
 	}
 
+	ensureFallbackSpawnHive(&layout)
+
 	return layout, nil
+}
+
+func ensureFallbackSpawnHive(layout *worldLayout) {
+	if layout == nil || len(layout.chunks) == 0 {
+		return
+	}
+
+	for _, chunk := range layout.chunks {
+		if len(chunk.Hives) > 0 {
+			return
+		}
+	}
+
+	chunkX := worldAxisToChunk(fallbackSpawnHiveX)
+	chunkY := worldAxisToChunk(fallbackSpawnHiveY)
+	chunkKey := buildChunkKey(chunkX, chunkY)
+	chunk, ok := layout.chunks[chunkKey]
+	if !ok {
+		return
+	}
+
+	chunk.Hives = append(chunk.Hives, worldHiveState{
+		ID:        "hive:spawn",
+		X:         fallbackSpawnHiveX,
+		Y:         fallbackSpawnHiveY,
+		GroundY:   0,
+		Scale:     1.08,
+		ToneColor: hiveTonePalette[0],
+		GlowColor: hiveGlowPalette[0],
+	})
+
+	sort.Slice(chunk.Hives, func(left int, right int) bool {
+		return chunk.Hives[left].ID < chunk.Hives[right].ID
+	})
+
+	layout.chunks[chunkKey] = chunk
 }
 
 func (layout worldLayout) visibleChunksAround(centerChunkX int, centerChunkY int) []worldChunkState {

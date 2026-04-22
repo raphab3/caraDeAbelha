@@ -1,35 +1,201 @@
 import { useEffect, useMemo, useRef } from "react";
-import { useGLTF } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
-import React from "react";
 import {
+	CylinderGeometry,
+	SphereGeometry,
+	MeshStandardMaterial,
+	MeshBasicMaterial,
+	InstancedMesh,
+	Object3D,
 	type BufferGeometry,
 	type Material,
-	Group,
-	InstancedMesh,
-	Mesh,
-	Object3D,
 } from "three";
 
 import type { WorldFlowerState } from "../../types/game";
 import { toSceneAxis, toTerrainSurfaceY } from "./worldSurface";
 
-const FLOWERS_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/flowers.glb";
+// ─── Constants ────────────────────────────────────────────────────────────────
+const FLOWER_STEM_HEIGHT = 0.28;
+const FLOWER_STEM_Y = -0.02;
+const FLOWER_HEAD_Y = 0.14;
+const FLOWER_PETAL_RADIUS = 0.14;
+const FLOWER_PETAL_SIZE = 0.11;
+const FLOWER_CORE_SIZE = 0.09;
+const FLOWER_CORE_Y = FLOWER_HEAD_Y + 0.01;
 
-interface InstanceConfig {
-	position: [number, number, number];
-	rotation?: [number, number, number];
-	scale?: number | [number, number, number];
+const PETAL_OFFSETS: readonly [number, number, number][] = [
+	[0, FLOWER_HEAD_Y, FLOWER_PETAL_RADIUS],
+	[FLOWER_PETAL_RADIUS, FLOWER_HEAD_Y, 0],
+	[0, FLOWER_HEAD_Y, -FLOWER_PETAL_RADIUS],
+	[-FLOWER_PETAL_RADIUS, FLOWER_HEAD_Y, 0],
+	[FLOWER_PETAL_RADIUS * 0.72, FLOWER_HEAD_Y, FLOWER_PETAL_RADIUS * 0.72],
+];
+
+// ─── Shared module-level geometries and materials (created once) ─────────────
+const stemGeometry = new CylinderGeometry(0.018, 0.026, FLOWER_STEM_HEIGHT, 8);
+const petalGeometry = new SphereGeometry(FLOWER_PETAL_SIZE, 10, 10);
+const coreGeometry = new SphereGeometry(FLOWER_CORE_SIZE, 12, 12);
+const hitGeometry = new SphereGeometry(0.24, 6, 6);
+
+const stemMaterial = new MeshStandardMaterial({ color: "#2d8a57", roughness: 0.88 });
+const hitMaterial = new MeshBasicMaterial({ visible: false });
+
+const colorMaterialCache = new Map<string, MeshStandardMaterial>();
+function getColorMaterial(color: string, roughness: number): MeshStandardMaterial {
+	const key = `${color}:${roughness}`;
+	let mat = colorMaterialCache.get(key);
+	if (!mat) {
+		mat = new MeshStandardMaterial({ color, roughness });
+		colorMaterialCache.set(key, mat);
+	}
+	return mat;
 }
 
-interface InstancedModelMeshSource {
+// ─── Instance data ────────────────────────────────────────────────────────────
+interface InstanceLayer {
+	positions: Float32Array; // stride-3: x, y, z per instance
+	scales: Float32Array;    // uniform scale per instance
+	count: number;
+}
+
+interface FlowerRenderData {
+	stemLayer: InstanceLayer;
+	petalLayers: { color: string; layer: InstanceLayer }[];
+	coreLayers: { color: string; layer: InstanceLayer }[];
+	hitLayer: InstanceLayer;
+	flowerIds: string[]; // maps hitLayer instanceId → flower.id
+}
+
+function buildFlowerRenderData(flowers: WorldFlowerState[]): FlowerRenderData {
+	const n = flowers.length;
+
+	const stemPos = new Float32Array(n * 3);
+	const stemScale = new Float32Array(n);
+	const hitPos = new Float32Array(n * 3);
+	const hitScale = new Float32Array(n);
+	const flowerIds: string[] = new Array(n);
+
+	const petalsByColor = new Map<string, { pos: number[]; sc: number[] }>();
+	const coresByColor = new Map<string, { pos: number[]; sc: number[] }>();
+
+	for (let i = 0; i < n; i++) {
+		const flower = flowers[i];
+		const gx = toSceneAxis(flower.x);
+		const gy = toTerrainSurfaceY(flower.groundY ?? 0) + 0.02;
+		const gz = toSceneAxis(flower.y);
+		const gs = 1.65 * flower.scale;
+		const yaw = (gx + gz) * 0.05;
+		const cosYaw = Math.cos(yaw);
+		const sinYaw = Math.sin(yaw);
+
+		// Stem (centered at mid-height in local space)
+		stemPos[i * 3] = gx;
+		stemPos[i * 3 + 1] = gy + (FLOWER_STEM_Y + FLOWER_STEM_HEIGHT * 0.5) * gs;
+		stemPos[i * 3 + 2] = gz;
+		stemScale[i] = gs;
+
+		// Hitbox centered at flower head
+		hitPos[i * 3] = gx;
+		hitPos[i * 3 + 1] = gy + FLOWER_HEAD_Y * gs;
+		hitPos[i * 3 + 2] = gz;
+		hitScale[i] = gs;
+		flowerIds[i] = flower.id;
+
+		// Petals: rotate local offset by yaw around Y axis
+		let pg = petalsByColor.get(flower.petalColor);
+		if (!pg) {
+			pg = { pos: [], sc: [] };
+			petalsByColor.set(flower.petalColor, pg);
+		}
+		for (const [ox, oy, oz] of PETAL_OFFSETS) {
+			const wx = ox * cosYaw + oz * sinYaw;
+			const wz = -ox * sinYaw + oz * cosYaw;
+			pg.pos.push(gx + wx * gs, gy + oy * gs, gz + wz * gs);
+			pg.sc.push(gs);
+		}
+
+		// Core
+		let cg = coresByColor.get(flower.coreColor);
+		if (!cg) {
+			cg = { pos: [], sc: [] };
+			coresByColor.set(flower.coreColor, cg);
+		}
+		cg.pos.push(gx, gy + FLOWER_CORE_Y * gs, gz);
+		cg.sc.push(gs);
+	}
+
+	const toLayer = (pos: number[] | Float32Array, sc: number[] | Float32Array): InstanceLayer => ({
+		positions: pos instanceof Float32Array ? pos : new Float32Array(pos),
+		scales: sc instanceof Float32Array ? sc : new Float32Array(sc),
+		count: sc.length,
+	});
+
+	return {
+		stemLayer: toLayer(stemPos, stemScale),
+		petalLayers: Array.from(petalsByColor.entries()).map(([color, d]) => ({
+			color,
+			layer: toLayer(d.pos, d.sc),
+		})),
+		coreLayers: Array.from(coresByColor.entries()).map(([color, d]) => ({
+			color,
+			layer: toLayer(d.pos, d.sc),
+		})),
+		hitLayer: toLayer(hitPos, hitScale),
+		flowerIds,
+	};
+}
+
+// ─── Instanced layer component ────────────────────────────────────────────────
+function FlowerInstancedLayer({
+	layer,
+	geometry,
+	material,
+	castShadow = false,
+	onPointerDown,
+}: {
+	layer: InstanceLayer;
 	geometry: BufferGeometry;
 	material: Material;
+	castShadow?: boolean;
+	onPointerDown?: (event: ThreeEvent<PointerEvent>) => void;
+}) {
+	const meshRef = useRef<InstancedMesh>(null);
+	const dummy = useMemo(() => new Object3D(), []);
+
+	useEffect(() => {
+		const mesh = meshRef.current;
+		if (!mesh || layer.count === 0) return;
+
+		mesh.count = layer.count;
+		for (let i = 0; i < layer.count; i++) {
+			dummy.position.set(layer.positions[i * 3], layer.positions[i * 3 + 1], layer.positions[i * 3 + 2]);
+			dummy.scale.setScalar(layer.scales[i]);
+			dummy.rotation.set(0, 0, 0);
+			dummy.updateMatrix();
+			mesh.setMatrixAt(i, dummy.matrix);
+		}
+		mesh.instanceMatrix.needsUpdate = true;
+	}, [dummy, layer]);
+
+	if (layer.count === 0) return null;
+
+	return (
+		<instancedMesh
+			ref={meshRef}
+			args={[geometry, material, layer.count]}
+			castShadow={castShadow}
+			frustumCulled={false}
+			onPointerDown={onPointerDown}
+		/>
+	);
 }
 
+// ─── Public component ─────────────────────────────────────────────────────────
 /**
- * FlowerRenderer: Renders world flowers using instancing.
- * Receives flowers array and click callback from parent component.
+ * FlowerRenderer draws all world flowers using instanced meshes.
+ * 1748 flowers → ~10 draw calls (grouped by color), vs ~14 000 with per-mesh approach.
+ * Click detection uses a separate invisible hitbox InstancedMesh;
+ * instanceId maps back to flower.id via flowerIds array.
  */
 export function FlowerRenderer({
 	flowers,
@@ -38,158 +204,57 @@ export function FlowerRenderer({
 	flowers: WorldFlowerState[];
 	onFlowerClick?: (event: ThreeEvent<PointerEvent>, flowerId: string, index: number) => void;
 }) {
-	const flowersModel = useGLTF(FLOWERS_MODEL_PATH);
-	const meshRefsMap = useRef<Map<number, InstancedMesh>>(new Map());
+	const renderData = useMemo(() => buildFlowerRenderData(flowers), [flowers]);
 
-	// Extract geometry and material from loaded model
-	const flowerMeshSources = useMemo(() => collectInstancedModelMeshes(flowersModel.scene), [flowersModel.scene]);
-
-	// Build instance configurations from flower states
-	const flowerInstances = useMemo(() => buildFlowerInstances(flowers), [flowers]);
-
-
-
-	// Cleanup on unmount
-	useEffect(() => {
-		return () => {
-			meshRefsMap.current.forEach((mesh) => {
-				if (mesh.geometry) {
-					mesh.geometry.dispose();
-				}
-				if (Array.isArray(mesh.material)) {
-					mesh.material.forEach((m) => m.dispose());
-				} else if (mesh.material) {
-					mesh.material.dispose();
-				}
-			});
-			meshRefsMap.current.clear();
-		};
-	}, []);
-
-	// Update instance matrices whenever flowers change
-	useEffect(() => {
-		const dummy = new Object3D();
-
-		meshRefsMap.current.forEach((mesh) => {
-			mesh.count = flowerInstances.length;
-
-			for (let idx = 0; idx < flowerInstances.length; idx += 1) {
-				const instance = flowerInstances[idx];
-				dummy.position.set(...instance.position);
-
-				if (instance.rotation) {
-					dummy.rotation.set(...instance.rotation);
-				} else {
-					dummy.rotation.set(0, 0, 0);
-				}
-
-				if (typeof instance.scale === "number") {
-					dummy.scale.setScalar(instance.scale);
-				} else if (instance.scale) {
-					dummy.scale.set(...instance.scale);
-				} else {
-					dummy.scale.set(1, 1, 1);
-				}
-
-				dummy.updateMatrix();
-				mesh.setMatrixAt(idx, dummy.matrix);
+	const handleHit = onFlowerClick
+		? (event: ThreeEvent<PointerEvent>) => {
+				event.stopPropagation();
+				const id = event.instanceId;
+				if (id == null) return;
+				const flowerId = renderData.flowerIds[id];
+				if (!flowerId) return;
+				onFlowerClick(event, flowerId, id);
 			}
+		: undefined;
 
-			mesh.instanceMatrix.needsUpdate = true;
-		});
-	}, [flowerInstances]);
-
-	const handlePointerClick = (event: ThreeEvent<PointerEvent>, meshIndex: number) => {
-		event.stopPropagation();
-		if (flowers[meshIndex] && onFlowerClick) {
-			onFlowerClick(event, flowers[meshIndex].id, meshIndex);
-		}
-	};
-
-	if (flowerInstances.length === 0 || flowerMeshSources.length === 0) {
-		return null;
-	}
+	if (flowers.length === 0) return null;
 
 	return (
 		<group>
-			{flowerMeshSources.map((source, sourceIndex) => (
-				<InstancedFlowerLayer
-					key={`flower-model:${sourceIndex}`}
-					ref={(mesh: InstancedMesh | null) => {
-						if (mesh) {
-							meshRefsMap.current.set(sourceIndex, mesh);
-						}
-					}}
-					geometry={source.geometry}
-					material={source.material}
-					instanceCount={flowerInstances.length}
-					onPointerDown={(event: ThreeEvent<PointerEvent>) => {
-						if (event.instanceId !== undefined) {
-							handlePointerClick(event, event.instanceId);
-						}
-					}}
+			{/* Stems */}
+			<FlowerInstancedLayer layer={renderData.stemLayer} geometry={stemGeometry} material={stemMaterial} castShadow />
+
+			{/* Petals grouped by color */}
+			{renderData.petalLayers.map(({ color, layer }) => (
+				<FlowerInstancedLayer
+					key={`p:${color}`}
+					layer={layer}
+					geometry={petalGeometry}
+					material={getColorMaterial(color, 0.56)}
+					castShadow
 				/>
 			))}
+
+			{/* Cores grouped by color */}
+			{renderData.coreLayers.map(({ color, layer }) => (
+				<FlowerInstancedLayer
+					key={`c:${color}`}
+					layer={layer}
+					geometry={coreGeometry}
+					material={getColorMaterial(color, 0.44)}
+					castShadow
+				/>
+			))}
+
+			{/* Invisible hitboxes for click interaction */}
+			{handleHit && (
+				<FlowerInstancedLayer
+					layer={renderData.hitLayer}
+					geometry={hitGeometry}
+					material={hitMaterial}
+					onPointerDown={handleHit}
+				/>
+			)}
 		</group>
 	);
 }
-
-/**
- * InstancedFlowerLayer: Individual layer of flower instances
- */
-const InstancedFlowerLayer = React.forwardRef<
-	InstancedMesh,
-	{
-		geometry: BufferGeometry;
-		material: Material;
-		instanceCount: number;
-		onPointerDown?: (event: ThreeEvent<PointerEvent>) => void;
-	}
->(({ geometry, material, instanceCount, onPointerDown }, ref) => {
-	return (
-		<instancedMesh
-			ref={ref}
-			args={[geometry, material, instanceCount]}
-			castShadow
-			onPointerDown={onPointerDown}
-			frustumCulled={false}
-		/>
-	);
-});
-
-/**
- * Helper: Build instance configurations from flower states
- */
-function buildFlowerInstances(flowers: WorldFlowerState[]): InstanceConfig[] {
-	return flowers.map((flower) => ({
-		position: [toSceneAxis(flower.x), toTerrainSurfaceY(flower.groundY ?? 0) + 0.02, toSceneAxis(flower.y)],
-		rotation: [0, (toSceneAxis(flower.x) + toSceneAxis(flower.y)) * 0.05, 0],
-		scale: 0.36 * flower.scale,
-	}));
-}
-
-/**
- * Helper: Collect mesh geometry and material from loaded GLTF model
- */
-function collectInstancedModelMeshes(root: Group): InstancedModelMeshSource[] {
-	const meshes: InstancedModelMeshSource[] = [];
-
-	root.traverse((child) => {
-		if (!(child instanceof Mesh)) {
-			return;
-		}
-
-		if (Array.isArray(child.material)) {
-			return;
-		}
-
-		meshes.push({
-			geometry: child.geometry,
-			material: child.material,
-		});
-	});
-
-	return meshes;
-}
-
-useGLTF.preload(FLOWERS_MODEL_PATH);

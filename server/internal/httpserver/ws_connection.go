@@ -53,10 +53,10 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		PlayerID: client.id,
 		Username: username,
 	})
-	
+
 	// Send zone state to player on login
 	hub.sendZoneState(client, client.id)
-	
+
 	hub.broadcast()
 
 	defer func() {

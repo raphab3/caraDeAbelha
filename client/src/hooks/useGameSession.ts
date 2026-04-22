@@ -19,6 +19,19 @@ const DEFAULT_DISCONNECT_ERROR = "A conexao com o jardim ficou sem resposta. Ten
 const OFFLINE_DISCONNECT_ERROR = "Sua internet ficou offline. Tente reconectar para voltar ao jardim.";
 const WS_CONNECT_ERROR = "Falha ao conectar no websocket do jogo.";
 
+function createDefaultPlayerProgress() {
+  return {
+    pollenCarried: 0,
+    pollenCapacity: 40,
+    honey: 0,
+    level: 1,
+    xp: 0,
+    skillPoints: 0,
+    currentZoneId: "zone_0",
+    unlockedZoneIds: ["zone_0"],
+  };
+}
+
 function createInitialState(
   connectionState: GameSessionState["connectionState"],
   localUsername?: string,
@@ -225,6 +238,7 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
             ...current,
             localPlayerId: message.playerId,
             localUsername: message.username,
+            playerProgress: current.playerProgress ?? createDefaultPlayerProgress(),
           }));
           return;
         }
@@ -388,7 +402,14 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
         return;
       }
 
-      const headingDirection = getHeadingDirection(localPlayerRef.current);
+      // Keep movement grid-stepped: avoid sending a new move while the previous
+      // target is still active, which can cause visible jitter/corrections.
+      const localPlayer = localPlayerRef.current;
+      if (localPlayer?.targetX !== undefined && localPlayer.targetY !== undefined) {
+        return;
+      }
+
+      const headingDirection = getHeadingDirection(localPlayer);
       if (headingDirection) {
         facingDirectionRef.current = headingDirection;
       }

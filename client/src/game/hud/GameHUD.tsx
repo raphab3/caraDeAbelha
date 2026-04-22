@@ -28,12 +28,12 @@ export const GameHUD = ({
   return (
     <>
       {/* Top Ribbon with Resources */}
-      <div className="fixed top-0 left-0 right-0 z-40">
+      <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none">
         <ResourceRibbon playerProgress={playerProgress} lastInteraction={lastInteraction} />
       </div>
 
       {/* Left Panel with Objectives */}
-      <div className="fixed left-0 top-20 z-30 pointer-events-auto">
+      <div className="absolute left-0 top-20 z-30 pointer-events-auto">
         <ObjectivePanel playerProgress={playerProgress} />
       </div>
 
@@ -45,7 +45,7 @@ export const GameHUD = ({
       />
 
       {/* Center-Bottom Interaction Feed */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 pointer-events-none">
+      <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
         <InteractionFeed lastInteraction={lastInteraction} />
       </div>
     </>
