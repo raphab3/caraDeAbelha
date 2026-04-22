@@ -4,15 +4,21 @@ import { DisconnectModal } from "../DisconnectModal";
 import { GameViewport } from "../GameViewport";
 import { LoginGate } from "../LoginGate";
 import { PwaInstallPrompt } from "../PwaInstallPrompt";
+import { SettingsDock } from "./SettingsDock";
 import { GameHUD } from "../../game/hud";
 import { useFullscreenTarget } from "../../hooks/useFullscreenTarget";
 import { useGameSession } from "../../hooks/useGameSession";
 import { useStageBgm } from "../../hooks/useStageBgm";
 
 const USERNAME_STORAGE_KEY = "cara-de-abelha.username";
+const AUDIO_MUTED_STORAGE_KEY = "cara-de-abelha.audio-muted";
 
 function readStoredUsername(): string {
   return window.localStorage.getItem(USERNAME_STORAGE_KEY)?.trim() ?? "";
+}
+
+function readStoredAudioMuted(): boolean {
+  return window.localStorage.getItem(AUDIO_MUTED_STORAGE_KEY) === "true";
 }
 
 function ignoreRenderPerformance(): void {}
@@ -23,14 +29,21 @@ export default function PlayerExperience() {
   const [connectionAttempt, setConnectionAttempt] = useState(0);
   const [formError, setFormError] = useState<string>();
   const [hasJoinedSession, setHasJoinedSession] = useState(false);
+  const [isAudioMuted, setIsAudioMuted] = useState(readStoredAudioMuted);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { targetRef, isFullscreen, isSupported, requestFullscreen, toggleFullscreen } =
     useFullscreenTarget<HTMLDivElement>();
   const gameSession = useGameSession(activeUsername, connectionAttempt);
 
   useStageBgm({
     enabled: hasJoinedSession && gameSession.connectionState === "connected",
+    muted: isAudioMuted,
     src: gameSession.audioBgm,
   });
+
+  useEffect(() => {
+    window.localStorage.setItem(AUDIO_MUTED_STORAGE_KEY, String(isAudioMuted));
+  }, [isAudioMuted]);
 
   useEffect(() => {
     if (gameSession.connectionState !== "connected" || !gameSession.localUsername) {
@@ -154,6 +167,23 @@ export default function PlayerExperience() {
           </button>
         ) : null}
 
+        {hasStartedAdventure ? (
+          <SettingsDock
+            isAudioMuted={isAudioMuted}
+            isOpen={isSettingsOpen}
+            onExit={handleExit}
+            onRequestClose={() => {
+              setIsSettingsOpen(false);
+            }}
+            onToggleAudio={() => {
+              setIsAudioMuted((current) => !current);
+            }}
+            onToggleOpen={() => {
+              setIsSettingsOpen((current) => !current);
+            }}
+          />
+        ) : null}
+
         {showGameHud ? (
           <GameHUD
             flowerInteraction={gameSession.flowerInteraction}
@@ -184,6 +214,7 @@ export default function PlayerExperience() {
     if (isSupported) {
       void requestFullscreen();
     }
+    setIsSettingsOpen(false);
     setConnectionAttempt((current) => current + 1);
     setActiveUsername(normalizedUsername);
   }
@@ -203,6 +234,7 @@ export default function PlayerExperience() {
 
   function handleExit() {
     setFormError(undefined);
+    setIsSettingsOpen(false);
     setHasJoinedSession(false);
     setActiveUsername(undefined);
   }

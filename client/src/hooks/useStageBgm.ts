@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 
 interface UseStageBgmOptions {
   enabled: boolean;
+  muted?: boolean;
   src?: string;
 }
 
@@ -9,7 +10,7 @@ function normalizeAudioPath(src: string): string {
   return src.startsWith("/") ? src : `/${src}`;
 }
 
-export function useStageBgm({ enabled, src }: UseStageBgmOptions) {
+export function useStageBgm({ enabled, muted = false, src }: UseStageBgmOptions) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export function useStageBgm({ enabled, src }: UseStageBgmOptions) {
     }
 
     const audio = audioRef.current;
+    audio.muted = muted;
     const nextSrc = normalizeAudioPath(normalizedSrc);
     if (!audio.src.endsWith(nextSrc)) {
       audio.src = nextSrc;
@@ -44,7 +46,7 @@ export function useStageBgm({ enabled, src }: UseStageBgmOptions) {
     return () => {
       audio.pause();
     };
-  }, [enabled, src]);
+  }, [enabled, muted, src]);
 
   useEffect(() => {
     return () => {

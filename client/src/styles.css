@@ -316,6 +316,116 @@ body::after {
   border-color: rgba(255, 226, 165, 0.28);
 }
 
+.settings-dock {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 3;
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.settings-dock__trigger,
+.settings-dock__action {
+  min-height: 44px;
+  border: 1px solid rgba(63, 41, 11, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 249, 228, 0.94);
+  color: #322010;
+  font: inherit;
+  font-size: 0.94rem;
+  font-weight: 800;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition:
+    transform 180ms ease,
+    background 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.settings-dock__trigger {
+  width: 58px;
+  height: 58px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-color: rgba(72, 48, 16, 0.22);
+  background: rgba(51, 61, 83, 0.9);
+  color: #f5f9ff;
+  box-shadow: 0 14px 28px rgba(57, 32, 6, 0.16);
+}
+
+.settings-dock__trigger-badge {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #22c1c3, #2b7fff);
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    0 8px 18px rgba(12, 52, 109, 0.26);
+}
+
+.settings-dock__trigger:hover,
+.settings-dock__action:hover {
+  transform: translateY(-1px);
+}
+
+.settings-dock__trigger[aria-expanded="true"] {
+  background: rgba(35, 45, 65, 0.96);
+  border-color: rgba(117, 205, 255, 0.3);
+}
+
+.settings-dock__trigger:focus-visible,
+.settings-dock__action:focus-visible {
+  outline: 2px solid #fff0a4;
+  outline-offset: 3px;
+}
+
+.settings-dock__panel {
+  min-width: 188px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 230, 178, 0.22);
+  border-radius: 18px;
+  background: rgba(29, 18, 8, 0.82);
+  box-shadow: 0 20px 38px rgba(21, 11, 3, 0.28);
+  backdrop-filter: blur(12px);
+}
+
+.settings-dock__action {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 0 14px;
+  box-shadow: none;
+}
+
+.settings-dock__action-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.settings-dock__action--danger {
+  background: rgba(79, 26, 18, 0.92);
+  color: #fff0e6;
+  border-color: rgba(255, 183, 161, 0.28);
+}
+
 .viewport-shell {
   width: 100%;
   min-height: 540px;
@@ -343,6 +453,11 @@ body::after {
 .viewport-shell--gameplay a,
 .viewport-shell--gameplay .mini-map__action-button,
 .viewport-shell--gameplay .viewport-fullscreen-toggle {
+  cursor: var(--cursor-bee-pointer);
+}
+
+.viewport-shell--gameplay .settings-dock__trigger,
+.viewport-shell--gameplay .settings-dock__action {
   cursor: var(--cursor-bee-pointer);
 }
 
@@ -1159,6 +1274,11 @@ body::after {
     right: 14px;
   }
 
+  .settings-dock {
+    right: 14px;
+    bottom: 14px;
+  }
+
   .mini-map {
     left: 14px;
     bottom: 14px;
@@ -1227,6 +1347,33 @@ body::after {
     min-height: 40px;
     padding: 0 14px;
     font-size: 0.86rem;
+  }
+
+  .settings-dock {
+    right: 12px;
+    bottom: 12px;
+    gap: 8px;
+  }
+
+  .settings-dock__trigger {
+    width: 52px;
+    height: 52px;
+  }
+
+  .settings-dock__trigger-badge {
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+  }
+
+  .settings-dock__panel {
+    min-width: 172px;
+    padding: 8px;
+  }
+
+  .settings-dock__action {
+    min-height: 40px;
+    font-size: 0.88rem;
   }
 
   .mini-map {
