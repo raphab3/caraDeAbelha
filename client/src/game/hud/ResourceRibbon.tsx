@@ -45,8 +45,8 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction }: ResourceRibb
 
   if (!playerProgress) {
     return (
-      <div className="h-20 bg-yellow-900/30 border-b border-yellow-700/50 flex items-center justify-center">
-        <span className="text-yellow-900 font-medium">Carregando progresso...</span>
+      <div className="fixed top-4 left-4 px-4 py-2 bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-700 shadow-xl flex items-center justify-center">
+        <span className="text-amber-200 font-medium">Carregando progresso...</span>
       </div>
     );
   }
@@ -56,51 +56,63 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction }: ResourceRibb
   const xpPercent = (playerProgress.xp % 100); // Placeholder: 0-100 per level
 
   return (
-    <div className="h-20 bg-yellow-900/20 border-b border-yellow-700/50 px-6 py-3 flex items-center justify-between gap-8">
-      {/* Pollen Bar */}
-      <div className="flex flex-col gap-1 min-w-48">
-        <div className="flex justify-between items-center">
-          <span className="text-sm font-semibold text-yellow-900">Pollen</span>
-          <span className="text-xs text-yellow-800">{playerProgress.pollenCarried}/{playerProgress.pollenCapacity}</span>
+    <div className="px-4 py-4 flex items-start justify-between pointer-events-none">
+      <div className="flex flex-wrap gap-4 items-start">
+        {/* Level & XP Card */}
+        <div className="flex bg-slate-900/70 backdrop-blur-md rounded-full items-center p-1.5 pr-5 border border-slate-700/60 shadow-xl pointer-events-auto">
+          <div className="w-11 h-11 rounded-full flex items-center justify-center bg-gradient-to-b from-amber-400 to-amber-700 text-white font-black text-xl border-2 border-amber-200 shadow-inner">
+            {playerProgress.level}
+          </div>
+          <div className="ml-3 flex flex-col justify-center">
+            <span className="text-[10px] font-bold text-amber-200 uppercase tracking-widest leading-none mb-1.5 drop-shadow-md">
+              Nível {playerProgress.level}
+            </span>
+            <div className="w-28 h-2 bg-slate-950/80 rounded-full overflow-hidden border border-slate-700/80">
+              <div
+                className="h-full bg-gradient-to-r from-purple-500 to-fuchsia-400 transition-all duration-300"
+                style={{ width: `${xpPercent}%` }}
+              />
+            </div>
+          </div>
         </div>
-        <div className="w-full h-4 bg-yellow-900/30 rounded border border-yellow-700/50 overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 transition-all duration-300"
-            style={{ width: `${pollenPercent}%` }}
-          />
-        </div>
-      </div>
 
-      {/* Honey Counter */}
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-semibold text-yellow-900">Honey</span>
-        <div className="text-2xl font-bold text-orange-600">{playerProgress.honey}</div>
-      </div>
-
-      {/* Level */}
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-semibold text-yellow-900">Level</span>
-        <div className="text-2xl font-bold text-amber-700">{playerProgress.level}</div>
-      </div>
-
-      {/* XP Bar */}
-      <div className="flex flex-col gap-1 min-w-48">
-        <div className="flex justify-between items-center">
-          <span className="text-sm font-semibold text-yellow-900">XP</span>
-          <span className="text-xs text-yellow-800">{playerProgress.xp}</span>
-        </div>
-        <div className="w-full h-3 bg-yellow-900/30 rounded border border-yellow-700/50 overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-purple-400 to-purple-500 transition-all duration-300"
-            style={{ width: `${xpPercent}%` }}
-          />
+        {/* Resources Card */}
+        <div className="flex bg-slate-900/70 backdrop-blur-md rounded-full items-center px-5 py-2.5 border border-slate-700/60 shadow-xl gap-5 pointer-events-auto">
+          {/* Pollen */}
+          <div className="flex flex-col items-center">
+            <span className="text-[9px] font-bold text-amber-200/80 uppercase tracking-widest mb-1">Pólen</span>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.8)]" />
+              <span className="text-base font-black text-white drop-shadow-md tracking-tight">
+                {playerProgress.pollenCarried} <span className="text-xs font-semibold text-slate-400">/ {playerProgress.pollenCapacity}</span>
+              </span>
+            </div>
+            <div className="w-full h-1 mt-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-yellow-400 to-yellow-500 transition-all duration-300"
+                style={{ width: `${pollenPercent}%` }}
+              />
+            </div>
+          </div>
+          
+          {/* Divider */}
+          <div className="w-px h-8 bg-slate-700/60" />
+          
+          {/* Honey */}
+          <div className="flex flex-col items-center justify-center">
+            <span className="text-[9px] font-bold text-amber-200/80 uppercase tracking-widest mb-1">Mel</span>
+            <div className="flex items-center gap-2 mb-2.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)]" />
+              <span className="text-base font-black text-white drop-shadow-md">{playerProgress.honey}</span>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Flash Feedback */}
       {flashMessage && (
-        <div className="fixed top-24 left-1/2 transform -translate-x-1/2 animate-pulse">
-          <div className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold text-lg shadow-lg">
+        <div className="fixed top-24 left-1/2 transform -translate-x-1/2 animate-bounce pointer-events-none">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-5 py-2 rounded-full font-black text-lg shadow-[0_4px_24px_rgba(16,185,129,0.5)] border-2 border-green-300/50">
             {flashMessage}
           </div>
         </div>

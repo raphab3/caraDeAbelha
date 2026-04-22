@@ -182,7 +182,8 @@ function InstancedLayer({
 		}
 
 		mesh.instanceMatrix.needsUpdate = true;
-		mesh.computeBoundingSphere();
+		// frustumCulled={false} is set on all InstancedLayer meshes, so bounding sphere
+		// computation is not needed for culling and would be expensive on large tile counts.
 	}, [dummy, instances]);
 
 	if (instances.length === 0) {
@@ -260,7 +261,7 @@ export function InstancedWorldField({
 	const visibleFlowers = useMemo(() => {
 		const flowers = [];
 		for (const chunk of chunks) {
-			for (const flower of chunk.flowers) {
+			for (const flower of chunk.flowers || []) {
 				flowers.push(flower);
 			}
 		}
@@ -281,7 +282,7 @@ export function InstancedWorldField({
 	const visibleHives = useMemo(() => {
 		const hives = [];
 		for (const chunk of chunks) {
-			for (const hive of chunk.hives) {
+			for (const hive of chunk.hives || []) {
 				hives.push(hive);
 			}
 		}

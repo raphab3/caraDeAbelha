@@ -17,10 +17,10 @@ type ZoneAccessChecker interface {
 // It maintains collections of FlowerNode and HiveNode instances, initializes them with proper state,
 // provides distance validation for player interactions, and validates zone access for collections and deposits.
 type LoopBaseService struct {
-	mu             sync.RWMutex
-	flowers        map[string][]*FlowerNode // key: zoneID, value: list of flowers
-	hives          map[string][]*HiveNode   // key: zoneID, value: list of hives
-	zoneChecker    ZoneAccessChecker        // zone access validator (optional)
+	mu          sync.RWMutex
+	flowers     map[string][]*FlowerNode // key: zoneID, value: list of flowers
+	hives       map[string][]*HiveNode   // key: zoneID, value: list of hives
+	zoneChecker ZoneAccessChecker        // zone access validator (optional)
 }
 
 // NewLoopBaseService creates a new LoopBaseService with initialized test data.
@@ -35,29 +35,29 @@ func NewLoopBaseService() *LoopBaseService {
 	// Initialize zone:start with test data
 	// Flowers
 	flower1 := &FlowerNode{
-		ID:             "flower:start:1",
-		X:              5.0,
-		Y:              5.0,
-		GroundY:        0.0,
-		ZoneID:         "zone:start",
+		ID:              "flower:start:1",
+		X:               5.0,
+		Y:               5.0,
+		GroundY:         0.0,
+		ZoneID:          "zone:start",
 		PollenAvailable: 100,
-		PollenCapacity: 100,
-		CollectRadius:  2.5,
-		RegenPerSecond: 0.1,
-		YieldPerClick:  5,
+		PollenCapacity:  100,
+		CollectRadius:   2.5,
+		RegenPerSecond:  0.1,
+		YieldPerClick:   5,
 	}
 
 	flower2 := &FlowerNode{
-		ID:             "flower:start:2",
-		X:              10.0,
-		Y:              8.0,
-		GroundY:        0.0,
-		ZoneID:         "zone:start",
+		ID:              "flower:start:2",
+		X:               10.0,
+		Y:               8.0,
+		GroundY:         0.0,
+		ZoneID:          "zone:start",
 		PollenAvailable: 100,
-		PollenCapacity: 100,
-		CollectRadius:  2.5,
-		RegenPerSecond: 0.1,
-		YieldPerClick:  5,
+		PollenCapacity:  100,
+		CollectRadius:   2.5,
+		RegenPerSecond:  0.1,
+		YieldPerClick:   5,
 	}
 
 	service.flowers["zone:start"] = []*FlowerNode{flower1, flower2}
