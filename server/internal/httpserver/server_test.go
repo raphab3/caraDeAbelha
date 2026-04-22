@@ -39,6 +39,37 @@ func openGameSocket(t *testing.T, websocketURL string, username string) *websock
 	return connection
 }
 
+func TestMovePlayerToCompressesReturnFromOutlands(t *testing.T) {
+	hub := newRuntimeTestHub(time.Date(2026, time.April, 23, 10, 0, 0, 0, time.UTC))
+	hub.world.edgeBehavior = &worldEdgeBehavior{
+		Type:           "outlands_return_corridor",
+		PlayableBounds: worldBounds{X1: -45, X2: 45, Z1: -45, Z2: 45},
+		OutlandsBounds: worldBounds{X1: -120, X2: 120, Z1: -120, Z2: 120},
+	}
+
+	player := &playerState{
+		ID:       "player:scout",
+		Username: "Scout",
+		X:        110,
+		Y:        0,
+	}
+	hub.players[player.ID] = player
+
+	hub.movePlayerTo(player.ID, 40, 0)
+
+	if player.X >= 110 || player.X <= 45 {
+		t.Fatalf("expected player x to be compressed toward the playable edge, got %v", player.X)
+	}
+
+	if player.TargetX == nil || player.TargetY == nil {
+		t.Fatalf("expected movePlayerTo to set a target")
+	}
+
+	if math.Abs(*player.TargetX-40) > 0.001 || math.Abs(*player.TargetY) > 0.001 {
+		t.Fatalf("expected target to remain inside the playable area at 40,0, got %v,%v", *player.TargetX, *player.TargetY)
+	}
+}
+
 func TestHealthcheck(t *testing.T) {
 	handler := NewHandler()
 	request := httptest.NewRequest(http.MethodGet, "/healthz", nil)

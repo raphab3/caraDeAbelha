@@ -331,6 +331,53 @@ func TestCurrentMapFileParses(t *testing.T) {
 	}
 }
 
+func TestClampPositionUsesOutlandsBoundsWhenConfigured(t *testing.T) {
+	layout := worldLayout{
+		hasBounds: true,
+		minX:      -50,
+		maxX:      50,
+		minY:      -50,
+		maxY:      50,
+		edgeBehavior: &worldEdgeBehavior{
+			Type: "outlands_return_corridor",
+			PlayableBounds: worldBounds{X1: -45, X2: 45, Z1: -45, Z2: 45},
+			OutlandsBounds: worldBounds{X1: -120, X2: 120, Z1: -120, Z2: 120},
+		},
+	}
+
+	x, y := layout.clampPosition(130, -140)
+	if x != 120 || y != -120 {
+		t.Fatalf("expected clamp to outlands bounds 120,-120, got %v,%v", x, y)
+	}
+}
+
+func TestRemapReturnMovementCompressesOutlandsJourney(t *testing.T) {
+	layout := worldLayout{
+		edgeBehavior: &worldEdgeBehavior{
+			Type: "outlands_return_corridor",
+			PlayableBounds: worldBounds{X1: -45, X2: 45, Z1: -45, Z2: 45},
+			OutlandsBounds: worldBounds{X1: -120, X2: 120, Z1: -120, Z2: 120},
+		},
+	}
+
+	currentX, currentY, targetX, targetY, changed := layout.remapReturnMovement(110, 0, 40, 0)
+	if !changed {
+		t.Fatalf("expected return movement to be compressed")
+	}
+
+	if currentX >= 110 || currentX <= 45 {
+		t.Fatalf("expected compressed current x between playable edge and original outlands x, got %v", currentX)
+	}
+
+	if currentY != 0 || targetY != 0 {
+		t.Fatalf("expected y axis to remain unchanged, got currentY=%v targetY=%v", currentY, targetY)
+	}
+
+	if targetX != 40 {
+		t.Fatalf("expected playable target x to remain 40, got %v", targetX)
+	}
+}
+
 // Helper function to check if two zones overlap
 func zonesOverlap(z1, z2 worldZone) bool {
 	// Zones overlap if their x or z ranges intersect

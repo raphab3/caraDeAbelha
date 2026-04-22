@@ -117,6 +117,8 @@ type worldLayout struct {
 
 const fallbackSpawnHiveX = 6.5
 const fallbackSpawnHiveY = 1.5
+const outlandsReturnCompressionRatio = 0.25
+const outlandsReturnMaxOffset = 18.0
 
 var worldPrefabCatalog = map[string]worldPrefabDefinition{
 	"terrain/cliff-high": {
@@ -551,11 +553,73 @@ func (layout worldLayout) visibleChunksAround(centerChunkX int, centerChunkY int
 }
 
 func (layout worldLayout) clampPosition(x float64, y float64) (float64, float64) {
-	if !layout.hasBounds {
-		return x, y
+	bounds := layout.activeMovementBounds()
+	return clampWorldAxisToBounds(x, bounds.X1, bounds.X2), clampWorldAxisToBounds(y, bounds.Z1, bounds.Z2)
+}
+
+func (layout worldLayout) activeMovementBounds() worldBounds {
+	if layout.edgeBehavior != nil && strings.TrimSpace(layout.edgeBehavior.Type) == "outlands_return_corridor" && layout.edgeBehavior.OutlandsBounds.isValid() {
+		return layout.edgeBehavior.OutlandsBounds
 	}
 
-	return clampWorldAxisToBounds(x, layout.minX, layout.maxX), clampWorldAxisToBounds(y, layout.minY, layout.maxY)
+	if layout.hasBounds {
+		return worldBounds{X1: layout.minX, X2: layout.maxX, Z1: layout.minY, Z2: layout.maxY}
+	}
+
+	return worldBounds{}
+}
+
+func (layout worldLayout) playableBounds() worldBounds {
+	if layout.edgeBehavior != nil && strings.TrimSpace(layout.edgeBehavior.Type) == "outlands_return_corridor" && layout.edgeBehavior.PlayableBounds.isValid() {
+		return layout.edgeBehavior.PlayableBounds
+	}
+
+	return layout.activeMovementBounds()
+}
+
+func (layout worldLayout) outlandsDistanceFromPlayable(x float64, y float64) float64 {
+	playable := layout.playableBounds()
+	if !playable.isValid() {
+		return 0
+	}
+
+	var distance float64
+	if x < playable.X1 {
+		distance += playable.X1 - x
+	} else if x > playable.X2 {
+		distance += x - playable.X2
+	}
+
+	if y < playable.Z1 {
+		distance += playable.Z1 - y
+	} else if y > playable.Z2 {
+		distance += y - playable.Z2
+	}
+
+	return distance
+}
+
+func (layout worldLayout) remapReturnMovement(currentX float64, currentY float64, targetX float64, targetY float64) (float64, float64, float64, float64, bool) {
+	if layout.edgeBehavior == nil || strings.TrimSpace(layout.edgeBehavior.Type) != "outlands_return_corridor" {
+		return currentX, currentY, targetX, targetY, false
+	}
+
+	currentDistance := layout.outlandsDistanceFromPlayable(currentX, currentY)
+	if currentDistance <= 0 {
+		return currentX, currentY, targetX, targetY, false
+	}
+
+	targetDistance := layout.outlandsDistanceFromPlayable(targetX, targetY)
+	if targetDistance >= currentDistance {
+		return currentX, currentY, targetX, targetY, false
+	}
+
+	playable := layout.playableBounds()
+	return remapOutlandsCoordinate(currentX, playable.X1, playable.X2),
+		remapOutlandsCoordinate(currentY, playable.Z1, playable.Z2),
+		remapOutlandsCoordinate(targetX, playable.X1, playable.X2),
+		remapOutlandsCoordinate(targetY, playable.Z1, playable.Z2),
+		true
 }
 
 func (layout worldLayout) zoneIDAt(x float64, y float64) string {
@@ -581,6 +645,22 @@ func clampWorldAxisToBounds(value float64, min float64, max float64) float64 {
 
 	if value > max {
 		return max
+	}
+
+	return value
+}
+
+func (bounds worldBounds) isValid() bool {
+	return bounds.X1 < bounds.X2 && bounds.Z1 < bounds.Z2
+}
+
+func remapOutlandsCoordinate(value float64, min float64, max float64) float64 {
+	if value < min {
+		return min - math.Min((min-value)*outlandsReturnCompressionRatio, outlandsReturnMaxOffset)
+	}
+
+	if value > max {
+		return max + math.Min((value-max)*outlandsReturnCompressionRatio, outlandsReturnMaxOffset)
 	}
 
 	return value

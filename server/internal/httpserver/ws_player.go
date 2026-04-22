@@ -150,6 +150,13 @@ func (hub *gameHub) movePlayer(clientID string, direction string) bool {
 	}
 
 	nextX, nextY = hub.clampWorldPosition(nextX, nextY)
+	currentX, currentY, remappedTargetX, remappedTargetY, remapped := hub.world.remapReturnMovement(player.X, player.Y, nextX, nextY)
+	if remapped {
+		player.X = currentX
+		player.Y = currentY
+		nextX = remappedTargetX
+		nextY = remappedTargetY
+	}
 
 	hub.setPlayerTargetLocked(player, nextX, nextY, now)
 	hub.tick++
@@ -169,6 +176,13 @@ func (hub *gameHub) movePlayerTo(clientID string, x float64, z float64) bool {
 	now := hub.now()
 	hub.advanceActivePlayersLocked(now)
 	clampedX, clampedY := hub.clampWorldPosition(x, z)
+	currentX, currentY, remappedTargetX, remappedTargetY, remapped := hub.world.remapReturnMovement(player.X, player.Y, clampedX, clampedY)
+	if remapped {
+		player.X = currentX
+		player.Y = currentY
+		clampedX = remappedTargetX
+		clampedY = remappedTargetY
+	}
 	hub.setPlayerTargetLocked(player, clampedX, clampedY, now)
 	hub.tick++
 
