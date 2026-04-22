@@ -66,6 +66,8 @@ export function usePlayerControls(): PlayerMovementState {
       }
 
       event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
       updateMovement(event.code, true);
     };
 
@@ -78,6 +80,9 @@ export function usePlayerControls(): PlayerMovementState {
         return;
       }
 
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
       updateMovement(event.code, false);
     };
 
@@ -85,13 +90,13 @@ export function usePlayerControls(): PlayerMovementState {
       setMovement(DEFAULT_MOVEMENT_STATE);
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
+    window.addEventListener("keyup", handleKeyUp, { capture: true });
     window.addEventListener("blur", handleBlur);
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("keydown", handleKeyDown, { capture: true });
+      window.removeEventListener("keyup", handleKeyUp, { capture: true });
       window.removeEventListener("blur", handleBlur);
     };
   }, []);

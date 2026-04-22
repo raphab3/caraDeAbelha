@@ -46,16 +46,19 @@ const RENDER_CORRECTION_DISTANCE = WORLD_TO_SCENE_SCALE * 0.9;
 const SKY_COLOR = "#eff8ff";
 const FOG_COLOR = "#d8eaf4";
 const DEFAULT_CAMERA_FOV = 56;
-const MIN_CAMERA_DISTANCE = 6;
+const MIN_CAMERA_DISTANCE = 7.5;
 const MIN_MAX_CAMERA_DISTANCE = 30;
 const MAX_CAMERA_DISTANCE_PADDING = 10;
 const SCENE_EDGE_CAMERA_DISTANCE_RATIO = 0.44;
 const FOG_NEAR_RATIO = 0.62;
 const FOG_FAR_PADDING = 4;
-const BEE_TURN_RESPONSE = 10;
+const CAMERA_ROTATE_SPEED = 0.82;
+const CAMERA_ZOOM_SPEED = 0.9;
+const BEE_TURN_RESPONSE = 18;
 const KEYBOARD_MOVE_SEND_INTERVAL_MS = 100;
-const KEYBOARD_MOVE_LOOKAHEAD_SECONDS = 0.32;
-const KEYBOARD_MOVE_MIN_LOOKAHEAD_DISTANCE = 0.9;
+const KEYBOARD_MOVE_LOOKAHEAD_SECONDS = 0.18;
+const KEYBOARD_MOVE_MIN_LOOKAHEAD_DISTANCE = 0.48;
+const LOCAL_PLAYER_ROTATION_STOP_DISTANCE = 0.14;
 const MOVEMENT_VECTOR_EPSILON = 0.0001;
 // Important: the black rear piece is the stinger, not the head.
 // The bee visually faces local -X, so movement yaw must treat local +X as the tail.
@@ -256,6 +259,7 @@ interface BeeActorProps {
   drift: number;
   accentColor: string;
   isLocal: boolean;
+  inputPreviewTargetRef?: MutableRefObject<Vector3 | null>;
   surfaceIndex: WorldSurfaceIndex;
   trackedPositionRef?: MutableRefObject<Vector3>;
 }
@@ -269,7 +273,15 @@ interface RemoteBeeInstance {
   drift: number;
 }
 
-function BeeActor({ player, drift, accentColor, isLocal, surfaceIndex, trackedPositionRef }: BeeActorProps) {
+function BeeActor({
+  player,
+  drift,
+  accentColor,
+  isLocal,
+  inputPreviewTargetRef,
+  surfaceIndex,
+  trackedPositionRef,
+}: BeeActorProps) {
   const groupRef = useRef<Group>(null);
   const leftWingRef = useRef<Mesh>(null);
   const rightWingRef = useRef<Mesh>(null);
@@ -338,12 +350,20 @@ function BeeActor({ player, drift, accentColor, isLocal, surfaceIndex, trackedPo
         ? nextFlightHeight
         : MathUtils.lerp(currentPosition.y, nextFlightHeight, 0.18);
 
-    const lookTarget = hasMoveTarget(player)
-      ? desiredTargetPositionRef.current
-      : authoritativePositionRef.current;
+    const inputPreviewTarget = inputPreviewTargetRef?.current ?? null;
+    const hasInputPreviewTarget = inputPreviewTarget !== null;
+    const lookTarget = hasInputPreviewTarget
+      ? inputPreviewTarget
+      : hasMoveTarget(player)
+        ? desiredTargetPositionRef.current
+        : authoritativePositionRef.current;
     const lookDeltaX = lookTarget.x - currentPosition.x;
     const lookDeltaZ = lookTarget.z - currentPosition.z;
-    const targetYaw = resolveTargetYaw(lookDeltaX, lookDeltaZ);
+    const shouldFreezeLocalYaw =
+      isLocal &&
+      !hasInputPreviewTarget &&
+      (!hasMoveTarget(player) || currentPosition.distanceTo(desiredTargetPositionRef.current) <= LOCAL_PLAYER_ROTATION_STOP_DISTANCE);
+    const targetYaw = shouldFreezeLocalYaw ? null : resolveTargetYaw(lookDeltaX, lookDeltaZ);
 
     if (targetYaw !== null) {
       groupRef.current.rotation.y = smoothYawRotation(groupRef.current.rotation.y, targetYaw, delta);
@@ -641,11 +661,13 @@ function MoveTargetMarker({ target }: { target: MoveTargetMarkerState }) {
 
 function LocalPlayerMovementController({
   connectionState,
+  inputPreviewTargetRef,
   localPlayer,
   onMoveToTarget,
   trackedPositionRef,
 }: {
   connectionState: GameSessionState["connectionState"];
+  inputPreviewTargetRef: MutableRefObject<Vector3 | null>;
   localPlayer?: WorldPlayerState;
   onMoveToTarget: (x: number, z: number) => void;
   trackedPositionRef: MutableRefObject<Vector3>;
@@ -665,10 +687,11 @@ function LocalPlayerMovementController({
       return;
     }
 
+    inputPreviewTargetRef.current = null;
     lastSentAtRef.current = Number.NEGATIVE_INFINITY;
     lastTargetRef.current.set(Number.NaN, 0, Number.NaN);
     wasMovingRef.current = false;
-  }, [connectionState, localPlayer]);
+  }, [connectionState, inputPreviewTargetRef, localPlayer]);
 
   useFrame((state) => {
     if (connectionState !== "connected" || !localPlayer) {
@@ -688,6 +711,8 @@ function LocalPlayerMovementController({
     const nowMs = state.clock.elapsedTime * 1000;
 
     if (xIntent === 0 && zIntent === 0) {
+      inputPreviewTargetRef.current = null;
+
       if (wasMovingRef.current) {
         onMoveToTarget(anchorWorldX, anchorWorldZ);
         lastSentAtRef.current = nowMs;
@@ -718,6 +743,16 @@ function LocalPlayerMovementController({
 
     movementVector.normalize();
 
+    const previewDistance = Math.max(
+      localPlayer.speed * KEYBOARD_MOVE_LOOKAHEAD_SECONDS,
+      KEYBOARD_MOVE_MIN_LOOKAHEAD_DISTANCE,
+    );
+    inputPreviewTargetRef.current = new Vector3(
+      anchorSceneX + movementVector.x * toSceneAxis(previewDistance),
+      0,
+      anchorSceneZ + movementVector.z * toSceneAxis(previewDistance),
+    );
+
     const shouldSendTarget =
       !wasMovingRef.current ||
       nowMs - lastSentAtRef.current >= KEYBOARD_MOVE_SEND_INTERVAL_MS;
@@ -727,12 +762,8 @@ function LocalPlayerMovementController({
       return;
     }
 
-    const lookaheadDistance = Math.max(
-      localPlayer.speed * KEYBOARD_MOVE_LOOKAHEAD_SECONDS,
-      KEYBOARD_MOVE_MIN_LOOKAHEAD_DISTANCE,
-    );
-    const targetWorldX = anchorWorldX + movementVector.x * lookaheadDistance;
-    const targetWorldZ = anchorWorldZ + movementVector.z * lookaheadDistance;
+    const targetWorldX = anchorWorldX + movementVector.x * previewDistance;
+    const targetWorldZ = anchorWorldZ + movementVector.z * previewDistance;
 
     if (
       Math.abs(lastTargetRef.current.x - targetWorldX) <= MOVEMENT_VECTOR_EPSILON &&
@@ -762,7 +793,8 @@ function CameraRig({
 }) {
   const controlsRef = useRef<ElementRef<typeof OrbitControls>>(null);
   const smoothedTargetRef = useRef(new Vector3(0, 0.45, 0));
-  const { gl } = useThree();
+  const cameraFollowDeltaRef = useRef(new Vector3());
+  const { camera, gl } = useThree();
 
   useEffect(() => {
     const handleContextMenu = (event: MouseEvent) => {
@@ -778,11 +810,19 @@ function CameraRig({
 
   useFrame((_, delta) => {
     const anchor = resolveAnchorScenePosition(trackedPositionRef, focusPlayer);
-    const desiredTarget = new Vector3(anchor.x, 0.42, anchor.z);
+    const desiredTarget = cameraFollowDeltaRef.current.set(anchor.x, 0.42, anchor.z);
+    const controls = controlsRef.current;
 
     smoothedTargetRef.current.lerp(desiredTarget, 1 - Math.exp(-delta * 6));
-    controlsRef.current?.target.copy(smoothedTargetRef.current);
-    controlsRef.current?.update();
+
+    if (!controls) {
+      return;
+    }
+
+    cameraFollowDeltaRef.current.subVectors(smoothedTargetRef.current, controls.target);
+    camera.position.add(cameraFollowDeltaRef.current);
+    controls.target.copy(smoothedTargetRef.current);
+    controls.update();
   });
 
   return (
@@ -791,12 +831,15 @@ function CameraRig({
       dampingFactor={0.08}
       enableDamping
       enablePan={false}
+      keyEvents={false}
       makeDefault
       maxDistance={maxCameraDistance}
       maxPolarAngle={Math.PI / 2.2}
       minDistance={MIN_CAMERA_DISTANCE}
       minPolarAngle={0.32}
-      zoomSpeed={1.35}
+      rotateSpeed={CAMERA_ROTATE_SPEED}
+      zoomSpeed={CAMERA_ZOOM_SPEED}
+      zoomToCursor={false}
       mouseButtons={{
         MIDDLE: MOUSE.DOLLY,
         RIGHT: MOUSE.ROTATE,
@@ -931,6 +974,7 @@ function HiveCore({
 }: HiveCoreProps) {
   const [moveTargetMarker, setMoveTargetMarker] = useState<MoveTargetMarkerState | null>(null);
   const surfaceIndex = useMemo(() => buildWorldSurfaceIndex(chunks), [chunks]);
+  const localInputPreviewTargetRef = useRef<Vector3 | null>(null);
   const canvasWidth = useThree((state) => state.size.width);
   const localPlayer = useMemo(
     () => players.find((player) => player.id === localPlayerId),
@@ -1051,6 +1095,7 @@ function HiveCore({
 
       <LocalPlayerMovementController
         connectionState={connectionState}
+        inputPreviewTargetRef={localInputPreviewTargetRef}
         localPlayer={localPlayer}
         onMoveToTarget={onMoveToTarget}
         trackedPositionRef={localPlayerPositionRef}
@@ -1061,6 +1106,7 @@ function HiveCore({
           accentColor="#f8c537"
           drift={0}
           isLocal
+          inputPreviewTargetRef={localInputPreviewTargetRef}
           player={localPlayer}
           surfaceIndex={surfaceIndex}
           trackedPositionRef={localPlayerPositionRef}
