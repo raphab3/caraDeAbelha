@@ -143,6 +143,17 @@ Resultado esperado: adicionar equipamentos, skill points, inimigos com aggro, qu
 
 Resultado esperado: adicionar world bosses, contribuicao por participacao, distribuicao de loot e sinergias de grupo relevantes.
 
+## Refinamento da trilha de entrega
+
+Os tres epics acima continuam valendo como pilares macro do produto, mas a entrega foi refinada em epics numerados menores para reduzir risco e organizar dependencias reais do codebase.
+
+Entre esses refinamentos, passam a existir explicitamente:
+
+- `EPIC-CDAM-07` Evolucao do Mundo e Stages Autorais
+- `EPIC-CDAM-08` Cidade-Colmeia Compartilhada e Comercio Basico
+
+O `EPIC-CDAM-07` entra antes da cidade para garantir que o hub social nasca em um mundo convincente, com stage autoral, melhor leitura espacial e pipeline de mapa mais forte do que o gerador inicial.
+
 ## Assuncoes
 
 - Esta spec e guarda-chuva e organiza a visao de produto, nao o design tecnico detalhado.

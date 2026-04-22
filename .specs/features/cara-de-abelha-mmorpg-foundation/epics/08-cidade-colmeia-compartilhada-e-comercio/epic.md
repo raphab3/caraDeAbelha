@@ -1,7 +1,7 @@
-# Epic 07: Cidade-Colmeia Compartilhada e Comercio Basico
+# Epic 08: Cidade-Colmeia Compartilhada e Comercio Basico
 
 Status: planned
-Epic ID: EPIC-CDAM-07
+Epic ID: EPIC-CDAM-08
 Feature: Cara de Abelha MMORPG Foundation
 
 ## Objetivo
@@ -128,6 +128,7 @@ Hoje o mundo pode crescer em progressao territorial, mas ainda nao existe um esp
 ## Dependencias
 
 - Epic 02 com economia de mel consolidada
+- Epic 07 com mundo e stages suficientes para sustentar um hub memoravel
 - contrato confiavel de `player_status` para saldo e estado do jogador
 - base multiplayer suficiente para presenca compartilhada no hub
 - sistema de entidades interativas capaz de suportar NPCs vendedores

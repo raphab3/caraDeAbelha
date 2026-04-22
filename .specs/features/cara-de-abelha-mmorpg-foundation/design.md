@@ -490,11 +490,310 @@ O proximo passo operacional e abrir o epic do loop base com implementacao de:
 
 Isso valida o coracao economico do jogo sem antecipar combate, pets ou world boss.
 
-## Addendum de Design - Epic 07: Cidade-Colmeia Compartilhada e Comercio Basico
+## Addendum de Design - Epic 07: Evolucao do Mundo e Stages Autorais
 
 Status: approved
 
-Este addendum usa `EPIC-CDAM-07` como fonte obrigatoria de produto para detalhar a primeira versao da super colmeia compartilhada.
+Este addendum usa `EPIC-CDAM-07` como fonte obrigatoria de produto para detalhar a evolucao do pipeline de mapas e do mundo autoral antes da cidade-colmeia.
+
+### Escopo
+
+Esta fase cobre:
+
+- a evolucao do formato de mapa para stages autorais, landmarks e regras de borda
+- a arquitetura tecnica de prefabs e composicao usando os kits ja disponiveis no projeto
+- a direcao de mundo grande, finito em conteudo util, mas sem parede artificial dura
+- a regra de vazio transitavel com retorno comprimido
+- a direcao audiovisual minima para consolidar atmosfera
+
+Nao cobre:
+
+- procedural infinito com conteudo relevante
+- cidade-colmeia e comercio do hub
+- inventario completo, quests ou combate como foco principal
+
+### Contexto Atual
+
+#### Codebase
+
+- `server/internal/httpserver/world_map.go` ainda opera com um formato de mapa que privilegia `tiles`, `zones` e `transitions`, mas restringe `prop` a `flower`, `tree` e `hive`. Esse e o gargalo estrutural principal para cenarios mais ricos.
+- o parser ainda trata o mapa como lista ou container simples de tiles, sem metadados de stage, landmarks, audio ou comportamento de borda.
+- `layout.clampPosition(...)` hoje traduz a borda do mundo em clamp duro. Isso explica por que o limite do mapa ainda soa tecnico e abrupto.
+- `server/maps/map.json` continua representando o mundo em granularidade de tile cru, o que foi suficiente para prototipagem, mas nao escala bem para stage autoral com identidade forte.
+- `client/src/components/GameViewport/index.tsx` ja sustenta um palco 3D unico e e compativel com um mundo bem mais rico, desde que o pipeline de assets e props seja mais curado.
+- o runtime de entidades em `world_runtime.go` ja demonstrou que o servidor consegue injetar entidades especiais fora do mapa base, como a colmeia coletora. Isso abre caminho para landmarks e props especiais sem travar na versao inicial do schema.
+
+#### Assets disponiveis
+
+- `materials/Starter-Kit-3D-Platformer-main/models` oferece base forte para plataformas, nuvens, grama, blocos e elementos de relevo mais marcados.
+- `client/public/kenney_platformer-kit/Models/GLB format` amplia muito a biblioteca com slopes, overhangs, blocos altos, rochas, plantas, cercas, portas, placas, arvores e props de composicao.
+- `client/public/assets/rpg-adventure.mp3` ja pode funcionar como trilha inicial do primeiro stage autoral.
+
+#### Incerteza Explicita
+
+- ainda nao esta fechado se o retorno comprimido sera uma corrente de vento, corredor de voo, aceleracao passiva ou outro recurso diegetico. O design exige esse comportamento, mas nao prende a ficcao final.
+- ainda nao ha uma ferramenta externa formal de edicao de stage. A primeira versao pode continuar baseada em JSON autoral se a estrutura suportar composicao e reuse.
+
+### Decisao Principal
+
+Trocar o centro de gravidade do mundo de `mapa gerado por tiles simples` para `stages autorais compostos por prefabs e metadados de world design`, mantendo compatibilidade incremental com o runtime atual.
+
+Isso implica:
+
+- mapas curados por stage
+- props e relevo definidos por composicao
+- landmarks como parte do contrato de mapa
+- borda do mundo tratada como sistema de design, nao apenas clamp tecnico
+
+### Por Que Esta Decisao
+
+- o principal gargalo atual do produto nao e falta de sistemas sociais, e sim falta de mundo memoravel
+- cidades, zonas e progressao territorial vao parecer mais valiosas quando pousarem sobre um stage forte
+- o pipeline atual de mapa e bom para validar regra, mas fraco para vender fantasia
+- o time ja possui kits visuais suficientes para dar um salto grande sem depender de producao 100% nova
+
+### Arquitetura Proposta
+
+#### Formato de mapa em camadas
+
+O mapa deixa de ser tratado apenas como um conjunto de tiles e passa a ter quatro camadas logicas:
+
+1. `terrain`
+- superficie navegavel basica
+- alturas
+- material de solo
+- blocos de relevo
+
+2. `props`
+- vegetacao
+- rochas
+- placas
+- cercas
+- plataformas decorativas
+- arvores e composicao ambiental
+
+3. `gameplay`
+- flores
+- colmeias
+- gates
+- zonas
+- landmarks usados como referencia de navegacao
+
+4. `world_rules`
+- borda do mundo
+- vazio transitavel
+- retorno comprimido
+- trilha e atmosfera por stage
+
+Schema alvo incremental:
+
+```json
+{
+  "stageId": "stage:starter-basin",
+  "displayName": "Bacia do Primeiro Voo",
+  "audio": {
+    "bgm": "assets/rpg-adventure.mp3"
+  },
+  "edgeBehavior": {
+    "type": "outlands_return_corridor",
+    "playableBounds": { "x1": -120, "x2": 120, "z1": -120, "z2": 120 },
+    "outlandsBounds": { "x1": -260, "x2": 260, "z1": -260, "z2": 260 }
+  },
+  "tiles": [],
+  "props": [],
+  "zones": [],
+  "transitions": [],
+  "landmarks": []
+}
+```
+
+O parser continua aceitando o formato legado, mas o stage novo passa a usar o container expandido.
+
+#### Catalogo de prefabs
+
+Em vez de gravar cada detalhe visual como tipo solto, o mapa deve apontar para prefabs catalogados.
+
+Modelo sugerido:
+
+```ts
+type WorldPrefabId =
+  | "terrain/cliff-high"
+  | "terrain/slope-wide"
+  | "nature/flowers-cluster"
+  | "nature/pine-large"
+  | "setdressing/fence-broken"
+  | "landmark/stone-arch"
+  | "border/wind-gate";
+```
+
+Cada prefab resolve para:
+
+- asset GLB de origem
+- escala padrao
+- regra de colisao
+- tag de categoria
+- custo visual esperado
+
+Isso separa criacao de stage de detalhes de implementacao do asset.
+
+#### Pipeline tecnico
+
+1. `catalogo de prefabs`
+- define o que pode ser usado do kit existente
+
+2. `arquivo de stage`
+- compoe terreno, props, landmarks e regras
+
+3. `parser do servidor`
+- valida schema
+- resolve bounds
+- injeta entidades de gameplay
+
+4. `estado de mundo para o client`
+- envia apenas o necessario para renderizar o stage atual e seu entorno
+
+5. `renderizador do client`
+- agrupa por tipo/prefab
+- usa instancing ou batching quando possivel
+- mantem objetos estaveis no canvas
+
+#### Regra de borda
+
+O mundo passa a ter dois aneis:
+
+- `playableBounds`
+  - conteudo util
+  - coleta
+  - zonas
+  - landmarks
+
+- `outlandsBounds`
+  - vazio transitavel
+  - poucas ou nenhuma recompensa util
+  - atmosfera de exilio, vento, nevoa ou queda de densidade do mundo
+
+Ao ultrapassar `playableBounds`, o jogador nao bate numa parede. Ele entra em outlands.
+
+Ao tentar voltar:
+
+- o sistema direciona ou acelera o retorno por corredor de vento, impulso de retorno ou regra equivalente
+- o tempo efetivo de volta e menor que o tempo de ida profunda ao vazio
+
+Isso resolve a sensacao de mundo limitado sem exigir infinito real.
+
+#### Audio e atmosfera
+
+- cada stage pode declarar uma trilha base
+- a primeira fatia usa `assets/rpg-adventure.mp3`
+- o audio deve iniciar de forma compativel com gesto do usuario e controle simples de mute
+
+#### Frontend
+
+##### Renderizacao
+
+- manter `GameViewport` como palco unico
+- criar resolucao de prefab no client, separando dados de stage de implementacao visual
+- usar instancing e materiais compartilhados para props repetidos
+- evitar mount/unmount de grandes blocos do stage quando o jogador cruza chunks; preferir visibilidade e agrupamento estavel
+
+##### HUD e navegacao
+
+- landmarks relevantes podem aparecer no minimapa como POIs grandes
+- a UI nao deve compensar falta de world design; primeiro vem a leitura espacial do stage
+- feedback de borda precisa ser curto e ambiental, nao modal intrusivo
+
+### Direcao Visual dos Stages
+
+O primeiro stage autoral deve ter:
+
+- uma silhueta de horizonte reconhecivel
+- montanhas ou paredoes altos o suficiente para parecer geografia, nao barreira de tile
+- vales e caminhos de passagem que guiam sem parecer corredor linear
+- agrupamento de props por ecossistema, nao objetos isolados soltos
+
+### Reuso Confirmado
+
+Reaproveitar diretamente:
+
+- `world_map.go` como base do parser evoluido
+- `GameViewport` e runtime atual do mundo
+- a logica de chunks e visibilidade
+- o runtime de injecao de entidades especiais testado pela colmeia coletora
+
+Adaptar:
+
+- schema do mapa
+- parser de props
+- renderers para prefabs ricos
+- regra de clamp para borda com outlands
+
+Evitar agora:
+
+- editor visual completo de mundo antes de provar o novo schema
+- procedural infinito de alta ambicao
+- diversidade exagerada de biomas na primeira fatia
+
+### Mudancas Estruturais Esperadas
+
+#### Backend
+
+- `server/internal/httpserver/world_map.go`
+  - expandir `worldMapContainer`
+  - aceitar `stageId`, `audio`, `edgeBehavior`, `props`, `landmarks`
+  - evoluir `prop` de string simples para referencia de prefab
+
+- `server/maps/*.json`
+  - introduzir primeiro stage autoral em formato expandido
+
+- runtime de borda
+  - separar `playableBounds` de `outlandsBounds`
+  - substituir clamp duro por regra de borda com retorno comprimido
+
+#### Frontend
+
+- `client/src/types/game.ts`
+  - adicionar tipos de prefab, landmark e metadados de stage se forem expostos ao client
+
+- `client/src/components/GameViewport/*`
+  - resolver e renderizar prefabs por categoria
+  - destacar landmarks e props ricos sem inflar o render loop
+
+- audio do stage
+  - integrar trilha de fundo simples com ciclo de vida do jogo
+
+### Validacao
+
+#### Backend
+
+- teste de parse do novo schema de stage
+- teste de compatibilidade com formato legado
+- teste de borda com entrada em outlands
+- teste de retorno comprimido
+
+#### Frontend
+
+- `pnpm build`
+- validacao manual de stage maior com landmarks
+- validacao manual da borda sem parede brusca
+- validacao manual de audio de fundo
+
+### Proximo Passo Recomendado
+
+O primeiro slice operacional deste epic deve entrar nesta ordem:
+
+1. schema expandido de stage
+2. catalogo de prefabs
+3. primeiro stage autoral com kits existentes
+4. borda com outlands e retorno comprimido
+5. trilha de fundo
+
+Essa ordem troca rapidamente a sensacao de prototipo por sensacao de mundo, antes de introduzir a cidade como payoff social.
+
+## Addendum de Design - Epic 08: Cidade-Colmeia Compartilhada e Comercio Basico
+
+Status: approved
+
+Este addendum usa `EPIC-CDAM-08` como fonte obrigatoria de produto para detalhar a primeira versao da super colmeia compartilhada.
 
 ### Escopo
 
@@ -531,7 +830,7 @@ Nao cobre:
 
 - `ARCHITECTURE.md` reafirma a arquitetura server-authoritative e lista `ZoneGateRenderer`, `ZoneUnlockPanel` e `ZoneService` como superfícies do ecossistema, o que combina com um hub que convive com progressao territorial sem substitui-la.
 - `docs/main.md` continua tratando mel como recurso central do loop e posiciona o jogo como multiplayer 3D compartilhado, o que reforca a necessidade de um centro social legivel.
-- o `epic.md` do Epic 07 ja travou as decisoes centrais: cidade sempre acessivel, respawn e reconexao no hub, NPCs fisicos e comercio basico autoritativo.
+- o `epic.md` do Epic 08 ja travou as decisoes centrais: cidade sempre acessivel, respawn e reconexao no hub, NPCs fisicos e comercio basico autoritativo.
 
 #### Context7
 
@@ -918,7 +1217,7 @@ Tratamento esperado:
 
 ### Proximo Passo Recomendado
 
-O primeiro slice operacional do Epic 07 deve entrar nesta ordem:
+O primeiro slice operacional do Epic 08 deve entrar nesta ordem:
 
 1. `zone:hive_city` como ponto oficial de entrada e respawn
 2. entidade de vendedor fisico no mundo
