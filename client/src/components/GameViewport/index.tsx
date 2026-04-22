@@ -1324,7 +1324,6 @@ export function GameViewport({
   onHiveClick,
   tapTargetingConfig,
 }: GameViewportProps) {
-  const [isMiniMapVisible, setIsMiniMapVisible] = useState(true);
   const localPlayer = useMemo(
     () => players.find((player) => player.id === localPlayerId),
     [localPlayerId, players],
@@ -1355,33 +1354,6 @@ export function GameViewport({
     });
   }, [players, localPlayer, chunkSize, renderDistance]);
   const visibleHives = useMemo(() => collectVisibleHives(chunks), [chunks]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement ||
-        (target instanceof HTMLElement && target.isContentEditable)
-      ) {
-        return;
-      }
-
-      if (event.key.toLowerCase() !== "m") {
-        return;
-      }
-
-      event.preventDefault();
-      setIsMiniMapVisible((current) => !current);
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
 
   return (
     <div className="viewport-canvas-shell">
@@ -1417,31 +1389,17 @@ export function GameViewport({
         />
       </Canvas>
 
-      {isMiniMapVisible ? (
-        <MiniMap
-          flowerInteraction={flowerInteraction}
-          hiveInteraction={hiveInteraction}
-          hives={visibleHives}
-          localPlayerId={localPlayerId}
-          onClearTargets={onClearTargets}
-          onCollectorClick={onHiveClick}
-          players={players}
-          onPlayerClick={onMoveToTarget}
-          onRespawn={onRespawn}
-        />
-      ) : (
-        <button
-          aria-keyshortcuts="M"
-          aria-label="Abrir minimapa"
-          className="absolute bottom-4 left-4 z-10 min-h-11 rounded-full border border-slate-700/70 bg-slate-950/78 px-4 py-2 text-sm font-bold uppercase tracking-[0.22em] text-cyan-100 shadow-[0_12px_32px_rgba(15,23,42,0.42)] backdrop-blur-md transition hover:border-cyan-300/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
-          onClick={() => {
-            setIsMiniMapVisible(true);
-          }}
-          type="button"
-        >
-          Mapa · M
-        </button>
-      )}
+      <MiniMap
+        flowerInteraction={flowerInteraction}
+        hiveInteraction={hiveInteraction}
+        hives={visibleHives}
+        localPlayerId={localPlayerId}
+        onClearTargets={onClearTargets}
+        onCollectorClick={onHiveClick}
+        players={players}
+        onPlayerClick={onMoveToTarget}
+        onRespawn={onRespawn}
+      />
     </div>
   );
 }

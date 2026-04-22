@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { FlowerInteractionState, HiveInteractionState, WorldHiveState, WorldPlayerState } from "../../types/game";
 
@@ -116,6 +116,33 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 	const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
 	const collectorHive = useMemo(() => hives.find((hive) => hive.id === COLLECTOR_HIVE_ID), [hives]);
 
+	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			const target = event.target;
+			if (
+				target instanceof HTMLInputElement ||
+				target instanceof HTMLTextAreaElement ||
+				target instanceof HTMLSelectElement ||
+				(target instanceof HTMLElement && target.isContentEditable)
+			) {
+				return;
+			}
+
+			if (event.key.toLowerCase() !== "m") {
+				return;
+			}
+
+			event.preventDefault();
+			setCollapsed((previous) => !previous);
+		};
+
+		window.addEventListener("keydown", handleKeyDown);
+
+		return () => {
+			window.removeEventListener("keydown", handleKeyDown);
+		};
+	}, []);
+
 	const localPlayer = useMemo(
 		() => players.find((player) => player.id === localPlayerId),
 		[localPlayerId, players],
@@ -210,6 +237,7 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 						type="button"
 						className="mini-map__toggle"
 						aria-label={collapsed ? "Expandir minimapa" : "Minimizar minimapa"}
+						aria-keyshortcuts="M"
 						aria-expanded={!collapsed}
 						onClick={() => setCollapsed((previous) => !previous)}
 					>
