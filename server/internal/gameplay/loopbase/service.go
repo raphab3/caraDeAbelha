@@ -251,6 +251,67 @@ func (s *LoopBaseService) CollectFlowerPollen(
 	return pollenToCollect, nil
 }
 
+// CanDepositAtHive validates whether a player can deposit pollen at a hive.
+// It checks two conditions:
+// 1. Player has pollen to deposit (PollenCarried > 0)
+// 2. Hive is not nil
+// Returns (success bool, reason string) for detailed validation feedback.
+func (s *LoopBaseService) CanDepositAtHive(
+	playerProgress *PlayerProgress,
+	hive *HiveNode,
+) (bool, string) {
+	// Validate inputs
+	if playerProgress == nil {
+		return false, "player progress is nil"
+	}
+
+	if hive == nil {
+		return false, "hive is nil"
+	}
+
+	// Check if player has pollen to deposit
+	if playerProgress.PollenCarried <= 0 {
+		return false, "player has no pollen to deposit"
+	}
+
+	return true, ""
+}
+
+// DepositPollenToHoney processes the conversion of pollen to honey at a hive.
+// It validates deposit preconditions, converts pollen to honey using the hive's conversion rate,
+// updates player progress (adds honey, clears pollen), and updates the hive timestamp.
+// Returns (honeyGained int, err error).
+// All state changes are authoritative and happen on the server.
+// Conversion formula: honeyGained = playerProgress.PollenCarried / hiveNode.ConversionRate (integer division)
+func (s *LoopBaseService) DepositPollenToHoney(
+	playerProgress *PlayerProgress,
+	hive *HiveNode,
+) (int, error) {
+	// Validate deposit is possible
+	canDeposit, reason := s.CanDepositAtHive(playerProgress, hive)
+	if !canDeposit {
+		return 0, fmt.Errorf("cannot deposit pollen: %s", reason)
+	}
+
+	// Calculate honey gained using integer division
+	// Example: 50 pollen ÷ 10 conversion rate = 5 honey
+	honeyGained := playerProgress.PollenCarried / hive.ConversionRate
+
+	// Handle edge case: if conversion rate is very high and pollen is low, honey could be 0
+	// This is mathematically correct (e.g., 5 pollen ÷ 10 rate = 0 honey)
+	// but still allowed since we validated PollenCarried > 0
+
+	// Update player state: add honey and clear pollen
+	playerProgress.Honey += honeyGained
+	playerProgress.PollenCarried = 0
+	playerProgress.UpdatedAt = time.Now()
+
+	// Update hive state: record the deposit timestamp
+	hive.UpdatedAt = time.Now()
+
+	return honeyGained, nil
+}
+
 // calculateDistance computes the Euclidean distance between two 2D points.
 // Formula: sqrt((x2-x1)^2 + (y2-y1)^2)
 func calculateDistance(x1 float64, y1 float64, x2 float64, y2 float64) float64 {

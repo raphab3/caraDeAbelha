@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gorilla/websocket"
+	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/loopbase"
 )
 
 func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +112,33 @@ func (hub *gameHub) broadcast() {
 }
 
 func (hub *gameHub) sendToClient(client *clientSession, message sessionMessage) {
+	if err := hub.writeJSON(client, message); err != nil {
+		log.Printf("websocket write failed for %s: %v", client.id, err)
+	}
+}
+
+// sendPlayerStatus sends a player_status message to a client.
+// Called when player progress changes (pollen, honey, level, etc).
+func (hub *gameHub) sendPlayerStatus(client *clientSession, progress *loopbase.PlayerProgress) {
+	if client == nil || progress == nil {
+		return
+	}
+
+	message := newPlayerStatusMessage(progress)
+	if err := hub.writeJSON(client, message); err != nil {
+		log.Printf("websocket write failed for %s: %v", client.id, err)
+	}
+}
+
+// sendInteractionResult sends an interaction_result message to a client.
+// Called to provide immediate feedback on player actions like collecting flowers or depositing pollen.
+func (hub *gameHub) sendInteractionResult(client *clientSession, action string, success bool, amount int, reason string) {
+	if client == nil {
+		return
+	}
+
+	timestamp := hub.now().UnixMilli()
+	message := newInteractionResultMessage(action, success, amount, reason, timestamp)
 	if err := hub.writeJSON(client, message); err != nil {
 		log.Printf("websocket write failed for %s: %v", client.id, err)
 	}

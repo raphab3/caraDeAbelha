@@ -9,3 +9,5 @@ client/.pnpm-store/
 materials/*
 
 coverage/
+
+server/server

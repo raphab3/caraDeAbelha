@@ -3,6 +3,7 @@ package loopbase
 import (
 	"fmt"
 	"testing"
+	"time"
 )
 
 // TestNewLoopBaseService validates that LoopBaseService initializes with default test data.
@@ -1032,4 +1033,547 @@ func TestCollectFlowerPollenConcurrentCollections(t *testing.T) {
 	if flower.PollenAvailable < 0 {
 		t.Errorf("flower pollen went negative: %d", flower.PollenAvailable)
 	}
+}
+
+// TestCanDepositAtHiveSuccessful validates successful deposit preconditions.
+func TestCanDepositAtHiveSuccessful(t *testing.T) {
+	service := NewLoopBaseService()
+	hives := service.GetHivesByZone("zone:start")
+
+	if len(hives) == 0 {
+		t.Fatal("expected at least one hive in zone:start")
+	}
+
+	hive := hives[0]
+	playerProgress := &PlayerProgress{
+		PlayerID:       "player:test:1",
+		PollenCarried:  50,
+		PollenCapacity: 100,
+		Honey:          0,
+	}
+
+	canDeposit, reason := service.CanDepositAtHive(playerProgress, hive)
+
+	if !canDeposit {
+		t.Errorf("expected CanDepositAtHive to return true, got false: %s", reason)
+	}
+
+	if reason != "" {
+		t.Errorf("expected empty reason for successful validation, got: %s", reason)
+	}
+}
+
+// TestCanDepositAtHiveNoPollen validates that players with zero pollen cannot deposit.
+func TestCanDepositAtHiveNoPollen(t *testing.T) {
+	service := NewLoopBaseService()
+	hives := service.GetHivesByZone("zone:start")
+
+	if len(hives) == 0 {
+		t.Fatal("expected at least one hive in zone:start")
+	}
+
+	hive := hives[0]
+	playerProgress := &PlayerProgress{
+		PlayerID:       "player:test:1",
+		PollenCarried:  0,
+		PollenCapacity: 100,
+		Honey:          0,
+	}
+
+	canDeposit, reason := service.CanDepositAtHive(playerProgress, hive)
+
+	if canDeposit {
+		t.Error("expected CanDepositAtHive to return false for player with zero pollen")
+	}
+
+	if reason != "player has no pollen to deposit" {
+		t.Errorf("expected 'player has no pollen to deposit' reason, got: %s", reason)
+	}
+}
+
+// TestCanDepositAtHiveNegativePollen validates that negative pollen is treated as none.
+func TestCanDepositAtHiveNegativePollen(t *testing.T) {
+	service := NewLoopBaseService()
+	hives := service.GetHivesByZone("zone:start")
+
+	if len(hives) == 0 {
+		t.Fatal("expected at least one hive in zone:start")
+	}
+
+	hive := hives[0]
+	playerProgress := &PlayerProgress{
+		PlayerID:       "player:test:1",
+		PollenCarried:  -5,
+		PollenCapacity: 100,
+		Honey:          0,
+	}
+
+	canDeposit, reason := service.CanDepositAtHive(playerProgress, hive)
+
+	if canDeposit {
+		t.Error("expected CanDepositAtHive to return false for negative pollen")
+	}
+
+	if reason != "player has no pollen to deposit" {
+		t.Errorf("expected 'player has no pollen to deposit' reason, got: %s", reason)
+	}
+}
+
+// TestCanDepositAtHiveNilPlayer validates that nil player returns error.
+func TestCanDepositAtHiveNilPlayer(t *testing.T) {
+	service := NewLoopBaseService()
+	hives := service.GetHivesByZone("zone:start")
+
+	if len(hives) == 0 {
+		t.Fatal("expected at least one hive in zone:start")
+	}
+
+	hive := hives[0]
+
+	canDeposit, reason := service.CanDepositAtHive(nil, hive)
+
+	if canDeposit {
+		t.Error("expected CanDepositAtHive to return false for nil player")
+	}
+
+	if reason != "player progress is nil" {
+		t.Errorf("expected 'player progress is nil' reason, got: %s", reason)
+	}
+}
+
+// TestCanDepositAtHiveNilHive validates that nil hive returns error.
+func TestCanDepositAtHiveNilHive(t *testing.T) {
+	service := NewLoopBaseService()
+	playerProgress := &PlayerProgress{
+		PlayerID:       "player:test:1",
+		PollenCarried:  50,
+		PollenCapacity: 100,
+		Honey:          0,
+	}
+
+	canDeposit, reason := service.CanDepositAtHive(playerProgress, nil)
+
+	if canDeposit {
+		t.Error("expected CanDepositAtHive to return false for nil hive")
+	}
+
+	if reason != "hive is nil" {
+		t.Errorf("expected 'hive is nil' reason, got: %s", reason)
+	}
+}
+
+// TestDepositPollenToHoneySuccessfulFullLoad validates successful deposit with full pollen load.
+func TestDepositPollenToHoneySuccessfulFullLoad(t *testing.T) {
+	service := NewLoopBaseService()
+	hives := service.GetHivesByZone("zone:start")
+
+	if len(hives) == 0 {
+		t.Fatal("expected at least one hive in zone:start")
+	}
+
+	hive := hives[0] // ConversionRate = 10
+	playerProgress := &PlayerProgress{
+		PlayerID:       "player:test:1",
+		PollenCarried:  100,
+		PollenCapacity: 100,
+		Honey:          0,
+	}
+
+	// 100 pollen ÷ 10 rate = 10 honey
+	honeyGained, err := service.DepositPollenToHoney(playerProgress, hive)
+
+	if err != nil {
+		t.Errorf("unexpected error during deposit: %v", err)
+	}
+
+	if honeyGained != 10 {
+		t.Errorf("expected 10 honey gained, got %d", honeyGained)
+	}
+
+	if playerProgress.Honey != 10 {
+		t.Errorf("expected player honey to be 10, got %d", playerProgress.Honey)
+	}
+
+	if playerProgress.PollenCarried != 0 {
+		t.Errorf("expected player pollen to be 0 after deposit, got %d", playerProgress.PollenCarried)
+	}
+
+	if hive.UpdatedAt.IsZero() {
+		t.Error("expected hive UpdatedAt to be set")
+	}
+
+	if playerProgress.UpdatedAt.IsZero() {
+		t.Error("expected player UpdatedAt to be set")
+	}
+}
+
+// TestDepositPollenToHoneyPartialLoad validates deposit with partial pollen load.
+func TestDepositPollenToHoneyPartialLoad(t *testing.T) {
+	service := NewLoopBaseService()
+	hives := service.GetHivesByZone("zone:start")
+
+	if len(hives) == 0 {
+		t.Fatal("expected at least one hive in zone:start")
+	}
+
+	hive := hives[0] // ConversionRate = 10
+	playerProgress := &PlayerProgress{
+		PlayerID:       "player:test:1",
+		PollenCarried:  50,
+		PollenCapacity: 100,
+		Honey:          5,
+	}
+
+	// 50 pollen ÷ 10 rate = 5 honey
+	honeyGained, err := service.DepositPollenToHoney(playerProgress, hive)
+
+	if err != nil {
+		t.Errorf("unexpected error during deposit: %v", err)
+	}
+
+	if honeyGained != 5 {
+		t.Errorf("expected 5 honey gained, got %d", honeyGained)
+	}
+
+	if playerProgress.Honey != 10 { // 5 previous + 5 gained
+		t.Errorf("expected player honey to be 10, got %d", playerProgress.Honey)
+	}
+
+	if playerProgress.PollenCarried != 0 {
+		t.Errorf("expected player pollen to be 0 after deposit, got %d", playerProgress.PollenCarried)
+	}
+}
+
+// TestDepositPollenToHoneyWithDifferentRates validates deposit with different conversion rates.
+func TestDepositPollenToHoneyWithDifferentRates(t *testing.T) {
+	tests := []struct {
+		name            string
+		pollenCarried   int
+		conversionRate  int
+		expectedHoney   int
+		expectedPollen  int
+	}{
+		{
+			name:           "10:1 ratio with 100 pollen",
+			pollenCarried:  100,
+			conversionRate: 10,
+			expectedHoney:  10,
+			expectedPollen: 0,
+		},
+		{
+			name:           "8:1 ratio with 80 pollen",
+			pollenCarried:  80,
+			conversionRate: 8,
+			expectedHoney:  10,
+			expectedPollen: 0,
+		},
+		{
+			name:           "12:1 ratio with 120 pollen",
+			pollenCarried:  120,
+			conversionRate: 12,
+			expectedHoney:  10,
+			expectedPollen: 0,
+		},
+		{
+			name:           "5:1 ratio with 25 pollen",
+			pollenCarried:  25,
+			conversionRate: 5,
+			expectedHoney:  5,
+			expectedPollen: 0,
+		},
+		{
+			name:           "high rate loses precision (7 pollen ÷ 10 = 0 honey)",
+			pollenCarried:  7,
+			conversionRate: 10,
+			expectedHoney:  0,
+			expectedPollen: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := NewLoopBaseService()
+
+			hive := &HiveNode{
+				ID:             "hive:test",
+				X:              0.0,
+				Y:              0.0,
+				GroundY:        -0.5,
+				ZoneID:         "zone:test",
+				DepositRadius:  3.0,
+				ConversionRate: tt.conversionRate,
+			}
+
+			playerProgress := &PlayerProgress{
+				PlayerID:       "player:test:1",
+				PollenCarried:  tt.pollenCarried,
+				PollenCapacity: 200,
+				Honey:          0,
+			}
+
+			honeyGained, err := service.DepositPollenToHoney(playerProgress, hive)
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			if honeyGained != tt.expectedHoney {
+				t.Errorf("expected %d honey, got %d", tt.expectedHoney, honeyGained)
+			}
+
+			if playerProgress.Honey != tt.expectedHoney {
+				t.Errorf("expected player honey %d, got %d", tt.expectedHoney, playerProgress.Honey)
+			}
+
+			if playerProgress.PollenCarried != tt.expectedPollen {
+				t.Errorf("expected player pollen %d, got %d", tt.expectedPollen, playerProgress.PollenCarried)
+			}
+		})
+	}
+}
+
+// TestDepositPollenToHoneyZeroPollen validates that zero pollen deposit fails.
+func TestDepositPollenToHoneyZeroPollen(t *testing.T) {
+	service := NewLoopBaseService()
+	hives := service.GetHivesByZone("zone:start")
+
+	if len(hives) == 0 {
+		t.Fatal("expected at least one hive in zone:start")
+	}
+
+	hive := hives[0]
+	playerProgress := &PlayerProgress{
+		PlayerID:       "player:test:1",
+		PollenCarried:  0,
+		PollenCapacity: 100,
+		Honey:          0,
+	}
+
+	honeyGained, err := service.DepositPollenToHoney(playerProgress, hive)
+
+	if err == nil {
+		t.Error("expected error when depositing zero pollen")
+	}
+
+	if honeyGained != 0 {
+		t.Errorf("expected 0 honey gained, got %d", honeyGained)
+	}
+
+	if playerProgress.Honey != 0 {
+		t.Errorf("expected honey to remain 0, got %d", playerProgress.Honey)
+	}
+
+	if playerProgress.PollenCarried != 0 {
+		t.Errorf("expected pollen to remain 0, got %d", playerProgress.PollenCarried)
+	}
+}
+
+// TestDepositPollenToHoneyNilInputs validates error handling for nil inputs.
+func TestDepositPollenToHoneyNilInputs(t *testing.T) {
+	service := NewLoopBaseService()
+	hives := service.GetHivesByZone("zone:start")
+
+	if len(hives) == 0 {
+		t.Fatal("expected at least one hive in zone:start")
+	}
+
+	hive := hives[0]
+
+	tests := []struct {
+		name             string
+		playerProgress   *PlayerProgress
+		hive             *HiveNode
+		expectedErrorMsg string
+	}{
+		{
+			name:             "nil player progress",
+			playerProgress:   nil,
+			hive:             hive,
+			expectedErrorMsg: "player progress is nil",
+		},
+		{
+			name:             "nil hive",
+			playerProgress:   &PlayerProgress{PollenCarried: 50},
+			hive:             nil,
+			expectedErrorMsg: "hive is nil",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			honeyGained, err := service.DepositPollenToHoney(tt.playerProgress, tt.hive)
+
+			if err == nil {
+				t.Error("expected error for nil input")
+			}
+
+			if !containsString(err.Error(), tt.expectedErrorMsg) {
+				t.Errorf("expected error containing '%s', got: %v", tt.expectedErrorMsg, err)
+			}
+
+			if honeyGained != 0 {
+				t.Errorf("expected 0 honey from failed deposit, got %d", honeyGained)
+			}
+		})
+	}
+}
+
+// TestDepositPollenToHoneyTimestampUpdate validates that timestamps are properly updated.
+func TestDepositPollenToHoneyTimestampUpdate(t *testing.T) {
+	service := NewLoopBaseService()
+	hives := service.GetHivesByZone("zone:start")
+
+	if len(hives) == 0 {
+		t.Fatal("expected at least one hive in zone:start")
+	}
+
+	hive := hives[0]
+	oldHiveTime := hive.UpdatedAt
+
+	playerProgress := &PlayerProgress{
+		PlayerID:       "player:test:1",
+		PollenCarried:  50,
+		PollenCapacity: 100,
+		Honey:          0,
+		UpdatedAt:      time.Time{}, // Zero time
+	}
+
+	honeyGained, err := service.DepositPollenToHoney(playerProgress, hive)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if honeyGained == 0 {
+		t.Error("expected honey to be gained")
+	}
+
+	// Verify timestamps were updated
+	if playerProgress.UpdatedAt.IsZero() {
+		t.Error("expected player UpdatedAt to be set")
+	}
+
+	if hive.UpdatedAt.IsZero() {
+		t.Error("expected hive UpdatedAt to be set")
+	}
+
+	// Verify hive timestamp changed
+	if hive.UpdatedAt.Equal(oldHiveTime) && !oldHiveTime.IsZero() {
+		t.Error("expected hive UpdatedAt to be updated")
+	}
+}
+
+// TestDepositPollenToHoneyMultiplePlayers validates concurrent deposits by multiple players.
+func TestDepositPollenToHoneyMultiplePlayers(t *testing.T) {
+	service := NewLoopBaseService()
+	hives := service.GetHivesByZone("zone:start")
+
+	if len(hives) == 0 {
+		t.Fatal("expected at least one hive in zone:start")
+	}
+
+	hive := hives[0]
+
+	// Create multiple players with pollen
+	players := make([]*PlayerProgress, 5)
+	for i := 0; i < 5; i++ {
+		players[i] = &PlayerProgress{
+			PlayerID:       fmt.Sprintf("player:test:%d", i),
+			PollenCarried:  100,
+			PollenCapacity: 100,
+			Honey:          0,
+		}
+	}
+
+	// Simulate concurrent deposits
+	done := make(chan bool, 5)
+
+	for i := 0; i < 5; i++ {
+		go func(idx int) {
+			honeyGained, err := service.DepositPollenToHoney(players[idx], hive)
+			if err != nil {
+				t.Errorf("unexpected error for player %d: %v", idx, err)
+			}
+			// Note: We can't safely accumulate totalHoneyGained due to race condition
+			// Instead we verify each player individually
+			if honeyGained != 10 {
+				t.Errorf("player %d expected 10 honey, got %d", idx, honeyGained)
+			}
+			done <- true
+		}(i)
+	}
+
+	// Wait for all goroutines
+	for i := 0; i < 5; i++ {
+		<-done
+	}
+
+	// Verify each player has correct state
+	for i, player := range players {
+		if player.Honey != 10 {
+			t.Errorf("player %d expected honey 10, got %d", i, player.Honey)
+		}
+
+		if player.PollenCarried != 0 {
+			t.Errorf("player %d expected pollen 0, got %d", i, player.PollenCarried)
+		}
+	}
+
+	// Verify hive timestamp was updated
+	if hive.UpdatedAt.IsZero() {
+		t.Error("expected hive UpdatedAt to be set after deposits")
+	}
+}
+
+// TestDepositPreservesExistingHoney validates that existing honey is preserved during deposit.
+func TestDepositPreservesExistingHoney(t *testing.T) {
+	service := NewLoopBaseService()
+	hives := service.GetHivesByZone("zone:start")
+
+	if len(hives) == 0 {
+		t.Fatal("expected at least one hive in zone:start")
+	}
+
+	hive := hives[0]
+	playerProgress := &PlayerProgress{
+		PlayerID:       "player:test:1",
+		PollenCarried:  50,
+		PollenCapacity: 100,
+		Honey:          42, // Player already has honey
+	}
+
+	honeyGained, err := service.DepositPollenToHoney(playerProgress, hive)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// 50 pollen ÷ 10 rate = 5 honey gained
+	if honeyGained != 5 {
+		t.Errorf("expected 5 honey gained, got %d", honeyGained)
+	}
+
+	// 42 existing + 5 gained = 47 total
+	if playerProgress.Honey != 47 {
+		t.Errorf("expected 47 total honey (42 + 5), got %d", playerProgress.Honey)
+	}
+
+	if playerProgress.PollenCarried != 0 {
+		t.Errorf("expected pollen cleared to 0, got %d", playerProgress.PollenCarried)
+	}
+}
+
+// containsString is a helper function to check if a string contains a substring.
+func containsString(haystack, needle string) bool {
+	return len(haystack) > 0 && len(needle) > 0 && haystack == needle || (len(haystack) > 0 && len(needle) > 0 && contains(haystack, needle))
+}
+
+// Simple contains check
+func contains(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }

@@ -21,10 +21,10 @@ import {
 	toTerrainSurfaceY,
 } from "./worldSurface";
 import type { TapTargetingHandlers } from "./useTapTargeting";
+import { FlowerRenderer } from "./FlowerRenderer";
+import { HiveRenderer } from "./HiveRenderer";
 
 const TERRAIN_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/block-grass.glb";
-const FLOWERS_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/flowers.glb";
-const HIVE_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/barrel.glb";
 const TREE_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/tree-pine-small.glb";
 const WATER_LAYER_THICKNESS = TERRAIN_BLOCK_SCALE * 0.18;
 const FLOWER_DETAIL_DISTANCE = 16;
@@ -46,9 +46,7 @@ interface WorldFieldBuild {
 	grassTerrainInstances: InstanceConfig[];
 	stoneTerrainInstances: InstanceConfig[];
 	waterTerrainInstances: InstanceConfig[];
-	flowerModelInstances: InstanceConfig[];
 	treeModelInstances: InstanceConfig[];
-	hiveModelInstances: InstanceConfig[];
 }
 
 interface InstancedModelMeshSource {
@@ -73,9 +71,7 @@ function buildWorldField(chunks: WorldChunkState[], detailFocus?: DetailFocus): 
 	const grassTerrainInstances: InstanceConfig[] = [];
 	const stoneTerrainInstances: InstanceConfig[] = [];
 	const waterTerrainInstances: InstanceConfig[] = [];
-	const flowerModelInstances: InstanceConfig[] = [];
 	const treeModelInstances: InstanceConfig[] = [];
-	const hiveModelInstances: InstanceConfig[] = [];
 
 	for (const chunk of chunks) {
 		for (const tile of chunk.tiles) {
@@ -105,21 +101,6 @@ function buildWorldField(chunks: WorldChunkState[], detailFocus?: DetailFocus): 
 			});
 		}
 
-		for (const flower of chunk.flowers) {
-			if (!isWithinDetailRange(detailFocus, flower.x, flower.y, FLOWER_DETAIL_DISTANCE)) {
-				continue;
-			}
-
-			const baseX = toSceneAxis(flower.x);
-			const baseZ = toSceneAxis(flower.y);
-
-			flowerModelInstances.push({
-				position: [baseX, toTerrainSurfaceY(flower.groundY ?? 0) + 0.02, baseZ],
-				rotation: [0, (baseX + baseZ) * 0.05, 0],
-				scale: 0.36 * flower.scale,
-			});
-		}
-
 		for (const tree of chunk.trees) {
 			if (!isWithinDetailRange(detailFocus, tree.x, tree.y, TREE_DETAIL_DISTANCE)) {
 				continue;
@@ -134,30 +115,13 @@ function buildWorldField(chunks: WorldChunkState[], detailFocus?: DetailFocus): 
 				scale: 0.54 * tree.scale,
 			});
 		}
-
-		for (const hive of chunk.hives) {
-			if (!isWithinDetailRange(detailFocus, hive.x, hive.y, HIVE_DETAIL_DISTANCE)) {
-				continue;
-			}
-
-			const baseX = toSceneAxis(hive.x);
-			const baseZ = toSceneAxis(hive.y);
-
-			hiveModelInstances.push({
-				position: [baseX, toTerrainSurfaceY(hive.groundY ?? 0) + 0.04, baseZ],
-				rotation: [0, (baseX - baseZ) * 0.03, 0],
-				scale: 0.78 * hive.scale,
-			});
-		}
 	}
 
 	return {
 		grassTerrainInstances,
 		stoneTerrainInstances,
 		waterTerrainInstances,
-		flowerModelInstances,
 		treeModelInstances,
-		hiveModelInstances,
 	};
 }
 
@@ -263,19 +227,21 @@ export function InstancedWorldField({
 	chunkSize,
 	detailFocus,
 	terrainPointerHandlers,
+	onFlowerClick,
+	onHiveClick,
 }: {
 	chunks: WorldChunkState[];
 	chunkSize: number;
 	detailFocus?: DetailFocus;
 	terrainPointerHandlers?: TapTargetingHandlers;
+	onFlowerClick?: (flowerId: string) => void;
+	onHiveClick?: (hiveId: string) => void;
 }) {
 	const worldField = useMemo(
 		() => buildWorldField(chunks, detailFocus),
 		[chunks, detailFocus?.x, detailFocus?.y],
 	);
 	const terrainModel = useGLTF(TERRAIN_MODEL_PATH);
-	const flowersModel = useGLTF(FLOWERS_MODEL_PATH);
-	const hiveModel = useGLTF(HIVE_MODEL_PATH);
 	const treeModel = useGLTF(TREE_MODEL_PATH);
 	const terrainBoxGeometry = useMemo(() => new BoxGeometry(1, 1, 1), []);
 	const stoneMaterial = useMemo(
@@ -295,18 +261,35 @@ export function InstancedWorldField({
 		() => collectInstancedModelMeshes(terrainModel.scene),
 		[terrainModel.scene],
 	);
-	const flowerMeshSources = useMemo(
-		() => collectInstancedModelMeshes(flowersModel.scene),
-		[flowersModel.scene],
-	);
-	const hiveMeshSources = useMemo(
-		() => collectInstancedModelMeshes(hiveModel.scene),
-		[hiveModel.scene],
-	);
 	const treeMeshSources = useMemo(
 		() => collectInstancedModelMeshes(treeModel.scene),
 		[treeModel.scene],
 	);
+
+	// Extract flowers and hives from chunks, respecting detail focus
+	const visibleFlowers = useMemo(() => {
+		const flowers = [];
+		for (const chunk of chunks) {
+			for (const flower of chunk.flowers) {
+				if (isWithinDetailRange(detailFocus, flower.x, flower.y, FLOWER_DETAIL_DISTANCE)) {
+					flowers.push(flower);
+				}
+			}
+		}
+		return flowers;
+	}, [chunks, detailFocus?.x, detailFocus?.y]);
+
+	const visibleHives = useMemo(() => {
+		const hives = [];
+		for (const chunk of chunks) {
+			for (const hive of chunk.hives) {
+				if (isWithinDetailRange(detailFocus, hive.x, hive.y, HIVE_DETAIL_DISTANCE)) {
+					hives.push(hive);
+				}
+			}
+		}
+		return hives;
+	}, [chunks, detailFocus?.x, detailFocus?.y]);
 
 	useEffect(() => {
 		return () => {
@@ -322,6 +305,7 @@ export function InstancedWorldField({
 
 	return (
 		<group>
+			{/* Terrain layers: grass, stone, water */}
 			{terrainMeshSources.map((source, index) => (
 				<InstancedLayer
 					key={`terrain-model:${index}`}
@@ -360,16 +344,17 @@ export function InstancedWorldField({
 				onPointerUp={terrainPointerHandlers?.onPointerUp}
 			/>
 
-			{flowerMeshSources.map((source, index) => (
-				<InstancedLayer
-					key={`flower-model:${index}`}
-					castShadow
-					geometry={source.geometry}
-					instances={worldField.flowerModelInstances}
-					material={source.material}
-				/>
-			))}
+			{/* Entity renderers: flowers and hives */}
+			<FlowerRenderer
+				flowers={visibleFlowers}
+				onFlowerClick={
+					onFlowerClick
+						? (_event: ThreeEvent<PointerEvent>, flowerId: string, _index: number) => onFlowerClick(flowerId)
+						: undefined
+				}
+			/>
 
+			{/* Trees: decorative entities without interaction */}
 			{treeMeshSources.map((source, index) => (
 				<InstancedLayer
 					key={`tree-model:${index}`}
@@ -381,21 +366,18 @@ export function InstancedWorldField({
 				/>
 			))}
 
-			{hiveMeshSources.map((source, index) => (
-				<InstancedLayer
-					key={`hive-model:${index}`}
-					castShadow
-					receiveShadow
-					geometry={source.geometry}
-					instances={worldField.hiveModelInstances}
-					material={source.material}
-				/>
-			))}
+			{/* Hive renderer */}
+			<HiveRenderer
+				hives={visibleHives}
+				onHiveClick={
+					onHiveClick
+						? (_event: ThreeEvent<PointerEvent>, hiveId: string, _index: number) => onHiveClick(hiveId)
+						: undefined
+				}
+			/>
 		</group>
 	);
 }
 
 useGLTF.preload(TERRAIN_MODEL_PATH);
-useGLTF.preload(FLOWERS_MODEL_PATH);
-useGLTF.preload(HIVE_MODEL_PATH);
 useGLTF.preload(TREE_MODEL_PATH);

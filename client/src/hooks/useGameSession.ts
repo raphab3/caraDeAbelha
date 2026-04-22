@@ -5,7 +5,9 @@ import { WSClient } from "../game/WSClient";
 import type {
   GameSessionController,
   GameSessionState,
+  InteractionResult,
   MoveDirection,
+  PlayerStatusMessage,
   SessionMessage,
   WorldPlayerState,
   WorldStateMessage,
@@ -104,6 +106,22 @@ function isSessionMessage(message: unknown): message is SessionMessage {
   return "type" in message && message.type === "session";
 }
 
+function isPlayerStatusMessage(message: unknown): message is PlayerStatusMessage {
+  if (typeof message !== "object" || message === null) {
+    return false;
+  }
+
+  return "type" in message && message.type === "player_status";
+}
+
+function isInteractionResultMessage(message: unknown): message is InteractionResult {
+  if (typeof message !== "object" || message === null) {
+    return false;
+  }
+
+  return "type" in message && message.type === "interaction_result";
+}
+
 function resolveDisconnectError(reason?: string): string {
   const normalizedReason = reason?.trim();
   return normalizedReason ? normalizedReason : DEFAULT_DISCONNECT_ERROR;
@@ -199,6 +217,42 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
             localUsername: message.username,
           }));
           return;
+        }
+
+        if (isPlayerStatusMessage(message)) {
+          setGameSession((current) => ({
+            ...current,
+            playerProgress: {
+              pollenCarried: message.pollenCarried,
+              pollenCapacity: message.pollenCapacity,
+              honey: message.honey,
+              level: message.level,
+              xp: message.xp,
+              skillPoints: message.skillPoints,
+              currentZoneId: message.currentZoneId,
+              unlockedZoneIds: message.unlockedZoneIds,
+            },
+          }));
+          return;
+        }
+
+        if (isInteractionResultMessage(message)) {
+          setGameSession((current) => ({
+            ...current,
+            lastInteraction: message,
+          }));
+
+          // Clear interaction feedback after 3 seconds
+          const timeoutId = window.setTimeout(() => {
+            setGameSession((current) => ({
+              ...current,
+              lastInteraction: undefined,
+            }));
+          }, 3000);
+
+          return () => {
+            window.clearTimeout(timeoutId);
+          };
         }
 
         if (!isWorldStateMessage(message)) {

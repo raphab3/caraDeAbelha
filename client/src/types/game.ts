@@ -150,7 +150,44 @@ export interface RespawnAction {
 }
 
 export type ClientMessage = MoveAction | MoveToAction | RespawnAction;
-export type ServerMessage = SessionMessage | WorldStateMessage;
+
+// Player progression state: economy, levels, zones
+export interface PlayerProgressState {
+  pollenCarried: number;
+  pollenCapacity: number;
+  honey: number;
+  level: number;
+  xp: number;
+  skillPoints: number;
+  currentZoneId: string;
+  unlockedZoneIds: string[];
+}
+
+// Result of a player interaction (collect, deposit, etc.)
+export interface InteractionResult {
+  type: "interaction_result";
+  action: string; // "collect_flower", "deposit_pollen", etc.
+  success: boolean;
+  amount: number; // pollen/honey involved
+  reason: string; // error message or empty string
+  timestamp: number; // Unix milliseconds
+}
+
+// Player status update from server
+export interface PlayerStatusMessage {
+  type: "player_status";
+  playerId: string;
+  pollenCarried: number;
+  pollenCapacity: number;
+  honey: number;
+  level: number;
+  xp: number;
+  skillPoints: number;
+  currentZoneId: string;
+  unlockedZoneIds: string[];
+}
+
+export type ServerMessage = SessionMessage | WorldStateMessage | PlayerStatusMessage | InteractionResult;
 
 export interface GameSessionState {
   connectionState: "idle" | "connecting" | "connected" | "disconnected";
@@ -163,6 +200,8 @@ export interface GameSessionState {
   renderDistance: number;
   chunkSize: number;
   tick: number;
+  playerProgress?: PlayerProgressState;
+  lastInteraction?: InteractionResult;
   error?: string;
 }
 
