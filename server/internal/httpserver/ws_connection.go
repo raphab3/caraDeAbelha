@@ -9,6 +9,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/loopbase"
+	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/zones"
 )
 
 func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -230,11 +231,11 @@ func shouldSendInitialProgress(progress *loopbase.PlayerProgress) bool {
 		return true
 	}
 
-	if progress.PollenCapacity != 40 || progress.CurrentZoneID != "zone_0" {
+	if progress.PollenCapacity != 40 || progress.CurrentZoneID != zones.DefaultCurrentZoneID() {
 		return true
 	}
 
-	return len(progress.UnlockedZoneIDs) != 1 || progress.UnlockedZoneIDs[0] != "zone_0"
+	return len(progress.UnlockedZoneIDs) != 1 || progress.UnlockedZoneIDs[0] != zones.DefaultCurrentZoneID()
 }
 
 func (hub *gameHub) collectClientSnapshots() []clientSnapshot {

@@ -37,6 +37,7 @@ func (s *ZoneService) CanAccessZone(player *loopbase.PlayerProgress, zoneID stri
 		return false, "player_progress_nil"
 	}
 
+	zoneID = NormalizeZoneID(zoneID)
 	if zoneID == "" {
 		return false, "zone_id_empty"
 	}
@@ -50,14 +51,10 @@ func (s *ZoneService) CanAccessZone(player *loopbase.PlayerProgress, zoneID stri
 		return false, "zone_not_found"
 	}
 
-	// Check if player has unlocked this zone
-	for _, unlockedZoneID := range player.UnlockedZoneIDs {
-		if unlockedZoneID == zoneID {
-			return true, ""
-		}
+	if zone.IsUnlockedForPlayer(player.UnlockedZoneIDs) {
+		return true, ""
 	}
 
-	// Zone exists but is not unlocked
 	return false, "zone_locked"
 }
 
@@ -89,6 +86,7 @@ func (s *ZoneService) UnlockZone(player *loopbase.PlayerProgress, zoneID string,
 		return false, 0, "invalid_request"
 	}
 
+	zoneID = NormalizeZoneID(zoneID)
 	if zoneID == "" {
 		return false, 0, "zone_id_empty"
 	}
@@ -103,23 +101,24 @@ func (s *ZoneService) UnlockZone(player *loopbase.PlayerProgress, zoneID string,
 	}
 
 	// 2. Check if already unlocked
-	if zone.IsUnlocked(now) {
+	player.UnlockedZoneIDs = NormalizeZoneIDs(player.UnlockedZoneIDs)
+	if zone.IsUnlockedForPlayer(player.UnlockedZoneIDs) {
 		return false, 0, "zone_already_unlocked"
 	}
 
 	// 3. Check honey available
-	if player.Honey < zone.CostHoney {
+	if player.Honey < zone.UnlockHoneyCost {
 		return false, 0, "insufficient_honey"
 	}
 
 	// 4. Check prerequisites
-	if len(zone.Prerequisites) > 0 {
+	if len(zone.RequiredZoneIDs) > 0 {
 		unlockedMap := make(map[string]bool)
 		for _, id := range player.UnlockedZoneIDs {
-			unlockedMap[id] = true
+			unlockedMap[NormalizeZoneID(id)] = true
 		}
 
-		for _, prereq := range zone.Prerequisites {
+		for _, prereq := range zone.RequiredZoneIDs {
 			if !unlockedMap[prereq] {
 				return false, 0, "prerequisites_not_met"
 			}
@@ -128,16 +127,13 @@ func (s *ZoneService) UnlockZone(player *loopbase.PlayerProgress, zoneID string,
 
 	// All validations passed, apply changes
 	// 5. Deduct honey
-	player.Honey -= zone.CostHoney
+	player.Honey -= zone.UnlockHoneyCost
 
-	// 6. Mark zone as unlocked
-	zone.UnlockedAt = &now
-
-	// 7. Add to player's unlocked zones
+	// 6. Add to player's unlocked zones
 	// Check if already in slice (defensive programming)
 	isAlreadyInList := false
 	for _, id := range player.UnlockedZoneIDs {
-		if id == zoneID {
+		if NormalizeZoneID(id) == zoneID {
 			isAlreadyInList = true
 			break
 		}
@@ -145,10 +141,11 @@ func (s *ZoneService) UnlockZone(player *loopbase.PlayerProgress, zoneID string,
 	if !isAlreadyInList {
 		player.UnlockedZoneIDs = append(player.UnlockedZoneIDs, zoneID)
 	}
+	player.UnlockedZoneIDs = NormalizeZoneIDs(player.UnlockedZoneIDs)
 
 	player.UpdatedAt = now
 
-	return true, zone.CostHoney, ""
+	return true, zone.UnlockHoneyCost, ""
 }
 
 // GetZoneState returns all zones from the registry as a slice.

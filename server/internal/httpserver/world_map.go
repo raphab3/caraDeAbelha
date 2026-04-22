@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/zones"
 )
 
 const worldMapEnvVar = "CARA_DE_ABELHA_MAP_PATH"
@@ -626,12 +628,12 @@ func (layout worldLayout) zoneIDAt(x float64, y float64) string {
 	for _, zone := range layout.zones {
 		if x >= zone.X1 && x <= zone.X2 && y >= zone.Z1 && y <= zone.Z2 {
 			if strings.TrimSpace(zone.ID) != "" {
-				return zone.ID
+				return zones.NormalizeZoneID(zone.ID)
 			}
 		}
 	}
 
-	return "zone_0"
+	return zones.DefaultCurrentZoneID()
 }
 
 func quantizeMapCoord(value float64) int {

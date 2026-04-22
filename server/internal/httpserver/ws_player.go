@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/loopbase"
+	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/zones"
 )
 
 func (hub *gameHub) ensurePlayerProgressLocked(playerID string) *loopbase.PlayerProgress {
@@ -19,8 +20,8 @@ func (hub *gameHub) ensurePlayerProgressLocked(playerID string) *loopbase.Player
 		PollenCapacity:  40,
 		Level:           1,
 		SkillPoints:     1,
-		CurrentZoneID:   "zone_0",
-		UnlockedZoneIDs: []string{"zone_0"},
+		CurrentZoneID:   zones.DefaultCurrentZoneID(),
+		UnlockedZoneIDs: zones.DefaultUnlockedZoneIDs(),
 	}
 
 	hub.playerProgress[playerID] = progress
@@ -60,6 +61,8 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 
 	if persisted != nil && persisted.Progress != nil {
 		persisted.Progress.PlayerID = profile.ID
+		persisted.Progress.CurrentZoneID = zones.NormalizeZoneID(persisted.Progress.CurrentZoneID)
+		persisted.Progress.UnlockedZoneIDs = zones.NormalizeZoneIDs(persisted.Progress.UnlockedZoneIDs)
 		persisted.Progress.UpdatedAt = now
 		hub.playerProgress[profile.ID] = persisted.Progress
 	}

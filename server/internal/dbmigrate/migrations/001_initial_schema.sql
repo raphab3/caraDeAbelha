@@ -38,8 +38,8 @@ CREATE TABLE IF NOT EXISTS game_player_profiles (
     level INT NOT NULL DEFAULT 1,
     xp INT NOT NULL DEFAULT 0,
     skill_points INT NOT NULL DEFAULT 1,
-    current_zone_id TEXT NOT NULL DEFAULT 'zone_0',
-    unlocked_zone_ids TEXT[] NOT NULL DEFAULT ARRAY['zone_0'],
+    current_zone_id TEXT NOT NULL DEFAULT 'zone:starter_meadow',
+    unlocked_zone_ids TEXT[] NOT NULL DEFAULT ARRAY['zone:starter_meadow'],
     last_seen_at TIMESTAMP NOT NULL DEFAULT NOW(),
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()

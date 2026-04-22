@@ -48,19 +48,19 @@ type sessionMessage struct {
 }
 
 type worldStateMessage struct {
-	Type           string            `json:"type"`
-	Tick           uint64            `json:"tick"`
-	StageID        string            `json:"stageId,omitempty"`
-	StageName      string            `json:"stageName,omitempty"`
-	AudioBGM       string            `json:"audioBgm,omitempty"`
-	Players        []playerState     `json:"players"`
-	Chunks         []worldChunkState `json:"chunks"`
-	Props          []worldPropState  `json:"props,omitempty"`
+	Type           string               `json:"type"`
+	Tick           uint64               `json:"tick"`
+	StageID        string               `json:"stageId,omitempty"`
+	StageName      string               `json:"stageName,omitempty"`
+	AudioBGM       string               `json:"audioBgm,omitempty"`
+	Players        []playerState        `json:"players"`
+	Chunks         []worldChunkState    `json:"chunks"`
+	Props          []worldPropState     `json:"props,omitempty"`
 	Landmarks      []worldLandmarkState `json:"landmarks,omitempty"`
-	CenterChunkX   int               `json:"centerChunkX"`
-	CenterChunkY   int               `json:"centerChunkY"`
-	RenderDistance int               `json:"renderDistance"`
-	ChunkSize      float64           `json:"chunkSize"`
+	CenterChunkX   int                  `json:"centerChunkX"`
+	CenterChunkY   int                  `json:"centerChunkY"`
+	RenderDistance int                  `json:"renderDistance"`
+	ChunkSize      float64              `json:"chunkSize"`
 }
 
 type worldPropState struct {
@@ -164,24 +164,24 @@ type interactionResultMessage struct {
 // zoneInfoMessage represents metadata and unlock status for a single zone.
 // Included in zoneStateMessage to provide zone details to the client.
 type zoneInfoMessage struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	CostHoney      int    `json:"costHoney"`
-	IsUnlocked     bool   `json:"isUnlocked"`
-	Prerequisites  []string `json:"prerequisites"`
-	BoundaryX1     float32 `json:"boundaryX1"`
-	BoundaryX2     float32 `json:"boundaryX2"`
-	BoundaryY1     float32 `json:"boundaryY1"`
-	BoundaryY2     float32 `json:"boundaryY2"`
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	CostHoney     int      `json:"costHoney"`
+	IsUnlocked    bool     `json:"isUnlocked"`
+	Prerequisites []string `json:"prerequisites"`
+	BoundaryX1    float32  `json:"boundaryX1"`
+	BoundaryX2    float32  `json:"boundaryX2"`
+	BoundaryY1    float32  `json:"boundaryY1"`
+	BoundaryY2    float32  `json:"boundaryY2"`
 }
 
 // zoneStateMessage exposes the minimal zone state to clients.
 // Contains metadata and unlock status for all zones and the player's unlocked zones.
 // Sent on login (after sessionMessage) and when a zone is unlocked.
 type zoneStateMessage struct {
-	Type           string              `json:"type"`
-	Zones          []zoneInfoMessage   `json:"zones"`
-	UnlockedZoneIDs []string           `json:"unlockedZoneIds"`
+	Type            string            `json:"type"`
+	Zones           []zoneInfoMessage `json:"zones"`
+	UnlockedZoneIDs []string          `json:"unlockedZoneIds"`
 }
 
 type clientSnapshot struct {
@@ -237,44 +237,39 @@ func newInteractionResultMessage(action string, success bool, amount int, reason
 // now: current time for checking zone unlock status
 func newZoneStateMessage(zoneList []*zones.ZoneState, unlockedZoneIDs []string, now time.Time) zoneStateMessage {
 	zoneInfos := make([]zoneInfoMessage, 0, len(zoneList))
+	normalizedUnlockedZoneIDs := zones.NormalizeZoneIDs(unlockedZoneIDs)
 
 	for _, zone := range zoneList {
 		if zone == nil {
 			continue
 		}
 
-		// Check if this zone is unlocked for the player
-		isUnlocked := zone.IsUnlocked(now)
+		isUnlocked := zone.IsUnlockedForPlayer(normalizedUnlockedZoneIDs)
 
 		// Ensure prerequisites is not nil (use empty slice instead)
-		prerequisites := zone.Prerequisites
+		prerequisites := zone.RequiredZoneIDs
 		if prerequisites == nil {
 			prerequisites = []string{}
 		}
 
 		zoneInfo := zoneInfoMessage{
-			ID:            zone.ID,
-			Name:          zone.Name,
-			CostHoney:     zone.CostHoney,
+			ID:            zone.ZoneID,
+			Name:          zone.DisplayName,
+			CostHoney:     zone.UnlockHoneyCost,
 			IsUnlocked:    isUnlocked,
 			Prerequisites: prerequisites,
-			BoundaryX1:    zone.BoundaryX1,
-			BoundaryX2:    zone.BoundaryX2,
-			BoundaryY1:    zone.BoundaryY1,
-			BoundaryY2:    zone.BoundaryY2,
+			BoundaryX1:    zone.Bounds.MinX,
+			BoundaryX2:    zone.Bounds.MaxX,
+			BoundaryY1:    zone.Bounds.MinY,
+			BoundaryY2:    zone.Bounds.MaxY,
 		}
 
 		zoneInfos = append(zoneInfos, zoneInfo)
 	}
 
-	// Ensure unlockedZoneIDs is not nil
-	if unlockedZoneIDs == nil {
-		unlockedZoneIDs = []string{}
-	}
-
 	return zoneStateMessage{
 		Type:            "zone_state",
 		Zones:           zoneInfos,
-		UnlockedZoneIDs: unlockedZoneIDs,
+		UnlockedZoneIDs: normalizedUnlockedZoneIDs,
 	}
 }

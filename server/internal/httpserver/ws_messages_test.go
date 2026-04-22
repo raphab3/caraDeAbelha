@@ -368,7 +368,7 @@ func TestPlayerStatusMessageEmptyUnlockedZones(t *testing.T) {
 func TestZoneStateMessageStructure(t *testing.T) {
 	zoneRegistry := zones.NewZoneRegistry()
 	zoneList := zoneRegistry.GetAllZones()
-	unlockedZoneIDs := []string{"zone_0"}
+	unlockedZoneIDs := []string{zones.StarterMeadowZoneID}
 	now := time.Now()
 
 	msg := newZoneStateMessage(zoneList, unlockedZoneIDs, now)
@@ -384,7 +384,7 @@ func TestZoneStateMessageStructure(t *testing.T) {
 	}
 
 	// Verify unlocked zones are copied
-	if len(msg.UnlockedZoneIDs) != 1 || msg.UnlockedZoneIDs[0] != "zone_0" {
+	if len(msg.UnlockedZoneIDs) != 1 || msg.UnlockedZoneIDs[0] != zones.StarterMeadowZoneID {
 		t.Errorf("expected unlocked zones %v, got %v", unlockedZoneIDs, msg.UnlockedZoneIDs)
 	}
 }
@@ -392,12 +392,12 @@ func TestZoneStateMessageStructure(t *testing.T) {
 // TestZoneStateMessageJSON verifies JSON marshaling with camelCase fields.
 func TestZoneStateMessageJSON(t *testing.T) {
 	zoneRegistry := zones.NewZoneRegistry()
-	zone0 := zoneRegistry.GetZone("zone_0")
+	zone0 := zoneRegistry.GetZone(zones.StarterMeadowZoneID)
 	if zone0 == nil {
-		t.Fatalf("zone_0 not found in registry")
+		t.Fatalf("starter meadow not found in registry")
 	}
 
-	msg := newZoneStateMessage([]*zones.ZoneState{zone0}, []string{"zone_0"}, time.Now())
+	msg := newZoneStateMessage([]*zones.ZoneState{zone0}, []string{zones.StarterMeadowZoneID}, time.Now())
 	jsonData, err := json.Marshal(msg)
 	if err != nil {
 		t.Fatalf("marshal to JSON: %v", err)
@@ -431,13 +431,13 @@ func TestZoneStateMessageJSON(t *testing.T) {
 // TestZoneStateMessageZoneInfo verifies zone info structures within the message.
 func TestZoneStateMessageZoneInfo(t *testing.T) {
 	zoneRegistry := zones.NewZoneRegistry()
-	zone0 := zoneRegistry.GetZone("zone_0")
+	zone0 := zoneRegistry.GetZone(zones.StarterMeadowZoneID)
 	if zone0 == nil {
-		t.Fatalf("zone_0 not found in registry")
+		t.Fatalf("starter meadow not found in registry")
 	}
 
 	now := time.Now()
-	msg := newZoneStateMessage([]*zones.ZoneState{zone0}, []string{"zone_0"}, now)
+	msg := newZoneStateMessage([]*zones.ZoneState{zone0}, []string{zones.StarterMeadowZoneID}, now)
 
 	if len(msg.Zones) == 0 {
 		t.Fatalf("expected at least one zone")
@@ -446,8 +446,8 @@ func TestZoneStateMessageZoneInfo(t *testing.T) {
 	zoneInfo := msg.Zones[0]
 
 	// Verify zone info fields
-	if zoneInfo.ID != "zone_0" {
-		t.Errorf("expected zone ID 'zone_0', got %q", zoneInfo.ID)
+	if zoneInfo.ID != zones.StarterMeadowZoneID {
+		t.Errorf("expected zone ID %q, got %q", zones.StarterMeadowZoneID, zoneInfo.ID)
 	}
 	if zoneInfo.Name == "" {
 		t.Errorf("expected non-empty zone name")
@@ -456,10 +456,10 @@ func TestZoneStateMessageZoneInfo(t *testing.T) {
 		t.Errorf("expected cost 0 for starting zone, got %d", zoneInfo.CostHoney)
 	}
 	if !zoneInfo.IsUnlocked {
-		t.Errorf("expected zone_0 to be unlocked (starting zone)")
+		t.Errorf("expected starter meadow to be unlocked (starting zone)")
 	}
-	if zoneInfo.BoundaryX1 != 0 || zoneInfo.BoundaryX2 != 50 {
-		t.Errorf("expected X boundaries [0, 50], got [%v, %v]", zoneInfo.BoundaryX1, zoneInfo.BoundaryX2)
+	if zoneInfo.BoundaryX1 != -50 || zoneInfo.BoundaryX2 != 20 {
+		t.Errorf("expected X boundaries [-50, 20], got [%v, %v]", zoneInfo.BoundaryX1, zoneInfo.BoundaryX2)
 	}
 }
 
@@ -467,7 +467,7 @@ func TestZoneStateMessageZoneInfo(t *testing.T) {
 func TestZoneStateMessageRoundTrip(t *testing.T) {
 	zoneRegistry := zones.NewZoneRegistry()
 	zoneList := zoneRegistry.GetAllZones()
-	unlockedZoneIDs := []string{"zone_0", "zone_1"}
+	unlockedZoneIDs := []string{zones.StarterMeadowZoneID, zones.SunflowerRidgeZoneID}
 	now := time.Now()
 
 	original := newZoneStateMessage(zoneList, unlockedZoneIDs, now)
@@ -512,9 +512,9 @@ func TestZoneStateMessageWithNilZones(t *testing.T) {
 // TestZoneStateMessagePrerequisites verifies prerequisites are correctly included.
 func TestZoneStateMessagePrerequisites(t *testing.T) {
 	zoneRegistry := zones.NewZoneRegistry()
-	zone1 := zoneRegistry.GetZone("zone_1")
+	zone1 := zoneRegistry.GetZone(zones.SunflowerRidgeZoneID)
 	if zone1 == nil {
-		t.Fatalf("zone_1 not found in registry")
+		t.Fatalf("sunflower ridge not found in registry")
 	}
 
 	msg := newZoneStateMessage([]*zones.ZoneState{zone1}, []string{}, time.Now())
@@ -525,12 +525,12 @@ func TestZoneStateMessagePrerequisites(t *testing.T) {
 
 	zoneInfo := msg.Zones[0]
 
-	// zone_1 should have zone_0 as a prerequisite
+	// Sunflower ridge should depend on starter meadow.
 	if len(zoneInfo.Prerequisites) == 0 {
-		t.Errorf("expected prerequisites for zone_1")
+		t.Errorf("expected prerequisites for sunflower ridge")
 	}
 
-	if len(zoneInfo.Prerequisites) > 0 && zoneInfo.Prerequisites[0] != "zone_0" {
-		t.Errorf("expected prerequisite zone_0, got %q", zoneInfo.Prerequisites[0])
+	if len(zoneInfo.Prerequisites) > 0 && zoneInfo.Prerequisites[0] != zones.StarterMeadowZoneID {
+		t.Errorf("expected prerequisite %q, got %q", zones.StarterMeadowZoneID, zoneInfo.Prerequisites[0])
 	}
 }

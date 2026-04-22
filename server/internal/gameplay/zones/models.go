@@ -2,12 +2,86 @@ package zones
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 )
+
+const (
+	StarterMeadowZoneID  = "zone:starter_meadow"
+	SunflowerRidgeZoneID = "zone:sunflower_ridge"
+)
+
+var legacyZoneIDs = map[string]string{
+	"zone_0": StarterMeadowZoneID,
+	"zone_1": SunflowerRidgeZoneID,
+}
+
+type ZoneBounds struct {
+	MinX float32 `json:"minX"`
+	MaxX float32 `json:"maxX"`
+	MinY float32 `json:"minY"`
+	MaxY float32 `json:"maxY"`
+}
+
+func NormalizeZoneID(zoneID string) string {
+	trimmed := strings.TrimSpace(zoneID)
+	if mapped, ok := legacyZoneIDs[trimmed]; ok {
+		return mapped
+	}
+
+	return trimmed
+}
+
+func NormalizeZoneIDs(zoneIDs []string) []string {
+	if len(zoneIDs) == 0 {
+		return []string{}
+	}
+
+	normalized := make([]string, 0, len(zoneIDs))
+	seen := make(map[string]struct{}, len(zoneIDs))
+	for _, zoneID := range zoneIDs {
+		normalizedID := NormalizeZoneID(zoneID)
+		if normalizedID == "" {
+			continue
+		}
+		if _, ok := seen[normalizedID]; ok {
+			continue
+		}
+		seen[normalizedID] = struct{}{}
+		normalized = append(normalized, normalizedID)
+	}
+
+	if len(normalized) == 0 {
+		return []string{}
+	}
+
+	return normalized
+}
+
+func DefaultCurrentZoneID() string {
+	return StarterMeadowZoneID
+}
+
+func DefaultUnlockedZoneIDs() []string {
+	return []string{StarterMeadowZoneID}
+}
 
 // ZoneState represents a game zone with unlock costs, prerequisites, spatial bounds, and per-player unlock status.
 // ZoneState is authoritative on the server: unlock validation, cost checking, and spatial boundaries are enforced here.
 type ZoneState struct {
+	ZoneID string `json:"zoneId"`
+
+	DisplayName string `json:"displayName"`
+
+	UnlockHoneyCost int `json:"unlockHoneyCost"`
+
+	RequiredZoneIDs []string `json:"requiredZoneIds"`
+
+	Bounds ZoneBounds `json:"bounds"`
+
+	IsStarter bool `json:"isStarter"`
+
 	// ID is a unique identifier for the zone (e.g., "zone_0", "zone_1").
 	ID string
 
@@ -36,7 +110,25 @@ type ZoneState struct {
 
 // IsUnlocked checks if the zone is currently unlocked (UnlockedAt is not nil).
 func (z *ZoneState) IsUnlocked(now time.Time) bool {
-	return z.UnlockedAt != nil
+	return z.IsStarter || z.UnlockedAt != nil
+}
+
+func (z *ZoneState) IsUnlockedForPlayer(unlockedZoneIDs []string) bool {
+	if z == nil {
+		return false
+	}
+
+	if z.IsStarter {
+		return true
+	}
+
+	for _, unlockedZoneID := range NormalizeZoneIDs(unlockedZoneIDs) {
+		if unlockedZoneID == z.ZoneID {
+			return true
+		}
+	}
+
+	return false
 }
 
 // CanUnlock validates whether a zone can be unlocked given the player's honey and list of already-unlocked zone IDs.
@@ -48,8 +140,12 @@ func (z *ZoneState) IsUnlocked(now time.Time) bool {
 //
 // Returns (true, "") if all conditions are met.
 func (z *ZoneState) CanUnlock(playerHoney int, unlockedZones []string) (bool, string) {
+	if z == nil {
+		return false, "zone_not_found"
+	}
+
 	// Check if already unlocked
-	if z.UnlockedAt != nil {
+	if z.IsUnlockedForPlayer(unlockedZones) {
 		return false, "already_unlocked"
 	}
 
@@ -65,7 +161,7 @@ func (z *ZoneState) CanUnlock(playerHoney int, unlockedZones []string) (bool, st
 			unlockedMap[id] = true
 		}
 
-		for _, prereq := range z.Prerequisites {
+		for _, prereq := range z.RequiredZoneIDs {
 			if !unlockedMap[prereq] {
 				return false, "unmet_prerequisites"
 			}
@@ -77,8 +173,8 @@ func (z *ZoneState) CanUnlock(playerHoney int, unlockedZones []string) (bool, st
 
 // IsWithinBounds checks if a position (x, y) is within the zone's spatial boundaries.
 func (z *ZoneState) IsWithinBounds(x, y float32) bool {
-	return x >= z.BoundaryX1 && x <= z.BoundaryX2 &&
-		y >= z.BoundaryY1 && y <= z.BoundaryY2
+	return x >= z.Bounds.MinX && x <= z.Bounds.MaxX &&
+		y >= z.Bounds.MinY && y <= z.Bounds.MaxY
 }
 
 // NewZoneState is a factory function that creates a new ZoneState with the given parameters.
@@ -89,16 +185,27 @@ func NewZoneState(id, name string, costHoney int, prerequisites []string, x1, x2
 		prerequisites = []string{}
 	}
 
+	normalizedID := NormalizeZoneID(id)
+	normalizedPrerequisites := NormalizeZoneIDs(prerequisites)
+	bounds := ZoneBounds{MinX: x1, MaxX: x2, MinY: y1, MaxY: y2}
+	isStarter := normalizedID == StarterMeadowZoneID
+
 	return &ZoneState{
-		ID:            id,
-		Name:          name,
-		CostHoney:     costHoney,
-		Prerequisites: prerequisites,
-		BoundaryX1:    x1,
-		BoundaryX2:    x2,
-		BoundaryY1:    y1,
-		BoundaryY2:    y2,
-		UnlockedAt:    nil,
+		ZoneID:          normalizedID,
+		DisplayName:     name,
+		UnlockHoneyCost: costHoney,
+		RequiredZoneIDs: normalizedPrerequisites,
+		Bounds:          bounds,
+		IsStarter:       isStarter,
+		ID:              normalizedID,
+		Name:            name,
+		CostHoney:       costHoney,
+		Prerequisites:   normalizedPrerequisites,
+		BoundaryX1:      x1,
+		BoundaryX2:      x2,
+		BoundaryY1:      y1,
+		BoundaryY2:      y2,
+		UnlockedAt:      nil,
 	}
 }
 
@@ -108,46 +215,24 @@ type ZoneRegistry struct {
 	Zones map[string]*ZoneState
 }
 
-// NewZoneRegistry creates and returns a new ZoneRegistry with all 5 default zones.
-// Zone definitions:
-//
-//   - Zone 0 "Prado de Flores": cost 0 (starting zone, always available), no prerequisites, bounds [0, 50, 0, 50]
-//   - Zone 1 "Bosque Central": cost 50 honey, prerequisite zone_0, bounds [50, 100, 0, 50]
-//   - Zone 2 "Colmeia Rainha": cost 150 honey, prerequisite zone_1, bounds [0, 50, 50, 100]
-//   - Zone 3 "Campos Selvagens": cost 300 honey, prerequisite zone_2, bounds [50, 100, 50, 100]
-//   - Zone 4 "Caverna Profunda": cost 500 honey, prerequisite zone_3, bounds [25, 75, 100, 150]
+// NewZoneRegistry creates and returns the Epic 02 starter zone catalog.
 func NewZoneRegistry() *ZoneRegistry {
 	registry := &ZoneRegistry{
 		Zones: make(map[string]*ZoneState),
 	}
 
-	// Zone 0: Prado de Flores (starting zone)
-	zone0 := NewZoneState("zone_0", "Prado de Flores", 0, []string{}, 0, 50, 0, 50)
-	zone0.UnlockedAt = &time.Time{} // Start unlocked (set to zero time; caller can use a real timestamp if needed)
-	registry.Zones["zone_0"] = zone0
+	starter := NewZoneState(StarterMeadowZoneID, "Starter Meadow", 0, []string{}, -50, 20, -50, 50)
+	registry.Zones[starter.ZoneID] = starter
 
-	// Zone 1: Bosque Central
-	zone1 := NewZoneState("zone_1", "Bosque Central", 50, []string{"zone_0"}, 50, 100, 0, 50)
-	registry.Zones["zone_1"] = zone1
-
-	// Zone 2: Colmeia Rainha
-	zone2 := NewZoneState("zone_2", "Colmeia Rainha", 150, []string{"zone_1"}, 0, 50, 50, 100)
-	registry.Zones["zone_2"] = zone2
-
-	// Zone 3: Campos Selvagens
-	zone3 := NewZoneState("zone_3", "Campos Selvagens", 300, []string{"zone_2"}, 50, 100, 50, 100)
-	registry.Zones["zone_3"] = zone3
-
-	// Zone 4: Caverna Profunda
-	zone4 := NewZoneState("zone_4", "Caverna Profunda", 500, []string{"zone_3"}, 25, 75, 100, 150)
-	registry.Zones["zone_4"] = zone4
+	ridge := NewZoneState(SunflowerRidgeZoneID, "Sunflower Ridge", 25, []string{StarterMeadowZoneID}, 20, 50, -50, 50)
+	registry.Zones[ridge.ZoneID] = ridge
 
 	return registry
 }
 
 // GetZone returns the zone with the given ID, or nil if not found.
 func (r *ZoneRegistry) GetZone(id string) *ZoneState {
-	return r.Zones[id]
+	return r.Zones[NormalizeZoneID(id)]
 }
 
 // GetAllZones returns a slice of all zones in the registry.
@@ -156,6 +241,9 @@ func (r *ZoneRegistry) GetAllZones() []*ZoneState {
 	for _, zone := range r.Zones {
 		zones = append(zones, zone)
 	}
+	sort.Slice(zones, func(left int, right int) bool {
+		return zones[left].ZoneID < zones[right].ZoneID
+	})
 	return zones
 }
 
@@ -164,11 +252,10 @@ func (r *ZoneRegistry) GetAllZones() []*ZoneState {
 func (r *ZoneRegistry) ValidateZoneTransition(targetZoneID string, unlockedZones []string) (bool, string) {
 	zone := r.GetZone(targetZoneID)
 	if zone == nil {
-		return false, fmt.Sprintf("zone_not_found: %s", targetZoneID)
+		return false, fmt.Sprintf("zone_not_found: %s", NormalizeZoneID(targetZoneID))
 	}
 
-	// Check if the zone is unlocked
-	if !zone.IsUnlocked(time.Now()) {
+	if !zone.IsUnlockedForPlayer(unlockedZones) {
 		return false, "zone_locked"
 	}
 

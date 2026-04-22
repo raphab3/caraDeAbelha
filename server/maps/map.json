@@ -70140,15 +70140,23 @@
       "z": 0,
       "scale": 1.6,
       "yaw": -90,
-      "zoneId": "zone_0",
+      "zoneId": "zone:starter_meadow",
       "tag": "border"
     }
   ],
   "zones": [
     {
-      "id": "zone_0",
-      "name": "Bacia do Primeiro Voo",
+      "id": "zone:starter_meadow",
+      "name": "Starter Meadow",
       "x1": -50,
+      "x2": 20,
+      "z1": -50,
+      "z2": 50
+    },
+    {
+      "id": "zone:sunflower_ridge",
+      "name": "Sunflower Ridge",
+      "x1": 20,
       "x2": 50,
       "z1": -50,
       "z2": 50
@@ -70156,7 +70164,14 @@
   ],
   "transitions": [
     {
-      "fromZone": "zone_0",
+      "fromZone": "zone:starter_meadow",
+      "toZone": "zone:sunflower_ridge",
+      "x": 20,
+      "z": 0,
+      "type": "gate"
+    },
+    {
+      "fromZone": "zone:sunflower_ridge",
       "toZone": "outlands:east-wind-lane",
       "x": 44,
       "z": 0,
@@ -70170,7 +70185,7 @@
       "x": 0,
       "y": 0,
       "z": 0,
-      "zoneId": "zone_0",
+      "zoneId": "zone:starter_meadow",
       "tag": "navigation"
     },
     {
@@ -70179,7 +70194,7 @@
       "x": -34,
       "y": 3,
       "z": -18,
-      "zoneId": "zone_0",
+      "zoneId": "zone:starter_meadow",
       "tag": "terrain"
     },
     {
@@ -70188,7 +70203,7 @@
       "x": 44,
       "y": 0,
       "z": 0,
-      "zoneId": "zone_0",
+      "zoneId": "zone:sunflower_ridge",
       "tag": "border"
     }
   ]

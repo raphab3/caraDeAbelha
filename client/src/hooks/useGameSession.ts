@@ -36,8 +36,8 @@ function createDefaultPlayerProgress() {
     level: 1,
     xp: 0,
     skillPoints: 0,
-    currentZoneId: "zone_0",
-    unlockedZoneIds: ["zone_0"],
+    currentZoneId: "zone:starter_meadow",
+    unlockedZoneIds: ["zone:starter_meadow"],
   };
 }
 

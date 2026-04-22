@@ -14,11 +14,8 @@ export interface ZoneUnlockPanelProps {
  * Auto-hides when zone is successfully unlocked or no zone is targeted.
  *
  * Zone Definitions (from server registry):
- * - zone_0: Prado de Flores (cost: 0, starting zone)
- * - zone_1: Bosque Central (cost: 50)
- * - zone_2: Colmeia Rainha (cost: 150)
- * - zone_3: Campos Selvagens (cost: 300)
- * - zone_4: Caverna Profunda (cost: 500)
+ * - zone:starter_meadow: Starter Meadow (cost: 0, starting zone)
+ * - zone:sunflower_ridge: Sunflower Ridge (cost: 25)
  */
 export const ZoneUnlockPanel = ({
   playerProgress,
@@ -33,11 +30,12 @@ export const ZoneUnlockPanel = ({
     string,
     { name: string; cost: number; prerequisites: string[] }
   > = {
-    zone_0: { name: "Prado de Flores", cost: 0, prerequisites: [] },
-    zone_1: { name: "Bosque Central", cost: 50, prerequisites: ["zone_0"] },
-    zone_2: { name: "Colmeia Rainha", cost: 150, prerequisites: ["zone_1"] },
-    zone_3: { name: "Campos Selvagens", cost: 300, prerequisites: ["zone_2"] },
-    zone_4: { name: "Caverna Profunda", cost: 500, prerequisites: ["zone_3"] },
+    "zone:starter_meadow": { name: "Starter Meadow", cost: 0, prerequisites: [] },
+    "zone:sunflower_ridge": {
+      name: "Sunflower Ridge",
+      cost: 25,
+      prerequisites: ["zone:starter_meadow"],
+    },
   };
 
   // Hide panel if zone is now unlocked

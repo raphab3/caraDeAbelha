@@ -18,11 +18,8 @@ export const ObjectivePanel = ({ playerProgress }: ObjectivePanelProps) => {
 
   // Zone name mapping (placeholder - would come from server in production)
   const zoneNames: Record<string, string> = {
-    zone_0: "Prado de Flores",
-    zone_1: "Bosque Central",
-    zone_2: "Colmeia Rainha",
-    zone_3: "Campos Selvagens",
-    zone_4: "Caverna Profunda",
+    "zone:starter_meadow": "Starter Meadow",
+    "zone:sunflower_ridge": "Sunflower Ridge",
   };
 
   const getZoneName = (zoneId: string): string => {

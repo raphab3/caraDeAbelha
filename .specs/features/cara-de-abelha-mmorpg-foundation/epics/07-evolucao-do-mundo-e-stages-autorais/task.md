@@ -28,6 +28,7 @@ Epic ID: EPIC-CDAM-07
 - testes focados do servidor para parser de mapa, retorno comprimido e snapshot autoritativo do stage passaram
 - testes focados do servidor para coleta, deposito, `move_to` via websocket e reconexao por username tambem passaram sobre o stage atual
 - `pnpm build` do client passou apos a integracao de props, landmarks, audio por stage e dock de configuracoes
+- validacao runtime com dois clientes WebSocket reais no ambiente local confirmou presenca simultanea no mesmo stage (`stage:starter-basin`) e snapshot vivo com `props` e `landmarks`
 
 ### Cobertura automatica atual de `TASK-CDAM-07-07`
 
@@ -37,15 +38,22 @@ Epic ID: EPIC-CDAM-07
 - snapshot do stage no websocket: coberto
 - reconexao basica e persistencia de sessao por username: cobertas
 
+### Evidencia runtime adicional
+
+- o servidor local em Docker aceitou duas conexoes reais (`alpha_manual` e `beta_manual`) no mesmo mundo e ambos os snapshots reportaram `stage:starter-basin`
+- os dois snapshots vivos retornaram `11` props e `3` landmarks, confirmando que a carga autoral do stage esta chegando no runtime fora do ambiente de teste
+- a parte de `move_to` ja permanece coberta pelos testes focados do servidor; na tentativa de repetir isso no runtime vivo por script Python, o socket nao entregou um novo frame dentro da janela curta usada na checagem, entao essa evidência manual adicional nao foi usada para fechamento
+
 ### Lacunas restantes para fechar `TASK-CDAM-07-07`
 
 - validacao manual do minimapa no stage novo
 - checagem manual de multiplayer visual no stage novo com mais de um cliente ativo
 - passada de UX jogavel para confirmar que a impressao do stage atende a Definition of Done, nao apenas a compilacao e aos testes focados
+- a automacao de browser desta sessao nao conseguiu sustentar a validacao visual porque os handles da browser tool ficaram invalidos e a extensao MCP do browser nao estava conectada
 
 ## O que ainda falta para fechar o epic
 
-- executar a validacao final do stage em `TASK-CDAM-07-07`, cobrindo explicitamente coleta, zonas, movimento, minimapa e multiplayer sobre o mundo novo
+- executar a validacao visual final do stage em `TASK-CDAM-07-07`, cobrindo explicitamente minimapa, multiplayer visivel e leitura geral de UX sobre o mundo novo
 - decidir se o stage inicial ja esta convincente o suficiente para Definition of Done ou se precisa de mais uma passada de densidade/verticalidade antes do encerramento do epic
 
 ## Definition of done
