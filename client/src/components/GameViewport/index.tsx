@@ -50,15 +50,18 @@ import {
 
 const TARGET_REACHED_DISTANCE = 0.22;
 const RENDER_CORRECTION_DISTANCE = WORLD_TO_SCENE_SCALE * 0.9;
-const SKY_COLOR = "#7fc0ff";
-const FOG_COLOR = "#cfe0eb";
+const SKY_COLOR = "#1279e0";
+const FOG_COLOR = "#2286c9";
 const DEFAULT_CAMERA_FOV = 56;
-const MIN_CAMERA_DISTANCE = 7.5;
-const MIN_MAX_CAMERA_DISTANCE = 30;
-const MAX_CAMERA_DISTANCE_PADDING = 10;
-const SCENE_EDGE_CAMERA_DISTANCE_RATIO = 0.44;
 const FOG_NEAR_RATIO = 0.54;
 const FOG_FAR_PADDING = 3;
+const VIEWPORT_CAMERA = {
+  base: 18,
+  initialPositionRatio: [1, 0.34, 1.08] as const,
+  maxZoomDistance: 30,
+  minZoomDistance: 7.5,
+  sceneSpanRatio: 0.3,
+} as const;
 const CAMERA_ROTATE_SPEED = 0.82;
 const CAMERA_ZOOM_SPEED = 0.9;
 const BEE_TURN_RESPONSE = 18;
@@ -172,28 +175,36 @@ type LocalMovementSource = "idle" | "keyboard" | "pointer";
 
 function resolveViewportScale(chunkSize: number, renderDistance: number): {
   cameraDistance: number;
+  cameraPosition: readonly [number, number, number];
   groundInputSize: number;
   maxCameraDistance: number;
 } {
+  const resolveCameraPosition = (cameraDistance: number): readonly [number, number, number] => {
+    const [xRatio, yRatio, zRatio] = VIEWPORT_CAMERA.initialPositionRatio;
+    return [cameraDistance * xRatio, cameraDistance * yRatio, cameraDistance * zRatio] as const;
+  };
+
   if (chunkSize <= 0 || renderDistance <= 0) {
     return {
-      cameraDistance: 18,
+      cameraDistance: VIEWPORT_CAMERA.base,
+      cameraPosition: resolveCameraPosition(VIEWPORT_CAMERA.base),
       groundInputSize: 960,
-      maxCameraDistance: MIN_MAX_CAMERA_DISTANCE,
+      maxCameraDistance: VIEWPORT_CAMERA.maxZoomDistance,
     };
   }
 
   const chunkSpan = chunkSize * (renderDistance * 2 + 1);
   const sceneSpan = toSceneAxis(chunkSpan);
-  const cameraDistance = Math.max(18, sceneSpan * 0.3);
+  const cameraDistance = Math.min(
+    VIEWPORT_CAMERA.maxZoomDistance,
+    Math.max(VIEWPORT_CAMERA.base, sceneSpan * VIEWPORT_CAMERA.sceneSpanRatio),
+  );
 
   return {
     cameraDistance,
+    cameraPosition: resolveCameraPosition(cameraDistance),
     groundInputSize: Math.max(960, sceneSpan * 3),
-    maxCameraDistance: Math.max(
-      MIN_MAX_CAMERA_DISTANCE,
-      Math.max(cameraDistance + MAX_CAMERA_DISTANCE_PADDING, sceneSpan * SCENE_EDGE_CAMERA_DISTANCE_RATIO),
-    ),
+    maxCameraDistance: VIEWPORT_CAMERA.maxZoomDistance,
   };
 }
 
@@ -966,7 +977,7 @@ function CameraRig({
       makeDefault
       maxDistance={maxCameraDistance}
       maxPolarAngle={Math.PI / 2.2}
-      minDistance={MIN_CAMERA_DISTANCE}
+      minDistance={VIEWPORT_CAMERA.minZoomDistance}
       minPolarAngle={0.32}
       rotateSpeed={CAMERA_ROTATE_SPEED}
       zoomSpeed={CAMERA_ZOOM_SPEED}
@@ -1371,10 +1382,6 @@ export function GameViewport({
     () => resolveFogDistances(viewportScale.maxCameraDistance),
     [viewportScale.maxCameraDistance],
   );
-  const defaultCameraPosition = useMemo(
-    () => [viewportScale.cameraDistance, viewportScale.cameraDistance * 0.34, viewportScale.cameraDistance * 1.08] as const,
-    [viewportScale.cameraDistance],
-  );
 
   // Jogadores visíveis no 3D — mesma lógica de chunk do servidor
   const nearbyPlayers = useMemo(() => {
@@ -1396,7 +1403,7 @@ export function GameViewport({
   return (
     <div className="viewport-canvas-shell">
       <Canvas
-        camera={{ position: defaultCameraPosition, fov: DEFAULT_CAMERA_FOV }}
+        camera={{ position: viewportScale.cameraPosition, fov: DEFAULT_CAMERA_FOV }}
         dpr={[1, 1.6]}
         shadows
         gl={{ antialias: true }}

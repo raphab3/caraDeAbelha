@@ -19,7 +19,6 @@ import {
 	toSceneAxis,
 	toTerrainSurfaceY,
 	type WorldSurfaceIndex,
-	WORLD_TO_SCENE_SCALE,
 } from "./worldSurface";
 
 interface InstancedModelMeshSource {
@@ -42,8 +41,7 @@ interface InstancedAssetMeshProps {
 
 function resolvePropSceneY(item: WorldPropState, surfaceIndex: WorldSurfaceIndex): number {
 	if (item.tag === "terrain") {
-		const groundedY = resolveSurfaceSceneY(surfaceIndex, item.x, item.z);
-		return groundedY + item.y * WORLD_TO_SCENE_SCALE * 0.38;
+		return resolveSurfaceSceneY(surfaceIndex, item.x, item.z);
 	}
 
 	return toTerrainSurfaceY(item.y);

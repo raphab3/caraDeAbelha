@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/zones"
 )
 
 func openGameSocket(t *testing.T, websocketURL string, username string) *websocket.Conn {
@@ -156,6 +157,64 @@ func TestMovePlayerToRejectsMountainTile(t *testing.T) {
 
 	if math.Abs(player.X-0.5) > 0.001 || math.Abs(player.Y-0.5) > 0.001 {
 		t.Fatalf("expected player to remain at the original position, got %.2f,%.2f", player.X, player.Y)
+	}
+}
+
+func TestMovePlayerToAllowsWaterTile(t *testing.T) {
+	hub := newGameHub()
+	hub.world = worldLayout{
+		chunks: map[string]worldChunkState{
+			buildChunkKey(0, 0): {
+				Key: buildChunkKey(0, 0),
+				Tiles: []worldTileState{
+					{ID: "tile:0:0", X: 0.5, Y: 0, Z: 0.5, Type: "grass"},
+					{ID: "tile:1:0", X: 1.5, Y: 0, Z: 0.5, Type: "water"},
+					{ID: "tile:0:1", X: 0.5, Y: 0, Z: 1.5, Type: "grass"},
+					{ID: "tile:1:1", X: 1.5, Y: 0, Z: 1.5, Type: "grass"},
+				},
+			},
+		},
+		hasBounds: true,
+		minX:      0.5,
+		maxX:      1.5,
+		minY:      0.5,
+		maxY:      1.5,
+	}
+
+	player := &playerState{ID: "player:test", Username: "test", X: 0.5, Y: 0.5, Speed: defaultPlayerSpeed}
+	hub.players[player.ID] = player
+
+	if ok := hub.movePlayerTo(player.ID, 1.5, 0.5); !ok {
+		t.Fatalf("expected movePlayerTo to allow water tile traversal")
+	}
+
+	if player.TargetX == nil || player.TargetY == nil {
+		t.Fatalf("expected water traversal to set a movement target")
+	}
+
+	if math.Abs(*player.TargetX-1.5) > 0.001 || math.Abs(*player.TargetY-0.5) > 0.001 {
+		t.Fatalf("expected water traversal target 1.5,0.5, got %.2f,%.2f", *player.TargetX, *player.TargetY)
+	}
+}
+
+func TestMovePlayerToRejectsLockedZoneTarget(t *testing.T) {
+	hub := newGameHub()
+	hub.world = buildTraversableTestWorld()
+	hub.world.zones = []worldZone{
+		{ID: zones.StarterMeadowZoneID, X1: 0.5, X2: 2.99, Z1: 0.5, Z2: 1.5},
+		{ID: zones.SunflowerRidgeZoneID, X1: 3.0, X2: 5.5, Z1: 0.5, Z2: 1.5},
+	}
+
+	player := &playerState{ID: "player:test", Username: "test", X: 0.5, Y: 0.5, Speed: defaultPlayerSpeed}
+	hub.players[player.ID] = player
+	hub.ensurePlayerProgressLocked(player.ID)
+
+	if ok := hub.movePlayerTo(player.ID, 4.5, 0.5); ok {
+		t.Fatalf("expected movePlayerTo to reject locked zone traversal")
+	}
+
+	if player.TargetX != nil || player.TargetY != nil {
+		t.Fatalf("expected locked zone rejection to leave no active target")
 	}
 }
 
@@ -779,6 +838,38 @@ func TestAdvancePlayerLockedStopsBeforeBlockedMountain(t *testing.T) {
 
 	if math.Abs(player.X-0.5) > 0.001 || math.Abs(player.Y-0.5) > 0.001 {
 		t.Fatalf("expected player to stay before the blocked mountain tile, got %.2f,%.2f", player.X, player.Y)
+	}
+}
+
+func TestAdvancePlayerLockedRespawnsPlayerFromLockedZone(t *testing.T) {
+	hub := newGameHub()
+	hub.world = buildTraversableTestWorld()
+	hub.world.zones = []worldZone{
+		{ID: zones.StarterMeadowZoneID, X1: 0.5, X2: 2.99, Z1: 0.5, Z2: 1.5},
+		{ID: zones.SunflowerRidgeZoneID, X1: 3.0, X2: 5.5, Z1: 0.5, Z2: 1.5},
+	}
+
+	baseTime := time.Date(2026, time.April, 21, 12, 0, 0, 0, time.UTC)
+	player := &playerState{
+		ID:        "player:c",
+		Username:  "c",
+		X:         4.5,
+		Y:         0.5,
+		Speed:     defaultPlayerSpeed,
+		UpdatedAt: baseTime,
+	}
+	progress := hub.ensurePlayerProgressLocked(player.ID)
+
+	if changed := hub.advancePlayerLocked(player, baseTime.Add(500*time.Millisecond)); !changed {
+		t.Fatalf("expected locked-zone recovery to update the player state")
+	}
+
+	if player.X > 2.99 {
+		t.Fatalf("expected player to be moved back into an unlocked zone, got %.2f,%.2f", player.X, player.Y)
+	}
+
+	if progress.CurrentZoneID != zones.StarterMeadowZoneID {
+		t.Fatalf("expected recovered player zone %q, got %q", zones.StarterMeadowZoneID, progress.CurrentZoneID)
 	}
 }
 

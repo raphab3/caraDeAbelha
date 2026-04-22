@@ -73,6 +73,7 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 	profile.LastSeenAt = now
 	replacedClient := hub.clients[profile.ID]
 	progress := hub.ensurePlayerProgressLocked(profile.ID)
+	hub.resetPlayerToAccessibleSpawnLocked(profile, now)
 	hub.updatePlayerZoneLocked(profile, progress)
 
 	client := &clientSession{
@@ -103,6 +104,43 @@ func (hub *gameHub) touchPlayerLastSeen(clientID string, seenAt time.Time) {
 	}
 
 	profile.LastSeenAt = seenAt
+}
+
+func (hub *gameHub) canPlayerAccessPositionLocked(player *playerState, x float64, y float64) bool {
+	if player == nil {
+		return false
+	}
+
+	progress := hub.ensurePlayerProgressLocked(player.ID)
+	zoneID := hub.world.zoneIDAt(x, y)
+	canAccess, _ := hub.zones.CanAccessZone(progress, zoneID)
+	return canAccess
+}
+
+func (hub *gameHub) resetPlayerToAccessibleSpawnLocked(player *playerState, now time.Time) bool {
+	if player == nil {
+		return false
+	}
+
+	progress := hub.ensurePlayerProgressLocked(player.ID)
+	currentZoneID := hub.world.zoneIDAt(player.X, player.Y)
+	if canAccess, _ := hub.zones.CanAccessZone(progress, currentZoneID); canAccess {
+		return false
+	}
+
+	spawnX, spawnY := profileSpawnPosition(strings.TrimPrefix(player.ID, "player:"))
+	spawnX, spawnY = hub.clampWorldPosition(spawnX, spawnY)
+	if !hub.world.isTraversablePosition(spawnX, spawnY) || !hub.canPlayerAccessPositionLocked(player, spawnX, spawnY) {
+		return false
+	}
+
+	player.X = spawnX
+	player.Y = spawnY
+	player.TargetX = nil
+	player.TargetY = nil
+	player.UpdatedAt = now
+	hub.updatePlayerZoneLocked(player, progress)
+	return true
 }
 
 func (hub *gameHub) unregister(client *clientSession) bool {
@@ -161,7 +199,7 @@ func (hub *gameHub) movePlayer(clientID string, direction string) bool {
 		nextY = remappedTargetY
 	}
 
-	if !hub.world.isTraversablePosition(nextX, nextY) {
+	if !hub.world.isTraversablePosition(nextX, nextY) || !hub.canPlayerAccessPositionLocked(player, nextX, nextY) {
 		return false
 	}
 
@@ -190,7 +228,7 @@ func (hub *gameHub) movePlayerTo(clientID string, x float64, z float64) bool {
 		clampedX = remappedTargetX
 		clampedY = remappedTargetY
 	}
-	if !hub.world.isTraversablePosition(clampedX, clampedY) {
+	if !hub.world.isTraversablePosition(clampedX, clampedY) || !hub.canPlayerAccessPositionLocked(player, clampedX, clampedY) {
 		return false
 	}
 	hub.setPlayerTargetLocked(player, clampedX, clampedY, now)
@@ -279,6 +317,10 @@ func (hub *gameHub) advancePlayerLocked(player *playerState, now time.Time) bool
 		return false
 	}
 
+	if hub.resetPlayerToAccessibleSpawnLocked(player, now) {
+		return true
+	}
+
 	if player.UpdatedAt.IsZero() {
 		player.UpdatedAt = now
 		return false
@@ -299,7 +341,7 @@ func (hub *gameHub) advancePlayerLocked(player *playerState, now time.Time) bool
 	distance := math.Hypot(deltaX, deltaY)
 
 	if distance <= movementStopDistance {
-		if !hub.world.isTraversablePosition(*player.TargetX, *player.TargetY) {
+		if !hub.world.isTraversablePosition(*player.TargetX, *player.TargetY) || !hub.canPlayerAccessPositionLocked(player, *player.TargetX, *player.TargetY) {
 			player.TargetX = nil
 			player.TargetY = nil
 			player.UpdatedAt = now
@@ -316,7 +358,7 @@ func (hub *gameHub) advancePlayerLocked(player *playerState, now time.Time) bool
 
 	stepDistance := player.Speed * elapsed
 	if stepDistance >= distance {
-		if !hub.world.isTraversablePosition(*player.TargetX, *player.TargetY) {
+		if !hub.world.isTraversablePosition(*player.TargetX, *player.TargetY) || !hub.canPlayerAccessPositionLocked(player, *player.TargetX, *player.TargetY) {
 			player.TargetX = nil
 			player.TargetY = nil
 			player.UpdatedAt = now
@@ -334,7 +376,7 @@ func (hub *gameHub) advancePlayerLocked(player *playerState, now time.Time) bool
 	ratio := stepDistance / distance
 	nextX := player.X + deltaX*ratio
 	nextY := player.Y + deltaY*ratio
-	if !hub.world.isTraversablePosition(nextX, nextY) {
+	if !hub.world.isTraversablePosition(nextX, nextY) || !hub.canPlayerAccessPositionLocked(player, nextX, nextY) {
 		player.TargetX = nil
 		player.TargetY = nil
 		player.UpdatedAt = now

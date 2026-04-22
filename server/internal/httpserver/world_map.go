@@ -619,7 +619,7 @@ func (layout worldLayout) isTraversablePosition(x float64, y float64) bool {
 		return false
 	}
 
-	return tile.Type == "grass"
+	return tile.Type != "stone"
 }
 
 func (layout worldLayout) activeMovementBounds() worldBounds {
