@@ -143,6 +143,8 @@ interface MoveTargetMarkerState {
   sceneZ: number;
 }
 
+type LocalMovementSource = "idle" | "keyboard" | "pointer";
+
 function resolveViewportScale(chunkSize: number, renderDistance: number): {
   cameraDistance: number;
   groundInputSize: number;
@@ -259,6 +261,7 @@ interface BeeActorProps {
   drift: number;
   accentColor: string;
   isLocal: boolean;
+  localMovementSourceRef?: MutableRefObject<LocalMovementSource>;
   inputPreviewTargetRef?: MutableRefObject<Vector3 | null>;
   surfaceIndex: WorldSurfaceIndex;
   trackedPositionRef?: MutableRefObject<Vector3>;
@@ -278,6 +281,7 @@ function BeeActor({
   drift,
   accentColor,
   isLocal,
+  localMovementSourceRef,
   inputPreviewTargetRef,
   surfaceIndex,
   trackedPositionRef,
@@ -352,11 +356,21 @@ function BeeActor({
 
     const inputPreviewTarget = inputPreviewTargetRef?.current ?? null;
     const hasInputPreviewTarget = inputPreviewTarget !== null;
+    const localMovementSource = localMovementSourceRef?.current ?? "idle";
     const lookTarget = hasInputPreviewTarget
       ? inputPreviewTarget
+      : isLocal && localMovementSource !== "pointer"
+        ? null
       : hasMoveTarget(player)
         ? desiredTargetPositionRef.current
         : authoritativePositionRef.current;
+    if (lookTarget === null) {
+      trackedPositionRef?.current.copy(groupRef.current.position);
+      leftWingRef.current.rotation.z = Math.sin((elapsedTime + drift) * 18) * 0.3;
+      rightWingRef.current.rotation.z = -Math.sin((elapsedTime + drift) * 18) * 0.3;
+      return;
+    }
+
     const lookDeltaX = lookTarget.x - currentPosition.x;
     const lookDeltaZ = lookTarget.z - currentPosition.z;
     const shouldFreezeLocalYaw =
@@ -663,12 +677,14 @@ function LocalPlayerMovementController({
   connectionState,
   inputPreviewTargetRef,
   localPlayer,
+  localMovementSourceRef,
   onMoveToTarget,
   trackedPositionRef,
 }: {
   connectionState: GameSessionState["connectionState"];
   inputPreviewTargetRef: MutableRefObject<Vector3 | null>;
   localPlayer?: WorldPlayerState;
+  localMovementSourceRef: MutableRefObject<LocalMovementSource>;
   onMoveToTarget: (x: number, z: number) => void;
   trackedPositionRef: MutableRefObject<Vector3>;
 }) {
@@ -688,10 +704,11 @@ function LocalPlayerMovementController({
     }
 
     inputPreviewTargetRef.current = null;
+    localMovementSourceRef.current = "idle";
     lastSentAtRef.current = Number.NEGATIVE_INFINITY;
     lastTargetRef.current.set(Number.NaN, 0, Number.NaN);
     wasMovingRef.current = false;
-  }, [connectionState, inputPreviewTargetRef, localPlayer]);
+  }, [connectionState, inputPreviewTargetRef, localMovementSourceRef, localPlayer]);
 
   useFrame((state) => {
     if (connectionState !== "connected" || !localPlayer) {
@@ -711,7 +728,10 @@ function LocalPlayerMovementController({
     const nowMs = state.clock.elapsedTime * 1000;
 
     if (xIntent === 0 && zIntent === 0) {
-      inputPreviewTargetRef.current = null;
+      if (localMovementSourceRef.current === "keyboard") {
+        inputPreviewTargetRef.current = null;
+        localMovementSourceRef.current = "idle";
+      }
 
       if (wasMovingRef.current) {
         onMoveToTarget(anchorWorldX, anchorWorldZ);
@@ -742,6 +762,7 @@ function LocalPlayerMovementController({
     }
 
     movementVector.normalize();
+    localMovementSourceRef.current = "keyboard";
 
     const previewDistance = Math.max(
       localPlayer.speed * KEYBOARD_MOVE_LOOKAHEAD_SECONDS,
@@ -974,6 +995,7 @@ function HiveCore({
 }: HiveCoreProps) {
   const [moveTargetMarker, setMoveTargetMarker] = useState<MoveTargetMarkerState | null>(null);
   const surfaceIndex = useMemo(() => buildWorldSurfaceIndex(chunks), [chunks]);
+  const localMovementSourceRef = useRef<LocalMovementSource>("idle");
   const localInputPreviewTargetRef = useRef<Vector3 | null>(null);
   const canvasWidth = useThree((state) => state.size.width);
   const localPlayer = useMemo(
@@ -1004,6 +1026,12 @@ function HiveCore({
         sceneZ: toSceneAxis(worldZ),
       });
 
+      localInputPreviewTargetRef.current = new Vector3(
+        toSceneAxis(worldX),
+        0,
+        toSceneAxis(worldZ),
+      );
+      localMovementSourceRef.current = "pointer";
       onMoveToTarget(worldX, worldZ);
     },
     [connectionState, localPlayerId, onMoveToTarget, surfaceIndex],
@@ -1018,6 +1046,8 @@ function HiveCore({
   useEffect(() => {
     if (connectionState !== "connected" || !localPlayerId) {
       setMoveTargetMarker(null);
+      localInputPreviewTargetRef.current = null;
+      localMovementSourceRef.current = "idle";
       localPlayerPositionRef.current.set(Number.NaN, Number.NaN, Number.NaN);
       resetPendingTap();
     }
@@ -1025,6 +1055,7 @@ function HiveCore({
 
   useEffect(() => {
     if (!localPlayer) {
+      localMovementSourceRef.current = "idle";
       return;
     }
 
@@ -1034,9 +1065,20 @@ function HiveCore({
         sceneY: resolveTargetMarkerSceneY(surfaceIndex, localPlayer.targetX, localPlayer.targetY),
         sceneZ: toSceneAxis(localPlayer.targetY),
       });
+      if (localMovementSourceRef.current === "pointer") {
+        localInputPreviewTargetRef.current = new Vector3(
+          toSceneAxis(localPlayer.targetX),
+          0,
+          toSceneAxis(localPlayer.targetY),
+        );
+      }
       return;
     }
 
+    if (localMovementSourceRef.current === "pointer") {
+      localInputPreviewTargetRef.current = null;
+      localMovementSourceRef.current = "idle";
+    }
     setMoveTargetMarker(null);
   }, [localPlayer, surfaceIndex]);
 
@@ -1097,6 +1139,7 @@ function HiveCore({
         connectionState={connectionState}
         inputPreviewTargetRef={localInputPreviewTargetRef}
         localPlayer={localPlayer}
+        localMovementSourceRef={localMovementSourceRef}
         onMoveToTarget={onMoveToTarget}
         trackedPositionRef={localPlayerPositionRef}
       />
@@ -1106,6 +1149,7 @@ function HiveCore({
           accentColor="#f8c537"
           drift={0}
           isLocal
+          localMovementSourceRef={localMovementSourceRef}
           inputPreviewTargetRef={localInputPreviewTargetRef}
           player={localPlayer}
           surfaceIndex={surfaceIndex}
