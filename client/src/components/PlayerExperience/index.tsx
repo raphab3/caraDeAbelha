@@ -66,7 +66,12 @@ export default function PlayerExperience() {
     const stageClassName = isFullscreen
       ? "experience-stage player-experience__stage player-experience__stage--immersive w-screen h-screen overflow-hidden bg-black"
       : "experience-stage player-experience__stage";
-    const viewportClassName = isFullscreen ? "viewport-shell player-viewport-shell" : "viewport-shell";
+    const viewportClassName = [
+      "viewport-shell viewport-shell--gameplay",
+      isFullscreen ? "player-viewport-shell" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
 
     return (
       <div className={stageClassName} ref={targetRef}>
