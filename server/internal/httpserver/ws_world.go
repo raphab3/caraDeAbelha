@@ -28,7 +28,7 @@ func (hub *gameHub) snapshotForPlayerLocked(viewer *playerState) worldStateMessa
 		Type:           "state",
 		Tick:           hub.tick,
 		Players:        players,
-		Chunks:         hub.world.visibleChunksAround(centerChunkX, centerChunkY),
+		Chunks:         hub.buildVisibleChunksLocked(centerChunkX, centerChunkY),
 		CenterChunkX:   centerChunkX,
 		CenterChunkY:   centerChunkY,
 		RenderDistance: worldRenderDistance,

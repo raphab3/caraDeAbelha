@@ -54,14 +54,17 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		Username: username,
 	})
 
-	// Send zone state to player on login
-	hub.sendZoneState(client, client.id)
-
 	hub.broadcast()
+	progress := hub.ensurePlayerProgress(client.id)
+	if shouldSendInitialProgress(progress) {
+		hub.sendPlayerStatus(client, progress)
+		hub.sendZoneState(client, client.id)
+	}
 
 	defer func() {
 		close(stopPingLoop)
 		_ = connection.Close()
+		hub.persistPlayerState(client.profileKey)
 
 		if hub.unregister(client) {
 			hub.broadcast()
@@ -123,6 +126,7 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			shouldBroadcast = hub.collectFlower(client.id, nodeID)
 
 		case "deposit_honey", "deposit":
+			shouldBroadcast = hub.depositHoney(client.id)
 
 		case "unlock_zone":
 			zoneID, ok := raw["zoneId"].(string)
@@ -208,6 +212,29 @@ func (hub *gameHub) sendZoneState(client *clientSession, playerID string) {
 	if err := hub.writeJSON(client, message); err != nil {
 		log.Printf("websocket write failed for %s: %v", client.id, err)
 	}
+}
+
+func (hub *gameHub) ensurePlayerProgress(playerID string) *loopbase.PlayerProgress {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	return hub.ensurePlayerProgressLocked(playerID)
+}
+
+func shouldSendInitialProgress(progress *loopbase.PlayerProgress) bool {
+	if progress == nil {
+		return false
+	}
+
+	if progress.PollenCarried != 0 || progress.Honey != 0 || progress.Level != 1 || progress.XP != 0 || progress.SkillPoints != 1 {
+		return true
+	}
+
+	if progress.PollenCapacity != 40 || progress.CurrentZoneID != "zone_0" {
+		return true
+	}
+
+	return len(progress.UnlockedZoneIDs) != 1 || progress.UnlockedZoneIDs[0] != "zone_0"
 }
 
 func (hub *gameHub) collectClientSnapshots() []clientSnapshot {

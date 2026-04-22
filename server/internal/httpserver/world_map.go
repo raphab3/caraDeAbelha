@@ -348,6 +348,18 @@ func (layout worldLayout) clampPosition(x float64, y float64) (float64, float64)
 	return clampWorldAxisToBounds(x, layout.minX, layout.maxX), clampWorldAxisToBounds(y, layout.minY, layout.maxY)
 }
 
+func (layout worldLayout) zoneIDAt(x float64, y float64) string {
+	for _, zone := range layout.zones {
+		if x >= zone.X1 && x <= zone.X2 && y >= zone.Z1 && y <= zone.Z2 {
+			if strings.TrimSpace(zone.ID) != "" {
+				return zone.ID
+			}
+		}
+	}
+
+	return "zone_0"
+}
+
 func quantizeMapCoord(value float64) int {
 	return int(math.Round(value * 100))
 }

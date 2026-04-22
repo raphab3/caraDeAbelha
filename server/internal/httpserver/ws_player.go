@@ -9,9 +9,6 @@ import (
 	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/loopbase"
 )
 
-const flowerCollectRadius = 2.2
-const flowerCollectYield = 10
-
 func (hub *gameHub) ensurePlayerProgressLocked(playerID string) *loopbase.PlayerProgress {
 	if progress, ok := hub.playerProgress[playerID]; ok && progress != nil {
 		return progress
@@ -21,6 +18,7 @@ func (hub *gameHub) ensurePlayerProgressLocked(playerID string) *loopbase.Player
 		PlayerID:        playerID,
 		PollenCapacity:  40,
 		Level:           1,
+		SkillPoints:     1,
 		CurrentZoneID:   "zone_0",
 		UnlockedZoneIDs: []string{"zone_0"},
 	}
@@ -30,6 +28,8 @@ func (hub *gameHub) ensurePlayerProgressLocked(playerID string) *loopbase.Player
 }
 
 func (hub *gameHub) register(connection *websocket.Conn, profileKey string, username string) (*clientSession, *clientSession, error) {
+	persisted := hub.loadPersistedPlayer(profileKey)
+
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
@@ -37,18 +37,31 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 
 	profile, ok := hub.profiles[profileKey]
 	if !ok {
-		spawnX, spawnY := profileSpawnPosition(profileKey)
-		spawnX, spawnY = hub.clampWorldPosition(spawnX, spawnY)
-		profile = &playerState{
-			ID:         buildPlayerID(profileKey),
-			Username:   username,
-			X:          spawnX,
-			Y:          spawnY,
-			Speed:      defaultPlayerSpeed,
-			UpdatedAt:  now,
-			LastSeenAt: now,
+		if persisted != nil && persisted.Player != nil {
+			profile = persisted.Player
+			profile.Username = username
+			profile.UpdatedAt = now
+			profile.LastSeenAt = now
+		} else {
+			spawnX, spawnY := profileSpawnPosition(profileKey)
+			spawnX, spawnY = hub.clampWorldPosition(spawnX, spawnY)
+			profile = &playerState{
+				ID:         buildPlayerID(profileKey),
+				Username:   username,
+				X:          spawnX,
+				Y:          spawnY,
+				Speed:      defaultPlayerSpeed,
+				UpdatedAt:  now,
+				LastSeenAt: now,
+			}
 		}
 		hub.profiles[profileKey] = profile
+	}
+
+	if persisted != nil && persisted.Progress != nil {
+		persisted.Progress.PlayerID = profile.ID
+		persisted.Progress.UpdatedAt = now
+		hub.playerProgress[profile.ID] = persisted.Progress
 	}
 
 	hub.advancePlayerLocked(profile, now)
@@ -56,6 +69,8 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 	profile.Username = username
 	profile.LastSeenAt = now
 	replacedClient := hub.clients[profile.ID]
+	progress := hub.ensurePlayerProgressLocked(profile.ID)
+	hub.updatePlayerZoneLocked(profile, progress)
 
 	client := &clientSession{
 		id:         profile.ID,
@@ -210,6 +225,9 @@ func (hub *gameHub) stepMovingPlayers() bool {
 			changed = true
 		}
 	}
+	if hub.processWorldInteractionsLocked(now) {
+		changed = true
+	}
 
 	if !changed {
 		return false
@@ -345,51 +363,14 @@ func (hub *gameHub) collectFlower(clientID string, nodeID string) bool {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
-	client, ok := hub.clients[clientID]
-	if !ok || client == nil {
-		return false
+	client := hub.clients[clientID]
+	if client != nil {
+		reason := "Encoste na flor para iniciar a coleta. O servidor conclui quando a abelha permanece em contato."
+		if strings.TrimSpace(nodeID) == "" {
+			reason = "Aproxime-se de uma flor para coletar"
+		}
+		hub.sendInteractionResult(client, "collect_flower", false, 0, reason)
 	}
-
-	progress := hub.ensurePlayerProgressLocked(clientID)
-	player, playerOk := hub.players[clientID]
-	if !playerOk || player == nil {
-		hub.sendInteractionResult(client, "collect_flower", false, 0, "player not found")
-		return false
-	}
-
-	normalizedNodeID := strings.TrimSpace(nodeID)
-	if normalizedNodeID == "" {
-		hub.sendInteractionResult(client, "collect_flower", false, 0, "missing flower id")
-		return false
-	}
-
-	flower, found := hub.findFlowerForPlayerLocked(player, normalizedNodeID)
-	if !found || flower == nil {
-		hub.sendInteractionResult(client, "collect_flower", false, 0, "flower not found")
-		return false
-	}
-
-	distance := math.Hypot(player.X-flower.X, player.Y-flower.Y)
-	if distance > flowerCollectRadius {
-		hub.sendInteractionResult(client, "collect_flower", false, 0, "flower out of range")
-		return false
-	}
-
-	remainingCapacity := progress.PollenCapacity - progress.PollenCarried
-	if remainingCapacity <= 0 {
-		hub.sendInteractionResult(client, "collect_flower", false, 0, "mochila is full")
-		return false
-	}
-
-	pollenGained := flowerCollectYield
-	if pollenGained > remainingCapacity {
-		pollenGained = remainingCapacity
-	}
-
-	progress.PollenCarried += pollenGained
-
-	hub.sendInteractionResult(client, "collect_flower", true, pollenGained, "Collected pollen successfully")
-	hub.sendPlayerStatus(client, progress)
 
 	return true
 }
@@ -422,35 +403,7 @@ func (hub *gameHub) depositHoney(clientID string) bool {
 	if !ok || client == nil {
 		return false
 	}
+	hub.sendInteractionResult(client, "deposit_honey", false, 0, "Entre em contato com a colmeia para converter polen em mel")
 
-	progress := hub.ensurePlayerProgressLocked(clientID)
-
-	// Convert pollen to honey: 10 pollen = 1 honey
-	honeyGained := progress.PollenCarried / 10
-	if honeyGained == 0 && progress.PollenCarried > 0 {
-		// Not enough pollen to convert
-		hub.sendInteractionResult(client, "deposit_honey", false, 0, "Not enough pollen (need 10)")
-		return false
-	}
-
-	success := honeyGained > 0
-	reason := "Honey deposited successfully"
-
-	// Update progress
-	if success {
-		progress.PollenCarried = progress.PollenCarried % 10 // Remainder stays
-		progress.Honey += honeyGained
-	} else {
-		reason = "No pollen to deposit"
-	}
-
-	// Send interaction result feedback
-	hub.sendInteractionResult(client, "deposit_honey", success, honeyGained, reason)
-
-	// Send updated player status
-	if success {
-		hub.sendPlayerStatus(client, progress)
-	}
-
-	return success
+	return false
 }

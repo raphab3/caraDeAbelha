@@ -80,8 +80,6 @@ export default function PlayerExperience() {
               onMoveToTarget={gameSession.moveToTarget}
               onPerformanceChange={ignoreRenderPerformance}
               onRespawn={gameSession.respawn}
-              onFlowerClick={(flowerId) => gameSession.sendAction({ type: "collect_flower", nodeId: flowerId })}
-              onHiveClick={() => gameSession.sendAction({ type: "deposit_honey" })}
               players={gameSession.players}
               renderDistance={gameSession.renderDistance}
             />

@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"errors"
+	"math/rand"
 	"net/http"
 	"sync"
 	"time"
@@ -38,9 +39,15 @@ type gameHub struct {
 	players         map[string]*playerState
 	profiles        map[string]*playerState
 	playerProgress  map[string]*loopbase.PlayerProgress // Player economy state: pollen, honey, level, zones
+	playerStore     playerStore
 	world           worldLayout
 	loopbase        *loopbase.LoopBaseService
 	zones           *zones.ZoneService
+	flowerSpawnSlots map[string]flowerSpawnSlot
+	activeFlowers    map[string]*activeFlowerRuntime
+	activeHives      map[string]*activeHiveRuntime
+	activeCollections map[string]*collectionState
+	random          *rand.Rand
 	tick            uint64
 	now             func() time.Time
 	pingPeriod      time.Duration
@@ -65,16 +72,20 @@ func newGameHub() *gameHub {
 		players:        make(map[string]*playerState),
 		profiles:       make(map[string]*playerState),
 		playerProgress: make(map[string]*loopbase.PlayerProgress),
+		playerStore:    newPlayerStoreFromEnv(),
 		world:          loadWorldLayout(),
 		loopbase:       loopbaseService,
 		zones:          zonesService,
+		random:         rand.New(rand.NewSource(time.Now().UnixNano())),
 		now:            time.Now,
 		pingPeriod:     websocketPingPeriod,
 		pongWait:       websocketPongWait,
 		writeWait:      websocketWriteTimeout,
 	}
 
+	hub.initializeWorldEntities()
 	go hub.runMovementLoop(worldTickInterval)
+	go hub.runPersistenceLoop(persistenceSaveInterval)
 
 	return hub
 }

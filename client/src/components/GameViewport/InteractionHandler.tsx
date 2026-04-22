@@ -72,8 +72,9 @@ export function createFlowerClickHandler(
 ): (event: ThreeEvent<PointerEvent>, flowerId: string, index: number) => void {
 	return useCallback(
 		(event: ThreeEvent<PointerEvent>, flowerId: string, _index: number) => {
-			// Stop propagation to prevent conflicting interactions
-			event.stopPropagation();
+			if (onFlowerClick) {
+				event.stopPropagation();
+			}
 
 			// Guard: player must be connected
 			if (!gameSession.localPlayerId) {
@@ -121,8 +122,9 @@ export function createHiveClickHandler(
 ): (event: ThreeEvent<PointerEvent>, hiveId: string, index: number) => void {
 	return useCallback(
 		(event: ThreeEvent<PointerEvent>, hiveId: string, _index: number) => {
-			// Stop propagation to prevent conflicting interactions
-			event.stopPropagation();
+			if (onHiveClick) {
+				event.stopPropagation();
+			}
 
 			// Guard: player must be connected
 			if (!gameSession.localPlayerId) {
