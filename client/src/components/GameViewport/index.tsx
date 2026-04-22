@@ -1045,7 +1045,7 @@ interface HiveCoreProps {
   localPlayerPositionRef: MutableRefObject<Vector3>;
   onMoveToTarget: (x: number, z: number) => void;
   onFlowerClick?: (flower: WorldFlowerState) => void;
-  onHiveClick?: () => void;
+  onHiveClick?: (hive: WorldHiveState) => void;
   tapTargetingConfig?: Partial<TapTargetingConfig>;
 }
 
@@ -1201,6 +1201,7 @@ function HiveCore({
           detailFocus={detailFocus}
           terrainPointerHandlers={pointerHandlers}
           onFlowerClick={onFlowerClick}
+          selectedFlowerId={flowerInteraction?.flowerId}
           onHiveClick={onHiveClick}
         />
       </Suspense>
@@ -1255,7 +1256,7 @@ interface GameViewportProps {
   onMoveToTarget: (x: number, z: number) => void;
   onRespawn: () => void;
   onFlowerClick?: (flower: WorldFlowerState) => void;
-  onHiveClick?: () => void;
+  onHiveClick?: (hive: WorldHiveState) => void;
   tapTargetingConfig?: Partial<TapTargetingConfig>;
 }
 

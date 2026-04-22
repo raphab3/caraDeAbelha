@@ -79,6 +79,7 @@ export default function PlayerExperience() {
               flowerInteraction={gameSession.flowerInteraction}
               localPlayerId={gameSession.localPlayerId}
               onFlowerClick={gameSession.targetFlower}
+              onHiveClick={gameSession.targetHive}
               onMoveToTarget={gameSession.moveToTarget}
               onPerformanceChange={ignoreRenderPerformance}
               onRespawn={gameSession.respawn}

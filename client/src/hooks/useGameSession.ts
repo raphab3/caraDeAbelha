@@ -10,6 +10,7 @@ import type {
   InteractionResult,
   PlayerStatusMessage,
   SessionMessage,
+  WorldHiveState,
   WorldStateMessage,
   WorldChunkState,
   WorldFlowerState,
@@ -97,6 +98,10 @@ function isZoneStateMessage(message: unknown): message is ZoneStateMessage {
 function resolveDisconnectError(reason?: string): string {
   const normalizedReason = reason?.trim();
   return normalizedReason ? normalizedReason : DEFAULT_DISCONNECT_ERROR;
+}
+
+function isCollectingPreview(interaction: InteractionResult): boolean {
+  return interaction.action === "collect_flower" && interaction.reason.startsWith("Coletando flor");
 }
 
 function hasMoveTarget(player: WorldPlayerState): player is WorldPlayerState & { targetX: number; targetY: number } {
@@ -263,7 +268,7 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
           setGameSession((current) => ({
             ...current,
             flowerInteraction:
-              message.action === "collect_flower" || message.action === "failed_collection"
+              (message.action === "collect_flower" && !isCollectingPreview(message)) || message.action === "failed_collection"
                 ? undefined
                 : current.flowerInteraction,
             lastInteraction: message,
@@ -371,6 +376,10 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
     moveToTarget(flower.x, flower.y);
   };
 
+  const targetHive = (hive: WorldHiveState) => {
+    moveToTarget(hive.x, hive.y);
+  };
+
   const respawn = () => {
     clientRef.current?.send({
       type: "respawn",
@@ -385,6 +394,7 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
     ...gameSession,
     moveToTarget,
     targetFlower,
+    targetHive,
     respawn,
     sendAction,
   };

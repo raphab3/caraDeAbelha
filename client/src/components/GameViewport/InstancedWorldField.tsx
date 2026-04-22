@@ -13,7 +13,7 @@ import {
 	Object3D,
 } from "three";
 
-import type { MapZone, PlayerProgressState, WorldChunkState, WorldFlowerState } from "../../types/game";
+import type { MapZone, PlayerProgressState, WorldChunkState, WorldFlowerState, WorldHiveState } from "../../types/game";
 import {
 	TERRAIN_BLOCK_SCALE,
 	toSceneAxis,
@@ -212,6 +212,7 @@ export function InstancedWorldField({
 	terrainPointerHandlers,
 	onFlowerClick,
 	onHiveClick,
+	selectedFlowerId,
 	zones,
 	playerProgress,
 }: {
@@ -220,7 +221,8 @@ export function InstancedWorldField({
 	detailFocus?: DetailFocus;
 	terrainPointerHandlers?: TapTargetingHandlers;
 	onFlowerClick?: (flower: WorldFlowerState) => void;
-	onHiveClick?: (hiveId: string) => void;
+	onHiveClick?: (hive: WorldHiveState) => void;
+	selectedFlowerId?: string;
 	zones?: MapZone[];
 	playerProgress?: PlayerProgressState;
 }) {
@@ -281,7 +283,7 @@ export function InstancedWorldField({
 	}, [chunks, detailFocus]);
 
 	const visibleHives = useMemo(() => {
-		const hives = [];
+		const hives: WorldHiveState[] = [];
 		for (const chunk of chunks) {
 			for (const hive of chunk.hives || []) {
 				hives.push(hive);
@@ -303,9 +305,13 @@ export function InstancedWorldField({
 	);
 	const handleHiveClick = useCallback(
 		(_event: ThreeEvent<PointerEvent>, hiveId: string, _index: number) => {
-			onHiveClick?.(hiveId);
+			const hive = visibleHives.find((item) => item.id === hiveId);
+			if (!hive) {
+				return;
+			}
+			onHiveClick?.(hive);
 		},
-		[onHiveClick],
+		[onHiveClick, visibleHives],
 	);
 
 	useEffect(() => {
@@ -365,6 +371,7 @@ export function InstancedWorldField({
 			<FlowerRenderer
 				flowers={visibleFlowers}
 				onFlowerClick={handleFlowerClick}
+				selectedFlowerId={selectedFlowerId}
 			/>
 
 			{/* Trees: decorative entities without interaction */}

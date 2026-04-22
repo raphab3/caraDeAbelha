@@ -273,6 +273,7 @@ export interface GameSessionState {
 export interface GameSessionController extends GameSessionState {
   moveToTarget: (x: number, z: number) => void;
   targetFlower: (flower: WorldFlowerState) => void;
+  targetHive: (hive: WorldHiveState) => void;
   respawn: () => void;
   sendAction: (action: ClientMessage) => void;
 }

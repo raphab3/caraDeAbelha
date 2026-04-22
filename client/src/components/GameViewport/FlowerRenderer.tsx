@@ -5,6 +5,7 @@ import {
 	MeshBasicMaterial,
 	MeshStandardMaterial,
 	Object3D,
+	RingGeometry,
 	SphereGeometry,
 	type BufferGeometry,
 	type InstancedMesh,
@@ -185,19 +186,30 @@ function FlowerLayer({
 export function FlowerRenderer({
 	flowers,
 	onFlowerClick,
+	selectedFlowerId,
 }: {
 	flowers: WorldFlowerState[];
 	onFlowerClick?: (event: ThreeEvent<PointerEvent>, flowerId: string, index: number) => void;
+	selectedFlowerId?: string;
 }) {
 	const instanceData = useMemo(() => buildFlowerInstanceData(flowers), [flowers]);
+	const selectedFlower = useMemo(
+		() => flowers.find((flower) => flower.id === selectedFlowerId),
+		[flowers, selectedFlowerId],
+	);
 
 	const stemGeometry = useMemo(() => new CylinderGeometry(0.018, 0.026, FLOWER_STEM_HEIGHT, 8), []);
 	const petalGeometry = useMemo(() => new SphereGeometry(FLOWER_PETAL_SIZE, 10, 10), []);
 	const coreGeometry = useMemo(() => new SphereGeometry(FLOWER_CORE_SIZE, 12, 12), []);
 	const hitGeometry = useMemo(() => new SphereGeometry(FLOWER_HIT_RADIUS, 6, 6), []);
+	const selectedHaloGeometry = useMemo(() => new RingGeometry(0.2, 0.28, 28), []);
 
 	const stemMaterial = useMemo(() => new MeshStandardMaterial({ color: "#2d8a57", roughness: 0.88 }), []);
 	const hitMaterial = useMemo(() => new MeshBasicMaterial({ visible: false }), []);
+	const selectedHaloMaterial = useMemo(
+		() => new MeshBasicMaterial({ color: "#9affd9", opacity: 0.85, transparent: true }),
+		[],
+	);
 	const petalMaterials = useMemo(
 		() => new Map<string, MeshStandardMaterial>(PETAL_PALETTE.map((c) => [c, new MeshStandardMaterial({ color: c, roughness: 0.56 })])),
 		[],
@@ -251,6 +263,22 @@ export function FlowerRenderer({
 					/>
 				);
 			})}
+
+				{selectedFlower ? (
+					<group
+						position={[
+							toSceneAxis(selectedFlower.x),
+							toTerrainSurfaceY(selectedFlower.groundY ?? 0) + 0.28 * selectedFlower.scale,
+							toSceneAxis(selectedFlower.y),
+						]}
+					>
+						<mesh rotation={[Math.PI / 2, 0, 0]}>
+							<primitive attach="geometry" object={selectedHaloGeometry} />
+							<primitive attach="material" object={selectedHaloMaterial} />
+						</mesh>
+						<pointLight color="#8effdc" distance={1.8} intensity={1.1} position={[0, 0.08, 0]} />
+					</group>
+				) : null}
 
 			{handleHit && (
 				<FlowerLayer

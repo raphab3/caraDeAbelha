@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import type { PlayerProgressState } from "../../types/game";
+import { PlayerStatusPanel } from "./PlayerStatusPanel";
 
 export interface ObjectivePanelProps {
   playerProgress: PlayerProgressState | undefined;
@@ -11,6 +13,8 @@ export interface ObjectivePanelProps {
  * - Completely dropped redundant level/xp bars (now in ribbon) and bulky unlocked lists
  */
 export const ObjectivePanel = ({ playerProgress }: ObjectivePanelProps) => {
+  const [isStatusOpen, setIsStatusOpen] = useState(false);
+
   // Zone name mapping (placeholder - would come from server in production)
   const zoneNames: Record<string, string> = {
     zone_0: "Prado de Flores",
@@ -24,7 +28,27 @@ export const ObjectivePanel = ({ playerProgress }: ObjectivePanelProps) => {
     return zoneNames[zoneId] ?? `${zoneId}`;
   };
 
+  useEffect(() => {
+    if (!isStatusOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsStatusOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isStatusOpen]);
+
   if (!playerProgress) return null;
+
+  const currentZoneName = getZoneName(playerProgress.currentZoneId);
 
   return (
     <div className="flex flex-col gap-3 pointer-events-none pl-4 pt-2">
@@ -41,7 +65,7 @@ export const ObjectivePanel = ({ playerProgress }: ObjectivePanelProps) => {
             Mundo Atual
           </span>
           <span className="text-sm font-black text-white drop-shadow-md">
-            {getZoneName(playerProgress.currentZoneId)}
+            {currentZoneName}
           </span>
         </div>
       </div>
@@ -55,6 +79,44 @@ export const ObjectivePanel = ({ playerProgress }: ObjectivePanelProps) => {
           </span>
         </div>
       )}
+
+      <button
+        aria-controls="player-status-panel"
+        aria-expanded={isStatusOpen}
+        className="min-h-11 self-start rounded-full border border-slate-700/60 bg-slate-900/72 px-4 py-2.5 text-left shadow-lg backdrop-blur-md transition hover:border-cyan-300/60 hover:bg-slate-900/82 pointer-events-auto"
+        onClick={() => {
+          setIsStatusOpen((current) => !current);
+        }}
+        type="button"
+      >
+        <span className="flex items-center gap-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-sky-600 text-white shadow-inner">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 21a6 6 0 0 0-12 0" />
+              <circle cx="12" cy="11" r="4" />
+            </svg>
+          </span>
+          <span className="flex flex-col">
+            <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-200/75">
+              Jogador
+            </span>
+            <span className="text-sm font-black text-white">
+              {isStatusOpen ? "Fechar status" : "Abrir status"}
+            </span>
+          </span>
+        </span>
+      </button>
+
+      <div id="player-status-panel" className="pointer-events-auto self-start">
+        <PlayerStatusPanel
+          currentZoneName={currentZoneName}
+          isOpen={isStatusOpen}
+          onClose={() => {
+            setIsStatusOpen(false);
+          }}
+          playerProgress={playerProgress}
+        />
+      </div>
     </div>
   );
 };

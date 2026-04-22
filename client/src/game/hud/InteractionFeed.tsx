@@ -67,9 +67,10 @@ export const InteractionFeed = ({ lastInteraction }: InteractionFeedProps) => {
   }
 
   const isSuccess = lastInteraction.success;
+  const isCollectingState = lastInteraction.action === "collect_flower" && lastInteraction.reason.startsWith("Coletando flor");
   const showReason = Boolean(lastInteraction.reason) && (!isSuccess || lastInteraction.amount === 0 || lastInteraction.reason.includes("XP ganho"));
-  const bgColor = isSuccess ? "bg-green-600" : "bg-red-600";
-  const borderColor = isSuccess ? "border-green-700" : "border-red-700";
+  const bgColor = isCollectingState ? "bg-sky-600" : isSuccess ? "bg-green-600" : "bg-red-600";
+  const borderColor = isCollectingState ? "border-sky-700" : isSuccess ? "border-green-700" : "border-red-700";
   const textColor = "text-white";
   const opacityClass = isExiting ? "opacity-0" : "opacity-100";
 
@@ -101,7 +102,7 @@ export const InteractionFeed = ({ lastInteraction }: InteractionFeedProps) => {
               />
             </svg>
           )}
-          <span className="text-lg font-bold">{getActionLabel(lastInteraction)}</span>
+          <span className="text-lg font-bold">{isCollectingState ? "Coletando" : getActionLabel(lastInteraction)}</span>
         </div>
 
         {/* Amount and Status */}
