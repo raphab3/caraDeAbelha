@@ -213,6 +213,7 @@ export function InstancedWorldField({
 	onFlowerClick,
 	onHiveClick,
 	selectedFlowerId,
+	selectedHiveId,
 	zones,
 	playerProgress,
 }: {
@@ -223,6 +224,7 @@ export function InstancedWorldField({
 	onFlowerClick?: (flower: WorldFlowerState) => void;
 	onHiveClick?: (hive: WorldHiveState) => void;
 	selectedFlowerId?: string;
+	selectedHiveId?: string;
 	zones?: MapZone[];
 	playerProgress?: PlayerProgressState;
 }) {
@@ -390,6 +392,7 @@ export function InstancedWorldField({
 			<HiveRenderer
 				hives={visibleHives}
 				onHiveClick={handleHiveClick}
+				selectedHiveId={selectedHiveId}
 			/>
 
 			{/* Zone gate renderer: gates for locked zones */}

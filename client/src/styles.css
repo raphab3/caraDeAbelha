@@ -639,37 +639,42 @@ body::after {
   gap: 6px;
 }
 
-.mini-map__respawn {
-  width: 100%;
-  min-height: 42px;
+.mini-map__actions {
+  display: flex;
+  gap: 10px;
+}
+
+.mini-map__action-button {
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 14px;
-  border: 1px solid rgba(255, 224, 150, 0.48);
-  border-radius: 12px;
+  border: 1px solid rgba(255, 224, 150, 0.44);
+  border-radius: 14px;
   background: linear-gradient(135deg, rgba(255, 231, 140, 0.94), rgba(255, 171, 68, 0.92));
   color: #30200d;
-  font: inherit;
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   cursor: pointer;
   pointer-events: all;
-  box-shadow: 0 12px 24px rgba(18, 10, 2, 0.28);
-  transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+  box-shadow: 0 12px 24px rgba(18, 10, 2, 0.24);
+  transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease, border-color 150ms ease;
 }
 
-.mini-map__respawn:hover {
+.mini-map__action-button:hover {
   transform: translateY(-1px);
   filter: brightness(1.04);
-  box-shadow: 0 16px 28px rgba(18, 10, 2, 0.32);
+  box-shadow: 0 16px 28px rgba(18, 10, 2, 0.3);
 }
 
-.mini-map__respawn:focus-visible {
+.mini-map__action-button:focus-visible {
   outline: 2px solid rgba(255, 232, 176, 0.94);
   outline-offset: 3px;
+}
+
+.mini-map__action-button--active {
+  border-color: rgba(255, 248, 204, 0.9);
+  box-shadow: 0 0 0 2px rgba(255, 237, 168, 0.36), 0 16px 30px rgba(18, 10, 2, 0.34);
 }
 
 .mini-map__coordinates {

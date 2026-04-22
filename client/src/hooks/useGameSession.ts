@@ -7,6 +7,7 @@ import type {
   FlowerInteractionState,
   GameSessionController,
   GameSessionState,
+  HiveInteractionState,
   InteractionResult,
   PlayerStatusMessage,
   SessionMessage,
@@ -24,6 +25,8 @@ const WS_CONNECT_ERROR = "Falha ao conectar no websocket do jogo.";
 const FLOWER_COLLECT_RADIUS = 0.65;
 const FLOWER_TARGET_SNAP_DISTANCE = 0.45;
 const FLOWER_TARGET_GRACE_MS = 1200;
+const HIVE_TARGET_SNAP_DISTANCE = 0.65;
+const HIVE_TARGET_GRACE_MS = 1500;
 
 function createDefaultPlayerProgress() {
   return {
@@ -119,6 +122,17 @@ function findFlowerById(chunks: WorldChunkState[], flowerId: string): WorldFlowe
   return undefined;
 }
 
+function findHiveById(chunks: WorldChunkState[], hiveId: string): WorldHiveState | undefined {
+  for (const chunk of chunks) {
+    const hive = chunk.hives.find((item) => item.id === hiveId);
+    if (hive) {
+      return hive;
+    }
+  }
+
+  return undefined;
+}
+
 function resolveFlowerInteraction(
   current: FlowerInteractionState | undefined,
   localPlayerId: string | undefined,
@@ -167,6 +181,48 @@ function resolveFlowerInteraction(
       flowerX: flower.x,
       flowerY: flower.y,
       phase: "moving",
+    };
+  }
+
+  return undefined;
+}
+
+function resolveHiveInteraction(
+  current: HiveInteractionState | undefined,
+  localPlayerId: string | undefined,
+  players: WorldPlayerState[],
+  chunks: WorldChunkState[],
+): HiveInteractionState | undefined {
+  if (!current || !localPlayerId) {
+    return undefined;
+  }
+
+  const localPlayer = players.find((player) => player.id === localPlayerId);
+  if (!localPlayer) {
+    return current;
+  }
+
+  const hive = findHiveById(chunks, current.hiveId);
+  if (!hive) {
+    return undefined;
+  }
+
+  if (hasMoveTarget(localPlayer)) {
+    const distanceToTarget = Math.hypot(localPlayer.targetX - hive.x, localPlayer.targetY - hive.y);
+    if (distanceToTarget <= HIVE_TARGET_SNAP_DISTANCE) {
+      return {
+        ...current,
+        hiveX: hive.x,
+        hiveY: hive.y,
+      };
+    }
+  }
+
+  if (Date.now() - current.startedAt <= HIVE_TARGET_GRACE_MS) {
+    return {
+      ...current,
+      hiveX: hive.x,
+      hiveY: hive.y,
     };
   }
 
@@ -271,6 +327,7 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
               (message.action === "collect_flower" && !isCollectingPreview(message)) || message.action === "failed_collection"
                 ? undefined
                 : current.flowerInteraction,
+            hiveInteraction: message.action === "deposit_honey" ? undefined : current.hiveInteraction,
             lastInteraction: message,
           }));
 
@@ -311,6 +368,12 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
           tick: message.tick,
           flowerInteraction: resolveFlowerInteraction(
             current.flowerInteraction,
+            current.localPlayerId,
+            message.players,
+            message.chunks,
+          ),
+          hiveInteraction: resolveHiveInteraction(
+            current.hiveInteraction,
             current.localPlayerId,
             message.players,
             message.chunks,
@@ -371,13 +434,33 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
         startedAt: Date.now(),
         phase: "moving",
       },
+      hiveInteraction: undefined,
     }));
 
     moveToTarget(flower.x, flower.y);
   };
 
   const targetHive = (hive: WorldHiveState) => {
+    setGameSession((current) => ({
+      ...current,
+      flowerInteraction: undefined,
+      hiveInteraction: {
+        hiveId: hive.id,
+        hiveX: hive.x,
+        hiveY: hive.y,
+        startedAt: Date.now(),
+      },
+    }));
+
     moveToTarget(hive.x, hive.y);
+  };
+
+  const clearTargets = () => {
+    setGameSession((current) => ({
+      ...current,
+      flowerInteraction: undefined,
+      hiveInteraction: undefined,
+    }));
   };
 
   const respawn = () => {
@@ -395,6 +478,7 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
     moveToTarget,
     targetFlower,
     targetHive,
+    clearTargets,
     respawn,
     sendAction,
   };

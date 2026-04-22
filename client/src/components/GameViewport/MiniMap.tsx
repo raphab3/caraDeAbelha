@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 
-import type { FlowerInteractionState, WorldHiveState, WorldPlayerState } from "../../types/game";
+import type { FlowerInteractionState, HiveInteractionState, WorldHiveState, WorldPlayerState } from "../../types/game";
 
 const RADAR_RADIUS = 50;
 const REMOTE_PLAYER_MARGIN = 8;
@@ -9,7 +9,10 @@ interface MiniMapProps {
 	players: WorldPlayerState[];
 	hives: WorldHiveState[];
 	flowerInteraction?: FlowerInteractionState;
+	hiveInteraction?: HiveInteractionState;
 	localPlayerId?: string;
+	onClearTargets?: () => void;
+	onCollectorClick?: (hive: WorldHiveState) => void;
 	onPlayerClick?: (x: number, z: number) => void;
 	onRespawn?: () => void;
 }
@@ -108,7 +111,7 @@ function resolveBounds(
 	};
 }
 
-export function MiniMap({ players, hives, flowerInteraction, localPlayerId, onPlayerClick, onRespawn }: MiniMapProps) {
+export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, localPlayerId, onClearTargets, onCollectorClick, onPlayerClick, onRespawn }: MiniMapProps) {
 	const [collapsed, setCollapsed] = useState(true);
 	const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
 	const collectorHive = useMemo(() => hives.find((hive) => hive.id === COLLECTOR_HIVE_ID), [hives]);
@@ -178,6 +181,7 @@ export function MiniMap({ players, hives, flowerInteraction, localPlayerId, onPl
 			top: clampPercent((1 - (flowerInteraction.flowerY - bounds.minY) / bounds.height) * 100),
 		};
 	}, [bounds.height, bounds.minX, bounds.minY, bounds.width, flowerInteraction]);
+	const isCollectorTargeted = collectorHive?.id === hiveInteraction?.hiveId;
 
 	return (
 		<aside
@@ -291,15 +295,41 @@ export function MiniMap({ players, hives, flowerInteraction, localPlayerId, onPl
 					</div>
 
 					<div className="mini-map__footer">
-						{localPlayer ? (
-							<button
-								type="button"
-								className="mini-map__respawn"
-								onClick={() => onRespawn?.()}
-							>
-								Respawn no encontro
-							</button>
-						) : null}
+						<div className="mini-map__actions">
+							{localPlayer ? (
+								<button
+									type="button"
+									className="mini-map__action-button"
+									aria-label="Voltar para o encontro"
+									onClick={() => {
+										onClearTargets?.();
+										onRespawn?.();
+									}}
+								>
+									<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+										<path d="M9 14 4 9l5-5" />
+										<path d="M20 20a8 8 0 0 0-8-8H4" />
+									</svg>
+								</button>
+							) : null}
+
+							{collectorHive ? (
+								<button
+									type="button"
+									className={`mini-map__action-button${isCollectorTargeted ? " mini-map__action-button--active" : ""}`}
+									aria-label="Ir andando para a colmeia coletora"
+									onClick={() => onCollectorClick?.(collectorHive)}
+								>
+									<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+										<path d="M7 10c0-3 2.2-5 5-5s5 2 5 5" />
+										<path d="M6 10h12" />
+										<path d="M8 10v7" />
+										<path d="M16 10v7" />
+										<path d="M8 17c0 1.7 1.8 3 4 3s4-1.3 4-3" />
+									</svg>
+								</button>
+							) : null}
+						</div>
 
 						<div className="mini-map__coordinates" aria-label="Coordenadas atuais">
 							<span className="mini-map__coord-icon" aria-hidden="true">

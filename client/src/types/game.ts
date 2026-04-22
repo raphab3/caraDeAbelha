@@ -214,6 +214,13 @@ export interface FlowerInteractionState {
   phase: "moving" | "collecting";
 }
 
+export interface HiveInteractionState {
+  hiveId: string;
+  hiveX: number;
+  hiveY: number;
+  startedAt: number;
+}
+
 // Player status update from server
 export interface PlayerStatusMessage {
   type: "player_status";
@@ -264,6 +271,7 @@ export interface GameSessionState {
   playerProgress?: PlayerProgressState;
   lastInteraction?: InteractionResult;
   flowerInteraction?: FlowerInteractionState;
+  hiveInteraction?: HiveInteractionState;
   zones?: MapZone[];
   transitions?: MapTransition[];
   zoneState?: ZoneStateMessage;
@@ -274,6 +282,7 @@ export interface GameSessionController extends GameSessionState {
   moveToTarget: (x: number, z: number) => void;
   targetFlower: (flower: WorldFlowerState) => void;
   targetHive: (hive: WorldHiveState) => void;
+  clearTargets: () => void;
   respawn: () => void;
   sendAction: (action: ClientMessage) => void;
 }

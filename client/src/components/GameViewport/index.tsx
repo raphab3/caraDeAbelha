@@ -26,6 +26,7 @@ import { type TapTargetingConfig, type TapTargetingHandlers, useTapTargeting } f
 import type {
   FlowerInteractionState,
   GameSessionState,
+  HiveInteractionState,
   RenderPerformanceSnapshot,
   WorldChunkState,
   WorldFlowerState,
@@ -285,6 +286,7 @@ interface BeeActorProps {
   inputPreviewTargetRef?: MutableRefObject<Vector3 | null>;
   surfaceIndex: WorldSurfaceIndex;
   trackedPositionRef?: MutableRefObject<Vector3>;
+  isCollecting?: boolean;
 }
 
 interface RemoteBeeInstance {
@@ -305,6 +307,7 @@ function BeeActor({
   inputPreviewTargetRef,
   surfaceIndex,
   trackedPositionRef,
+  isCollecting = false,
 }: BeeActorProps) {
   const groupRef = useRef<Group>(null);
   const leftWingRef = useRef<Mesh>(null);
@@ -373,6 +376,8 @@ function BeeActor({
       currentPosition.y < nextFlightHeight
         ? nextFlightHeight
         : MathUtils.lerp(currentPosition.y, nextFlightHeight, 0.18);
+
+    groupRef.current.scale.setScalar(isCollecting ? 1 + Math.sin((elapsedTime + drift) * 10) * 0.035 : 1);
 
     const inputPreviewTarget = inputPreviewTargetRef?.current ?? null;
     const hasInputPreviewTarget = inputPreviewTarget !== null;
@@ -731,6 +736,37 @@ function FlowerTargetMarker({
   );
 }
 
+function HiveTargetMarker({
+  hive,
+  surfaceIndex,
+}: {
+  hive: HiveInteractionState;
+  surfaceIndex: WorldSurfaceIndex;
+}) {
+  const markerRef = useRef<Group>(null);
+  const sceneX = toSceneAxis(hive.hiveX);
+  const sceneZ = toSceneAxis(hive.hiveY);
+  const sceneY = resolveTargetMarkerSceneY(surfaceIndex, hive.hiveX, hive.hiveY);
+
+  useFrame((state) => {
+    if (!markerRef.current) {
+      return;
+    }
+
+    markerRef.current.rotation.y = state.clock.elapsedTime * 1.35;
+    markerRef.current.position.y = sceneY + 0.05 + Math.sin(state.clock.elapsedTime * 2.7) * 0.05;
+  });
+
+  return (
+    <group ref={markerRef} position={[sceneX, sceneY, sceneZ]} renderOrder={31}>
+      <mesh renderOrder={31} rotation={[-Math.PI / 2, 0, 0]}>
+        <primitive attach="geometry" object={flowerTargetRingGeometry} />
+        <meshBasicMaterial color="#ffe59f" depthTest={false} depthWrite={false} opacity={0.82} side={DoubleSide} transparent />
+      </mesh>
+    </group>
+  );
+}
+
 function collectVisibleHives(chunks: WorldChunkState[]): WorldHiveState[] {
   const hives: WorldHiveState[] = [];
 
@@ -1038,6 +1074,7 @@ interface HiveCoreProps {
   chunkSize: number;
   connectionState: GameSessionState["connectionState"];
   flowerInteraction?: FlowerInteractionState;
+  hiveInteraction?: HiveInteractionState;
   fogFar: number;
   fogNear: number;
   groundInputSize: number;
@@ -1055,6 +1092,7 @@ function HiveCore({
   chunkSize,
   connectionState,
   flowerInteraction,
+  hiveInteraction,
   fogFar,
   fogNear,
   groundInputSize,
@@ -1202,12 +1240,14 @@ function HiveCore({
           terrainPointerHandlers={pointerHandlers}
           onFlowerClick={onFlowerClick}
           selectedFlowerId={flowerInteraction?.flowerId}
+          selectedHiveId={hiveInteraction?.hiveId}
           onHiveClick={onHiveClick}
         />
       </Suspense>
 
       {moveTargetMarker ? <MoveTargetMarker target={moveTargetMarker} /> : null}
       {flowerInteraction ? <FlowerTargetMarker flower={flowerInteraction} surfaceIndex={surfaceIndex} /> : null}
+      {hiveInteraction ? <HiveTargetMarker hive={hiveInteraction} surfaceIndex={surfaceIndex} /> : null}
 
       <LocalPlayerMovementController
         connectionState={connectionState}
@@ -1222,6 +1262,7 @@ function HiveCore({
         <BeeActor
           accentColor="#f8c537"
           drift={0}
+          isCollecting={flowerInteraction?.phase === "collecting"}
           isLocal
           localMovementSourceRef={localMovementSourceRef}
           inputPreviewTargetRef={localInputPreviewTargetRef}
@@ -1251,9 +1292,11 @@ interface GameViewportProps {
   renderDistance: number;
   connectionState: GameSessionState["connectionState"];
   flowerInteraction?: FlowerInteractionState;
+  hiveInteraction?: HiveInteractionState;
   localPlayerId?: string;
   onPerformanceChange: (snapshot: RenderPerformanceSnapshot) => void;
   onMoveToTarget: (x: number, z: number) => void;
+  onClearTargets?: () => void;
   onRespawn: () => void;
   onFlowerClick?: (flower: WorldFlowerState) => void;
   onHiveClick?: (hive: WorldHiveState) => void;
@@ -1271,9 +1314,11 @@ export function GameViewport({
   renderDistance,
   connectionState,
   flowerInteraction,
+  hiveInteraction,
   localPlayerId,
   onPerformanceChange,
   onMoveToTarget,
+  onClearTargets,
   onRespawn,
   onFlowerClick,
   onHiveClick,
@@ -1358,6 +1403,7 @@ export function GameViewport({
           chunkSize={chunkSize}
           connectionState={connectionState}
           flowerInteraction={flowerInteraction}
+          hiveInteraction={hiveInteraction}
           fogFar={fogDistances.far}
           fogNear={fogDistances.near}
           groundInputSize={viewportScale.groundInputSize}
@@ -1374,8 +1420,11 @@ export function GameViewport({
       {isMiniMapVisible ? (
         <MiniMap
           flowerInteraction={flowerInteraction}
+          hiveInteraction={hiveInteraction}
           hives={visibleHives}
           localPlayerId={localPlayerId}
+          onClearTargets={onClearTargets}
+          onCollectorClick={onHiveClick}
           players={players}
           onPlayerClick={onMoveToTarget}
           onRespawn={onRespawn}
