@@ -587,6 +587,41 @@ func (layout worldLayout) clampPosition(x float64, y float64) (float64, float64)
 	return clampWorldAxisToBounds(x, bounds.X1, bounds.X2), clampWorldAxisToBounds(y, bounds.Z1, bounds.Z2)
 }
 
+func (layout worldLayout) tileAtPosition(x float64, y float64) (worldTileState, bool) {
+	if len(layout.chunks) == 0 {
+		return worldTileState{}, false
+	}
+
+	chunkKey := buildChunkKey(worldAxisToChunk(x), worldAxisToChunk(y))
+	chunk, ok := layout.chunks[chunkKey]
+	if !ok {
+		return worldTileState{}, false
+	}
+
+	tileX := math.Floor(x)
+	tileY := math.Floor(y)
+	for _, tile := range chunk.Tiles {
+		if math.Floor(tile.X-0.5) == tileX && math.Floor(tile.Z-0.5) == tileY {
+			return tile, true
+		}
+	}
+
+	return worldTileState{}, false
+}
+
+func (layout worldLayout) isTraversablePosition(x float64, y float64) bool {
+	if len(layout.chunks) == 0 {
+		return true
+	}
+
+	tile, ok := layout.tileAtPosition(x, y)
+	if !ok {
+		return false
+	}
+
+	return tile.Type == "grass"
+}
+
 func (layout worldLayout) activeMovementBounds() worldBounds {
 	if layout.edgeBehavior != nil && strings.TrimSpace(layout.edgeBehavior.Type) == "outlands_return_corridor" && layout.edgeBehavior.OutlandsBounds.isValid() {
 		return layout.edgeBehavior.OutlandsBounds

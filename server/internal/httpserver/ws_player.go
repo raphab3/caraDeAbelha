@@ -161,6 +161,10 @@ func (hub *gameHub) movePlayer(clientID string, direction string) bool {
 		nextY = remappedTargetY
 	}
 
+	if !hub.world.isTraversablePosition(nextX, nextY) {
+		return false
+	}
+
 	hub.setPlayerTargetLocked(player, nextX, nextY, now)
 	hub.tick++
 
@@ -185,6 +189,9 @@ func (hub *gameHub) movePlayerTo(clientID string, x float64, z float64) bool {
 		player.Y = currentY
 		clampedX = remappedTargetX
 		clampedY = remappedTargetY
+	}
+	if !hub.world.isTraversablePosition(clampedX, clampedY) {
+		return false
 	}
 	hub.setPlayerTargetLocked(player, clampedX, clampedY, now)
 	hub.tick++
@@ -292,6 +299,13 @@ func (hub *gameHub) advancePlayerLocked(player *playerState, now time.Time) bool
 	distance := math.Hypot(deltaX, deltaY)
 
 	if distance <= movementStopDistance {
+		if !hub.world.isTraversablePosition(*player.TargetX, *player.TargetY) {
+			player.TargetX = nil
+			player.TargetY = nil
+			player.UpdatedAt = now
+			return true
+		}
+
 		player.X = *player.TargetX
 		player.Y = *player.TargetY
 		player.TargetX = nil
@@ -302,6 +316,13 @@ func (hub *gameHub) advancePlayerLocked(player *playerState, now time.Time) bool
 
 	stepDistance := player.Speed * elapsed
 	if stepDistance >= distance {
+		if !hub.world.isTraversablePosition(*player.TargetX, *player.TargetY) {
+			player.TargetX = nil
+			player.TargetY = nil
+			player.UpdatedAt = now
+			return true
+		}
+
 		player.X = *player.TargetX
 		player.Y = *player.TargetY
 		player.TargetX = nil
@@ -311,8 +332,17 @@ func (hub *gameHub) advancePlayerLocked(player *playerState, now time.Time) bool
 	}
 
 	ratio := stepDistance / distance
-	player.X += deltaX * ratio
-	player.Y += deltaY * ratio
+	nextX := player.X + deltaX*ratio
+	nextY := player.Y + deltaY*ratio
+	if !hub.world.isTraversablePosition(nextX, nextY) {
+		player.TargetX = nil
+		player.TargetY = nil
+		player.UpdatedAt = now
+		return true
+	}
+
+	player.X = nextX
+	player.Y = nextY
 	player.UpdatedAt = now
 	return true
 }

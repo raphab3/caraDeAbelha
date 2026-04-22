@@ -39,8 +39,60 @@ func openGameSocket(t *testing.T, websocketURL string, username string) *websock
 	return connection
 }
 
+func buildTraversableTestWorld() worldLayout {
+	return worldLayout{
+		chunks: map[string]worldChunkState{
+			buildChunkKey(0, 0): {
+				Key: buildChunkKey(0, 0),
+				Tiles: []worldTileState{
+					{ID: "tile:0:0", X: 0.5, Y: 0, Z: 0.5, Type: "grass"},
+					{ID: "tile:1:0", X: 1.5, Y: 0, Z: 0.5, Type: "grass"},
+					{ID: "tile:2:0", X: 2.5, Y: 0, Z: 0.5, Type: "grass"},
+					{ID: "tile:3:0", X: 3.5, Y: 0, Z: 0.5, Type: "grass"},
+					{ID: "tile:0:1", X: 0.5, Y: 0, Z: 1.5, Type: "grass"},
+					{ID: "tile:1:1", X: 1.5, Y: 0, Z: 1.5, Type: "grass"},
+					{ID: "tile:2:1", X: 2.5, Y: 0, Z: 1.5, Type: "grass"},
+					{ID: "tile:3:1", X: 3.5, Y: 0, Z: 1.5, Type: "grass"},
+				},
+			},
+			buildChunkKey(1, 0): {
+				Key: buildChunkKey(1, 0),
+				Tiles: []worldTileState{
+					{ID: "tile:4:0", X: 4.5, Y: 0, Z: 0.5, Type: "grass"},
+					{ID: "tile:5:0", X: 5.5, Y: 0, Z: 0.5, Type: "grass"},
+					{ID: "tile:4:1", X: 4.5, Y: 0, Z: 1.5, Type: "grass"},
+					{ID: "tile:5:1", X: 5.5, Y: 0, Z: 1.5, Type: "grass"},
+				},
+			},
+		},
+		hasBounds: true,
+		minX:      0.5,
+		maxX:      5.5,
+		minY:      0.5,
+		maxY:      1.5,
+	}
+}
+
 func TestMovePlayerToCompressesReturnFromOutlands(t *testing.T) {
 	hub := newRuntimeTestHub(time.Date(2026, time.April, 23, 10, 0, 0, 0, time.UTC))
+	hub.world = worldLayout{
+		chunks: map[string]worldChunkState{
+			buildChunkKey(10, 0): {
+				Key: buildChunkKey(10, 0),
+				Tiles: []worldTileState{
+					{ID: "tile:40:0", X: 40.5, Y: 0, Z: 0.5, Type: "grass"},
+					{ID: "tile:40:1", X: 40.5, Y: 0, Z: 1.5, Type: "grass"},
+					{ID: "tile:41:0", X: 41.5, Y: 0, Z: 0.5, Type: "grass"},
+					{ID: "tile:41:1", X: 41.5, Y: 0, Z: 1.5, Type: "grass"},
+				},
+			},
+		},
+		hasBounds: true,
+		minX:      40.5,
+		maxX:      41.5,
+		minY:      0.5,
+		maxY:      1.5,
+	}
 	hub.world.edgeBehavior = &worldEdgeBehavior{
 		Type:           "outlands_return_corridor",
 		PlayableBounds: worldBounds{X1: -45, X2: 45, Z1: -45, Z2: 45},
@@ -67,6 +119,43 @@ func TestMovePlayerToCompressesReturnFromOutlands(t *testing.T) {
 
 	if math.Abs(*player.TargetX-40) > 0.001 || math.Abs(*player.TargetY) > 0.001 {
 		t.Fatalf("expected target to remain inside the playable area at 40,0, got %v,%v", *player.TargetX, *player.TargetY)
+	}
+}
+
+func TestMovePlayerToRejectsMountainTile(t *testing.T) {
+	hub := newGameHub()
+	hub.world = worldLayout{
+		chunks: map[string]worldChunkState{
+			buildChunkKey(0, 0): {
+				Key: buildChunkKey(0, 0),
+				Tiles: []worldTileState{
+					{ID: "tile:0:0", X: 0.5, Y: 0, Z: 0.5, Type: "grass"},
+					{ID: "tile:1:0", X: 1.5, Y: 1, Z: 0.5, Type: "stone"},
+					{ID: "tile:0:1", X: 0.5, Y: 0, Z: 1.5, Type: "grass"},
+					{ID: "tile:1:1", X: 1.5, Y: 0, Z: 1.5, Type: "grass"},
+				},
+			},
+		},
+		hasBounds: true,
+		minX:      0.5,
+		maxX:      1.5,
+		minY:      0.5,
+		maxY:      1.5,
+	}
+
+	player := &playerState{ID: "player:test", Username: "test", X: 0.5, Y: 0.5, Speed: defaultPlayerSpeed}
+	hub.players[player.ID] = player
+
+	if ok := hub.movePlayerTo(player.ID, 1.5, 0.5); ok {
+		t.Fatalf("expected movePlayerTo to reject a mountain tile target")
+	}
+
+	if player.TargetX != nil || player.TargetY != nil {
+		t.Fatalf("expected rejected mountain target to leave no active movement target")
+	}
+
+	if math.Abs(player.X-0.5) > 0.001 || math.Abs(player.Y-0.5) > 0.001 {
+		t.Fatalf("expected player to remain at the original position, got %.2f,%.2f", player.X, player.Y)
 	}
 }
 
@@ -609,14 +698,15 @@ func TestWebSocketRespawnBroadcastsState(t *testing.T) {
 
 func TestAdvancePlayerLockedMovesTowardTargetAtConstantSpeed(t *testing.T) {
 	hub := newGameHub()
+	hub.world = buildTraversableTestWorld()
 	baseTime := time.Date(2026, time.April, 21, 12, 0, 0, 0, time.UTC)
-	targetX := 3.0
-	targetY := 0.0
+	targetX := 3.5
+	targetY := 0.5
 	player := &playerState{
 		ID:        "player:test",
 		Username:  "test",
-		X:         0,
-		Y:         0,
+		X:         0.5,
+		Y:         0.5,
 		TargetX:   &targetX,
 		TargetY:   &targetY,
 		Speed:     2,
@@ -625,8 +715,8 @@ func TestAdvancePlayerLockedMovesTowardTargetAtConstantSpeed(t *testing.T) {
 
 	hub.advancePlayerLocked(player, baseTime.Add(500*time.Millisecond))
 
-	if math.Abs(player.X-1.0) > 0.001 || math.Abs(player.Y) > 0.001 {
-		t.Fatalf("expected player to advance to 1.0,0.0 after 0.5s, got %.3f,%.3f", player.X, player.Y)
+	if math.Abs(player.X-1.5) > 0.001 || math.Abs(player.Y-0.5) > 0.001 {
+		t.Fatalf("expected player to advance to 1.5,0.5 after 0.5s, got %.3f,%.3f", player.X, player.Y)
 	}
 
 	if player.TargetX == nil || player.TargetY == nil {
@@ -635,8 +725,8 @@ func TestAdvancePlayerLockedMovesTowardTargetAtConstantSpeed(t *testing.T) {
 
 	hub.advancePlayerLocked(player, baseTime.Add(1500*time.Millisecond))
 
-	if math.Abs(player.X-3.0) > 0.001 || math.Abs(player.Y) > 0.001 {
-		t.Fatalf("expected player to reach 3.0,0.0 after 1.5s, got %.3f,%.3f", player.X, player.Y)
+	if math.Abs(player.X-3.5) > 0.001 || math.Abs(player.Y-0.5) > 0.001 {
+		t.Fatalf("expected player to reach 3.5,0.5 after 1.5s, got %.3f,%.3f", player.X, player.Y)
 	}
 
 	if player.TargetX != nil || player.TargetY != nil {
@@ -644,8 +734,57 @@ func TestAdvancePlayerLockedMovesTowardTargetAtConstantSpeed(t *testing.T) {
 	}
 }
 
+func TestAdvancePlayerLockedStopsBeforeBlockedMountain(t *testing.T) {
+	hub := newGameHub()
+	hub.world = worldLayout{
+		chunks: map[string]worldChunkState{
+			buildChunkKey(0, 0): {
+				Key: buildChunkKey(0, 0),
+				Tiles: []worldTileState{
+					{ID: "tile:0:0", X: 0.5, Y: 0, Z: 0.5, Type: "grass"},
+					{ID: "tile:1:0", X: 1.5, Y: 1, Z: 0.5, Type: "stone"},
+					{ID: "tile:0:1", X: 0.5, Y: 0, Z: 1.5, Type: "grass"},
+					{ID: "tile:1:1", X: 1.5, Y: 0, Z: 1.5, Type: "grass"},
+				},
+			},
+		},
+		hasBounds: true,
+		minX:      0.5,
+		maxX:      1.5,
+		minY:      0.5,
+		maxY:      1.5,
+	}
+
+	baseTime := time.Date(2026, time.April, 21, 12, 0, 0, 0, time.UTC)
+	targetX := 1.5
+	targetY := 0.5
+	player := &playerState{
+		ID:        "player:test",
+		Username:  "test",
+		X:         0.5,
+		Y:         0.5,
+		TargetX:   &targetX,
+		TargetY:   &targetY,
+		Speed:     2,
+		UpdatedAt: baseTime,
+	}
+
+	if changed := hub.advancePlayerLocked(player, baseTime.Add(500*time.Millisecond)); !changed {
+		t.Fatalf("expected movement attempt to update player state by cancelling blocked travel")
+	}
+
+	if player.TargetX != nil || player.TargetY != nil {
+		t.Fatalf("expected blocked mountain path to clear the active target")
+	}
+
+	if math.Abs(player.X-0.5) > 0.001 || math.Abs(player.Y-0.5) > 0.001 {
+		t.Fatalf("expected player to stay before the blocked mountain tile, got %.2f,%.2f", player.X, player.Y)
+	}
+}
+
 func TestMovePlayerUsesCurrentProgressWhenAlreadyMoving(t *testing.T) {
 	hub := newGameHub()
+	hub.world = buildTraversableTestWorld()
 	baseTime := time.Date(2026, time.April, 21, 14, 0, 0, 0, time.UTC)
 	currentTime := baseTime
 	hub.now = func() time.Time {
@@ -655,8 +794,8 @@ func TestMovePlayerUsesCurrentProgressWhenAlreadyMoving(t *testing.T) {
 	player := &playerState{
 		ID:        "player:test",
 		Username:  "test",
-		X:         0,
-		Y:         0,
+		X:         0.5,
+		Y:         0.5,
 		Speed:     2,
 		UpdatedAt: currentTime,
 	}
@@ -666,8 +805,8 @@ func TestMovePlayerUsesCurrentProgressWhenAlreadyMoving(t *testing.T) {
 		t.Fatalf("expected first move command to succeed")
 	}
 
-	if player.TargetX == nil || math.Abs(*player.TargetX-1) > 0.001 {
-		t.Fatalf("expected first move target to be 1.0, got %v", player.TargetX)
+	if player.TargetX == nil || math.Abs(*player.TargetX-1.5) > 0.001 {
+		t.Fatalf("expected first move target to be 1.5, got %v", player.TargetX)
 	}
 
 	currentTime = baseTime.Add(250 * time.Millisecond)
@@ -675,12 +814,12 @@ func TestMovePlayerUsesCurrentProgressWhenAlreadyMoving(t *testing.T) {
 		t.Fatalf("expected second move command to succeed")
 	}
 
-	if math.Abs(player.X-0.5) > 0.001 {
-		t.Fatalf("expected player to advance to 0.5 before recalculating target, got %.3f", player.X)
+	if math.Abs(player.X-1.0) > 0.001 {
+		t.Fatalf("expected player to advance to 1.0 before recalculating target, got %.3f", player.X)
 	}
 
-	if player.TargetX == nil || math.Abs(*player.TargetX-1.5) > 0.001 {
-		t.Fatalf("expected recalculated target to stay one unit ahead at 1.5, got %v", player.TargetX)
+	if player.TargetX == nil || math.Abs(*player.TargetX-2.0) > 0.001 {
+		t.Fatalf("expected recalculated target to stay one unit ahead at 2.0, got %v", player.TargetX)
 	}
 }
 
@@ -743,7 +882,11 @@ func TestWebSocketSessionUsesDistinctPlayerIDs(t *testing.T) {
 }
 
 func TestWebSocketReconnectLoadsPlayerStateByUsername(t *testing.T) {
-	handler := NewHandler()
+	hub := newGameHub()
+	hub.world = buildTraversableTestWorld()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", hub.handleWebSocket)
+	handler := mux
 	testServer := httptest.NewServer(handler)
 	defer testServer.Close()
 
@@ -770,6 +913,7 @@ func TestWebSocketReconnectLoadsPlayerStateByUsername(t *testing.T) {
 	}
 
 	expectedSpawnX, expectedSpawnY := profileSpawnPosition("beekeeper")
+	expectedSpawnX, expectedSpawnY = hub.clampWorldPosition(expectedSpawnX, expectedSpawnY)
 	expectedTargetX := clampToWorld(expectedSpawnX + 1)
 
 	if math.Abs(movedState.Players[0].X-expectedSpawnX) > 0.001 || math.Abs(movedState.Players[0].Y-expectedSpawnY) > 0.001 {
