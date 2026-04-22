@@ -29,6 +29,7 @@ import type {
   WorldChunkState,
   WorldPlayerState,
 } from "../../types/game";
+import { usePlayerControls } from "../../hooks/usePlayerControls";
 import {
   buildWorldSurfaceIndex,
   GROUND_HEIGHT,
@@ -52,6 +53,10 @@ const SCENE_EDGE_CAMERA_DISTANCE_RATIO = 0.44;
 const FOG_NEAR_RATIO = 0.62;
 const FOG_FAR_PADDING = 4;
 const BEE_TURN_RESPONSE = 10;
+const KEYBOARD_MOVE_SEND_INTERVAL_MS = 100;
+const KEYBOARD_MOVE_LOOKAHEAD_SECONDS = 0.32;
+const KEYBOARD_MOVE_MIN_LOOKAHEAD_DISTANCE = 0.9;
+const MOVEMENT_VECTOR_EPSILON = 0.0001;
 // Important: the black rear piece is the stinger, not the head.
 // The bee visually faces local -X, so movement yaw must treat local +X as the tail.
 const BEE_IDLE_YAW = -Math.PI / 2;
@@ -634,6 +639,118 @@ function MoveTargetMarker({ target }: { target: MoveTargetMarkerState }) {
   );
 }
 
+function LocalPlayerMovementController({
+  connectionState,
+  localPlayer,
+  onMoveToTarget,
+  trackedPositionRef,
+}: {
+  connectionState: GameSessionState["connectionState"];
+  localPlayer?: WorldPlayerState;
+  onMoveToTarget: (x: number, z: number) => void;
+  trackedPositionRef: MutableRefObject<Vector3>;
+}) {
+  const { camera } = useThree();
+  const { backward, forward, left, right } = usePlayerControls();
+  const frontVector = useMemo(() => new Vector3(), []);
+  const sideVector = useMemo(() => new Vector3(), []);
+  const movementVector = useMemo(() => new Vector3(), []);
+  const upVector = useMemo(() => new Vector3(0, 1, 0), []);
+  const lastTargetRef = useRef(new Vector3(Number.NaN, 0, Number.NaN));
+  const lastSentAtRef = useRef(Number.NEGATIVE_INFINITY);
+  const wasMovingRef = useRef(false);
+
+  useEffect(() => {
+    if (connectionState === "connected" && localPlayer) {
+      return;
+    }
+
+    lastSentAtRef.current = Number.NEGATIVE_INFINITY;
+    lastTargetRef.current.set(Number.NaN, 0, Number.NaN);
+    wasMovingRef.current = false;
+  }, [connectionState, localPlayer]);
+
+  useFrame((state) => {
+    if (connectionState !== "connected" || !localPlayer) {
+      return;
+    }
+
+    const zIntent = Number(forward) - Number(backward);
+    const xIntent = Number(right) - Number(left);
+    const anchorSceneX = Number.isFinite(trackedPositionRef.current.x)
+      ? trackedPositionRef.current.x
+      : toSceneAxis(localPlayer.x);
+    const anchorSceneZ = Number.isFinite(trackedPositionRef.current.z)
+      ? trackedPositionRef.current.z
+      : toSceneAxis(localPlayer.y);
+    const anchorWorldX = toWorldAxis(anchorSceneX);
+    const anchorWorldZ = toWorldAxis(anchorSceneZ);
+    const nowMs = state.clock.elapsedTime * 1000;
+
+    if (xIntent === 0 && zIntent === 0) {
+      if (wasMovingRef.current) {
+        onMoveToTarget(anchorWorldX, anchorWorldZ);
+        lastSentAtRef.current = nowMs;
+        lastTargetRef.current.set(anchorWorldX, 0, anchorWorldZ);
+      }
+
+      wasMovingRef.current = false;
+      return;
+    }
+
+    camera.getWorldDirection(frontVector);
+    frontVector.y = 0;
+
+    if (frontVector.lengthSq() <= MOVEMENT_VECTOR_EPSILON) {
+      frontVector.set(0, 0, -1);
+    } else {
+      frontVector.normalize();
+    }
+
+    sideVector.copy(frontVector).cross(upVector).normalize();
+    movementVector.set(0, 0, 0);
+    movementVector.addScaledVector(frontVector, zIntent);
+    movementVector.addScaledVector(sideVector, xIntent);
+
+    if (movementVector.lengthSq() <= MOVEMENT_VECTOR_EPSILON) {
+      return;
+    }
+
+    movementVector.normalize();
+
+    const shouldSendTarget =
+      !wasMovingRef.current ||
+      nowMs - lastSentAtRef.current >= KEYBOARD_MOVE_SEND_INTERVAL_MS;
+
+    if (!shouldSendTarget) {
+      wasMovingRef.current = true;
+      return;
+    }
+
+    const lookaheadDistance = Math.max(
+      localPlayer.speed * KEYBOARD_MOVE_LOOKAHEAD_SECONDS,
+      KEYBOARD_MOVE_MIN_LOOKAHEAD_DISTANCE,
+    );
+    const targetWorldX = anchorWorldX + movementVector.x * lookaheadDistance;
+    const targetWorldZ = anchorWorldZ + movementVector.z * lookaheadDistance;
+
+    if (
+      Math.abs(lastTargetRef.current.x - targetWorldX) <= MOVEMENT_VECTOR_EPSILON &&
+      Math.abs(lastTargetRef.current.z - targetWorldZ) <= MOVEMENT_VECTOR_EPSILON
+    ) {
+      wasMovingRef.current = true;
+      return;
+    }
+
+    onMoveToTarget(targetWorldX, targetWorldZ);
+    lastSentAtRef.current = nowMs;
+    lastTargetRef.current.set(targetWorldX, 0, targetWorldZ);
+    wasMovingRef.current = true;
+  });
+
+  return null;
+}
+
 function CameraRig({
   focusPlayer,
   trackedPositionRef,
@@ -931,6 +1048,13 @@ function HiveCore({
       </Suspense>
 
       {moveTargetMarker ? <MoveTargetMarker target={moveTargetMarker} /> : null}
+
+      <LocalPlayerMovementController
+        connectionState={connectionState}
+        localPlayer={localPlayer}
+        onMoveToTarget={onMoveToTarget}
+        trackedPositionRef={localPlayerPositionRef}
+      />
 
       {localPlayer ? (
         <BeeActor

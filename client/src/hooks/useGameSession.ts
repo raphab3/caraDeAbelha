@@ -7,10 +7,8 @@ import type {
   GameSessionController,
   GameSessionState,
   InteractionResult,
-  MoveDirection,
   PlayerStatusMessage,
   SessionMessage,
-  WorldPlayerState,
   WorldStateMessage,
   ZoneStateMessage,
 } from "../types/game";
@@ -47,62 +45,6 @@ function createInitialState(
     chunkSize: 0,
     tick: 0,
   };
-}
-
-type RelativeMoveDirection = "forward" | "backward" | "left" | "right";
-
-const KEY_TO_DIRECTION: Record<string, RelativeMoveDirection> = {
-  arrowup: "forward",
-  w: "forward",
-  arrowdown: "backward",
-  s: "backward",
-  arrowleft: "left",
-  a: "left",
-  arrowright: "right",
-  d: "right",
-};
-
-const CLOCKWISE_DIRECTIONS: MoveDirection[] = ["up", "right", "down", "left"];
-
-function getHeadingDirection(player?: WorldPlayerState): MoveDirection | undefined {
-  if (player?.targetX === undefined || player.targetY === undefined) {
-    return undefined;
-  }
-
-  const deltaX = player.targetX - player.x;
-  const deltaY = player.targetY - player.y;
-
-  if (Math.abs(deltaX) < 0.001 && Math.abs(deltaY) < 0.001) {
-    return undefined;
-  }
-
-  if (Math.abs(deltaX) > Math.abs(deltaY)) {
-    return deltaX > 0 ? "right" : "left";
-  }
-
-  return deltaY > 0 ? "down" : "up";
-}
-
-function resolveRelativeDirection(
-  inputDirection: RelativeMoveDirection,
-  facingDirection: MoveDirection,
-): MoveDirection {
-  const facingIndex = CLOCKWISE_DIRECTIONS.indexOf(facingDirection);
-
-  if (facingIndex === -1) {
-    return "up";
-  }
-
-  switch (inputDirection) {
-    case "forward":
-      return CLOCKWISE_DIRECTIONS[facingIndex];
-    case "backward":
-      return CLOCKWISE_DIRECTIONS[(facingIndex + 2) % CLOCKWISE_DIRECTIONS.length];
-    case "left":
-      return CLOCKWISE_DIRECTIONS[(facingIndex + 3) % CLOCKWISE_DIRECTIONS.length];
-    case "right":
-      return CLOCKWISE_DIRECTIONS[(facingIndex + 1) % CLOCKWISE_DIRECTIONS.length];
-  }
 }
 
 function isWorldStateMessage(message: unknown): message is WorldStateMessage {
@@ -150,27 +92,12 @@ function resolveDisconnectError(reason?: string): string {
   return normalizedReason ? normalizedReason : DEFAULT_DISCONNECT_ERROR;
 }
 
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-
-  const tagName = target.tagName.toLowerCase();
-  return target.isContentEditable || tagName === "input" || tagName === "textarea" || tagName === "select";
-}
-
 export function useGameSession(username?: string, reconnectKey = 0): GameSessionController {
   const [gameSession, setGameSession] = useState<GameSessionState>(createInitialState("idle"));
   const clientRef = useRef<WSClient | null>(null);
-  const pressedDirectionsRef = useRef<RelativeMoveDirection[]>([]);
-  const localPlayerRef = useRef<WorldPlayerState | undefined>(undefined);
-  const facingDirectionRef = useRef<MoveDirection>("up");
 
   useEffect(() => {
     if (!username) {
-      pressedDirectionsRef.current = [];
-      localPlayerRef.current = undefined;
-      facingDirectionRef.current = "up";
       clientRef.current?.disconnect();
       clientRef.current = null;
       setGameSession(createInitialState("idle"));
@@ -187,10 +114,6 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
       if (!active) {
         return;
       }
-
-      pressedDirectionsRef.current = [];
-      localPlayerRef.current = undefined;
-      facingDirectionRef.current = "up";
 
       setGameSession((current) => {
         const error = current.error ?? resolveDisconnectError(reason);
@@ -330,9 +253,6 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
 
     return () => {
       active = false;
-      pressedDirectionsRef.current = [];
-      localPlayerRef.current = undefined;
-      facingDirectionRef.current = "up";
       window.removeEventListener("offline", handleOffline);
       client.disconnect();
 
@@ -341,98 +261,6 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
       }
     };
   }, [reconnectKey, username]);
-
-  useEffect(() => {
-    const localPlayer = gameSession.localPlayerId
-      ? gameSession.players.find((player) => player.id === gameSession.localPlayerId)
-      : undefined;
-
-    localPlayerRef.current = localPlayer;
-
-    const headingDirection = getHeadingDirection(localPlayer);
-    if (headingDirection) {
-      facingDirectionRef.current = headingDirection;
-    }
-  }, [gameSession.localPlayerId, gameSession.players]);
-
-  useEffect(() => {
-    const syncPressedDirection = (direction: RelativeMoveDirection, pressed: boolean) => {
-      const directions = pressedDirectionsRef.current.filter((value) => value !== direction);
-      if (pressed) {
-        directions.push(direction);
-      }
-
-      pressedDirectionsRef.current = directions;
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-
-      const direction = KEY_TO_DIRECTION[event.key.toLowerCase()];
-      if (!direction) {
-        return;
-      }
-
-      event.preventDefault();
-      syncPressedDirection(direction, true);
-    };
-
-    const handleKeyUp = (event: KeyboardEvent) => {
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-
-      const direction = KEY_TO_DIRECTION[event.key.toLowerCase()];
-      if (!direction) {
-        return;
-      }
-
-      syncPressedDirection(direction, false);
-    };
-
-    const handleBlur = () => {
-      pressedDirectionsRef.current = [];
-    };
-
-    const intervalId = window.setInterval(() => {
-      const inputDirection = pressedDirectionsRef.current.at(-1);
-      if (!inputDirection) {
-        return;
-      }
-
-      // Keep movement grid-stepped: avoid sending a new move while the previous
-      // target is still active, which can cause visible jitter/corrections.
-      const localPlayer = localPlayerRef.current;
-      if (localPlayer?.targetX !== undefined && localPlayer.targetY !== undefined) {
-        return;
-      }
-
-      const headingDirection = getHeadingDirection(localPlayer);
-      if (headingDirection) {
-        facingDirectionRef.current = headingDirection;
-      }
-
-      const direction = resolveRelativeDirection(inputDirection, facingDirectionRef.current);
-
-      clientRef.current?.send({
-        type: "move",
-        dir: direction,
-      });
-    }, 110);
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
-    window.addEventListener("blur", handleBlur);
-
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
-      window.removeEventListener("blur", handleBlur);
-    };
-  }, []);
 
   const moveToTarget = (x: number, z: number) => {
     clientRef.current?.send({
