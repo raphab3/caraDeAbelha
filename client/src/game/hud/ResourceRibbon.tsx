@@ -17,6 +17,7 @@ export interface ResourceRibbonProps {
  */
 export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteraction }: ResourceRibbonProps) => {
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
+  const [flashTone, setFlashTone] = useState<"reward" | "xp">("reward");
 
   // Show flash message on interaction
   useEffect(() => {
@@ -24,8 +25,19 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteract
       return;
     }
 
+    if (lastInteraction.reason.startsWith("Coletando flor")) {
+      return;
+    }
+
     let flashText = "";
-    if (lastInteraction.action.includes("collect") || lastInteraction.action.includes("pollen")) {
+    let nextTone: "reward" | "xp" = "reward";
+    if (lastInteraction.action === "collect_flower" && lastInteraction.reason.includes("XP ganho")) {
+      flashText = "XP ganho";
+      nextTone = "xp";
+    } else if (lastInteraction.action === "level_up") {
+      flashText = `Nível ${lastInteraction.amount}`;
+      nextTone = "xp";
+    } else if (lastInteraction.action.includes("collect") || lastInteraction.action.includes("pollen")) {
       flashText = `+${lastInteraction.amount} pollen`;
     } else if (lastInteraction.action.includes("deposit") || lastInteraction.action.includes("honey")) {
       flashText = `+${lastInteraction.amount} honey`;
@@ -34,6 +46,7 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteract
     }
 
     setFlashMessage(flashText);
+    setFlashTone(nextTone);
 
     const timeoutId = window.setTimeout(() => {
       setFlashMessage(null);
@@ -141,7 +154,7 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteract
       {/* Flash Feedback */}
       {flashMessage && (
         <div className="fixed top-24 left-1/2 transform -translate-x-1/2 animate-bounce pointer-events-none">
-          <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-5 py-2 rounded-full font-black text-lg shadow-[0_4px_24px_rgba(16,185,129,0.5)] border-2 border-green-300/50">
+          <div className={`text-white px-5 py-2 rounded-full font-black text-lg border-2 ${flashTone === "xp" ? "bg-gradient-to-r from-fuchsia-500 to-violet-600 shadow-[0_4px_24px_rgba(168,85,247,0.45)] border-fuchsia-300/50" : "bg-gradient-to-r from-green-500 to-emerald-600 shadow-[0_4px_24px_rgba(16,185,129,0.5)] border-green-300/50"}`}>
             {flashMessage}
           </div>
         </div>

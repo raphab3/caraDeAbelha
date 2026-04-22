@@ -24,10 +24,12 @@ import { AtmosphereBackdrop } from "./AtmosphereBackdrop";
 import { MiniMap } from "./MiniMap";
 import { type TapTargetingConfig, type TapTargetingHandlers, useTapTargeting } from "./useTapTargeting";
 import type {
+  FlowerInteractionState,
   GameSessionState,
   RenderPerformanceSnapshot,
   WorldChunkState,
   WorldFlowerState,
+  WorldHiveState,
   WorldPlayerState,
 } from "../../types/game";
 import { usePlayerControls } from "../../hooks/usePlayerControls";
@@ -73,6 +75,8 @@ const beeWingGeometry = new SphereGeometry(0.26, 24, 24);
 const localMarkerGeometry = new RingGeometry(0.78, 1.04, 40);
 const moveTargetRingGeometry = new RingGeometry(0.22, 0.38, 36);
 const moveTargetCoreGeometry = new CircleGeometry(0.1, 24);
+const flowerTargetRingGeometry = new RingGeometry(0.3, 0.5, 42);
+const flowerTargetCoreGeometry = new CircleGeometry(0.12, 24);
 const disconnectedBeaconGeometry = new IcosahedronGeometry(0.38, 0);
 
 beeStingerGeometry.rotateZ(-Math.PI / 2);
@@ -105,11 +109,28 @@ const moveTargetCoreMaterial = new MeshBasicMaterial({
   opacity: 0.92,
   transparent: true,
 });
+const flowerTargetRingMaterial = new MeshBasicMaterial({
+  color: "#f6ff94",
+  depthTest: false,
+  depthWrite: false,
+  opacity: 0.84,
+  side: DoubleSide,
+  transparent: true,
+});
+const flowerTargetCoreMaterial = new MeshBasicMaterial({
+  color: "#7df9cf",
+  depthTest: false,
+  depthWrite: false,
+  opacity: 0.9,
+  transparent: true,
+});
 const disconnectedBeaconMaterial = new MeshStandardMaterial({
   color: "#b24a32",
   emissive: "#ff6b3d",
   emissiveIntensity: 0.8,
 });
+
+const COLLECTOR_HIVE_ID = "hive:collector";
 
 const BEE_LEFT_STRIPE_OFFSET = new Vector3(-0.35, 0, 0);
 const BEE_RIGHT_STRIPE_OFFSET = new Vector3(0.35, 0, 0);
@@ -674,6 +695,56 @@ function MoveTargetMarker({ target }: { target: MoveTargetMarkerState }) {
   );
 }
 
+function FlowerTargetMarker({
+  flower,
+  surfaceIndex,
+}: {
+  flower: FlowerInteractionState;
+  surfaceIndex: WorldSurfaceIndex;
+}) {
+  const markerRef = useRef<Group>(null);
+  const sceneX = toSceneAxis(flower.flowerX);
+  const sceneZ = toSceneAxis(flower.flowerY);
+  const sceneY = resolveTargetMarkerSceneY(surfaceIndex, flower.flowerX, flower.flowerY);
+
+  useFrame((state) => {
+    if (!markerRef.current) {
+      return;
+    }
+
+    const pulse = flower.phase === "collecting" ? 1.15 : 1;
+    markerRef.current.rotation.y = state.clock.elapsedTime * (flower.phase === "collecting" ? 2.6 : 1.5);
+    markerRef.current.position.y = sceneY + 0.04 + Math.sin(state.clock.elapsedTime * (flower.phase === "collecting" ? 4.8 : 3.2)) * 0.06;
+    markerRef.current.scale.setScalar(pulse + Math.sin(state.clock.elapsedTime * 5) * 0.04);
+  });
+
+  return (
+    <group ref={markerRef} position={[sceneX, sceneY, sceneZ]} renderOrder={32}>
+      <mesh renderOrder={32} rotation={[-Math.PI / 2, 0, 0]}>
+        <primitive attach="geometry" object={flowerTargetRingGeometry} />
+        <primitive attach="material" object={flowerTargetRingMaterial} />
+      </mesh>
+
+      <mesh position={[0, 0.03, 0]} renderOrder={33} rotation={[-Math.PI / 2, 0, 0]}>
+        <primitive attach="geometry" object={flowerTargetCoreGeometry} />
+        <primitive attach="material" object={flowerTargetCoreMaterial} />
+      </mesh>
+    </group>
+  );
+}
+
+function collectVisibleHives(chunks: WorldChunkState[]): WorldHiveState[] {
+  const hives: WorldHiveState[] = [];
+
+  for (const chunk of chunks) {
+    for (const hive of chunk.hives) {
+      hives.push(hive);
+    }
+  }
+
+  return hives;
+}
+
 function LocalPlayerMovementController({
   connectionState,
   inputPreviewTargetRef,
@@ -968,6 +1039,7 @@ interface HiveCoreProps {
   chunks: WorldChunkState[];
   chunkSize: number;
   connectionState: GameSessionState["connectionState"];
+  flowerInteraction?: FlowerInteractionState;
   fogFar: number;
   fogNear: number;
   groundInputSize: number;
@@ -984,6 +1056,7 @@ function HiveCore({
   chunks,
   chunkSize,
   connectionState,
+  flowerInteraction,
   fogFar,
   fogNear,
   groundInputSize,
@@ -1135,6 +1208,7 @@ function HiveCore({
       </Suspense>
 
       {moveTargetMarker ? <MoveTargetMarker target={moveTargetMarker} /> : null}
+      {flowerInteraction ? <FlowerTargetMarker flower={flowerInteraction} surfaceIndex={surfaceIndex} /> : null}
 
       <LocalPlayerMovementController
         connectionState={connectionState}
@@ -1177,6 +1251,7 @@ interface GameViewportProps {
   chunkSize: number;
   renderDistance: number;
   connectionState: GameSessionState["connectionState"];
+  flowerInteraction?: FlowerInteractionState;
   localPlayerId?: string;
   onPerformanceChange: (snapshot: RenderPerformanceSnapshot) => void;
   onMoveToTarget: (x: number, z: number) => void;
@@ -1196,6 +1271,7 @@ export function GameViewport({
   chunkSize,
   renderDistance,
   connectionState,
+  flowerInteraction,
   localPlayerId,
   onPerformanceChange,
   onMoveToTarget,
@@ -1233,6 +1309,7 @@ export function GameViewport({
       return Math.abs(centerChunkX - px) <= renderDistance && Math.abs(centerChunkY - py) <= renderDistance;
     });
   }, [players, localPlayer, chunkSize, renderDistance]);
+  const visibleHives = useMemo(() => collectVisibleHives(chunks), [chunks]);
 
   return (
     <div className="viewport-canvas-shell">
@@ -1253,6 +1330,7 @@ export function GameViewport({
           chunks={chunks}
           chunkSize={chunkSize}
           connectionState={connectionState}
+          flowerInteraction={flowerInteraction}
           fogFar={fogDistances.far}
           fogNear={fogDistances.near}
           groundInputSize={viewportScale.groundInputSize}
@@ -1267,6 +1345,8 @@ export function GameViewport({
       </Canvas>
 
       <MiniMap
+        flowerInteraction={flowerInteraction}
+        hives={visibleHives}
         localPlayerId={localPlayerId}
         players={players}
         onPlayerClick={onMoveToTarget}

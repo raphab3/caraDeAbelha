@@ -516,6 +516,43 @@ body::after {
   filter: drop-shadow(0 0 5px rgba(78, 207, 255, 0.7));
 }
 
+.mini-map__collector-marker,
+.mini-map__flower-marker {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px rgba(9, 17, 28, 0.48);
+}
+
+.mini-map__collector-marker {
+  background: radial-gradient(circle at 35% 35%, #fff7b3 0%, #ffc74d 52%, #a65d08 100%);
+  border: 2px solid rgba(255, 240, 185, 0.92);
+  transform: rotate(45deg);
+  border-radius: 4px;
+  box-shadow:
+    0 0 0 2px rgba(9, 17, 28, 0.48),
+    0 0 14px rgba(255, 196, 77, 0.55);
+}
+
+.mini-map__flower-marker {
+  background: radial-gradient(circle at 40% 35%, #c5fff2 0%, #6ef1c3 58%, #0f7b57 100%);
+  border: 2px solid rgba(206, 255, 244, 0.9);
+  animation: mini-map-flower-pulse 1.8s ease-in-out infinite;
+}
+
+.mini-map__flower-marker--collecting {
+  background: radial-gradient(circle at 40% 35%, #fff7b7 0%, #b4ff64 56%, #347a14 100%);
+  border-color: rgba(244, 255, 194, 0.95);
+  animation-duration: 1s;
+}
+
+@keyframes mini-map-flower-pulse {
+  0%,
+  100% { transform: scale(0.9); }
+  50% { transform: scale(1.15); }
+}
+
 /* Remote player marker — clickable */
 .mini-map__marker--remote {
   pointer-events: all;
@@ -644,6 +681,18 @@ body::after {
   letter-spacing: 0.04em;
   color: rgba(200, 236, 255, 0.88);
   text-transform: uppercase;
+}
+
+.mini-map__coordinates--collector {
+  color: rgba(255, 227, 161, 0.92);
+}
+
+.mini-map__collector-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ffe38d, #ff9c2f);
+  box-shadow: 0 0 10px rgba(255, 184, 61, 0.55);
 }
 
 .mini-map__coord-icon {

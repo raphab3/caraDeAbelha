@@ -41,16 +41,25 @@ export const InteractionFeed = ({ lastInteraction }: InteractionFeedProps) => {
   }, [lastInteraction]);
 
   // Format action name for display
-  const getActionLabel = (action: string): string => {
+  const getActionLabel = (interaction: InteractionResult): string => {
+    if (interaction.action === "collect_flower" && interaction.reason.startsWith("Coletando flor")) {
+      return "Iniciou coleta";
+    }
+
+    if (interaction.action === "collect_flower" && interaction.reason.includes("XP ganho")) {
+      return "Estudou flor";
+    }
+
     const labels: Record<string, string> = {
       collect_flower: "Colheu flor",
       deposit_pollen: "Depositou polen",
       collect_pollen: "Coletou polen",
       interact_hive: "Visitou colmeia",
       failed_collection: "Falha na coleta",
+      level_up: "Subiu de nível",
     };
 
-    return labels[action] ?? action;
+    return labels[interaction.action] ?? interaction.action;
   };
 
   if (!visible || !lastInteraction) {
@@ -58,6 +67,7 @@ export const InteractionFeed = ({ lastInteraction }: InteractionFeedProps) => {
   }
 
   const isSuccess = lastInteraction.success;
+  const showReason = Boolean(lastInteraction.reason) && (!isSuccess || lastInteraction.amount === 0 || lastInteraction.reason.includes("XP ganho"));
   const bgColor = isSuccess ? "bg-green-600" : "bg-red-600";
   const borderColor = isSuccess ? "border-green-700" : "border-red-700";
   const textColor = "text-white";
@@ -91,7 +101,7 @@ export const InteractionFeed = ({ lastInteraction }: InteractionFeedProps) => {
               />
             </svg>
           )}
-          <span className="text-lg font-bold">{getActionLabel(lastInteraction.action)}</span>
+          <span className="text-lg font-bold">{getActionLabel(lastInteraction)}</span>
         </div>
 
         {/* Amount and Status */}
@@ -102,7 +112,7 @@ export const InteractionFeed = ({ lastInteraction }: InteractionFeedProps) => {
               {lastInteraction.amount}
             </p>
           )}
-          {!isSuccess && lastInteraction.reason && (
+          {showReason && (
             <p className="text-sm opacity-90 italic">{lastInteraction.reason}</p>
           )}
         </div>

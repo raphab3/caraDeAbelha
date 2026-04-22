@@ -76,6 +76,7 @@ export default function PlayerExperience() {
               chunks={gameSession.chunks}
               chunkSize={gameSession.chunkSize}
               connectionState={gameSession.connectionState}
+              flowerInteraction={gameSession.flowerInteraction}
               localPlayerId={gameSession.localPlayerId}
               onFlowerClick={gameSession.targetFlower}
               onMoveToTarget={gameSession.moveToTarget}

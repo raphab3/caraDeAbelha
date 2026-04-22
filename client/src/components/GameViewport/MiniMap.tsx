@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
 
-import type { WorldPlayerState } from "../../types/game";
+import type { FlowerInteractionState, WorldHiveState, WorldPlayerState } from "../../types/game";
 
 const RADAR_RADIUS = 50;
 const REMOTE_PLAYER_MARGIN = 8;
 
 interface MiniMapProps {
 	players: WorldPlayerState[];
+	hives: WorldHiveState[];
+	flowerInteraction?: FlowerInteractionState;
 	localPlayerId?: string;
 	onPlayerClick?: (x: number, z: number) => void;
 	onRespawn?: () => void;
@@ -31,6 +33,15 @@ interface CoordinateReadout {
 	latitudeLabel: string;
 	longitudeLabel: string;
 }
+
+interface MiniMapPoi {
+	id: string;
+	label: string;
+	left: number;
+	top: number;
+}
+
+const COLLECTOR_HIVE_ID = "hive:collector";
 
 function clampPercent(value: number): number {
 	return Math.min(100, Math.max(0, value));
@@ -58,6 +69,7 @@ function formatLongitude(value: number): string {
 
 function resolveBounds(
 	players: WorldPlayerState[],
+	collectorHive: WorldHiveState | undefined,
 	localPlayer?: WorldPlayerState,
 ): MiniMapBounds {
 	const anchorX = localPlayer?.x ?? 0;
@@ -79,6 +91,13 @@ function resolveBounds(
 		maxY = Math.max(maxY, player.y + REMOTE_PLAYER_MARGIN);
 	}
 
+	if (collectorHive) {
+		minX = Math.min(minX, collectorHive.x - REMOTE_PLAYER_MARGIN);
+		maxX = Math.max(maxX, collectorHive.x + REMOTE_PLAYER_MARGIN);
+		minY = Math.min(minY, collectorHive.y - REMOTE_PLAYER_MARGIN);
+		maxY = Math.max(maxY, collectorHive.y + REMOTE_PLAYER_MARGIN);
+	}
+
 	return {
 		minX,
 		maxX,
@@ -89,9 +108,10 @@ function resolveBounds(
 	};
 }
 
-export function MiniMap({ players, localPlayerId, onPlayerClick, onRespawn }: MiniMapProps) {
+export function MiniMap({ players, hives, flowerInteraction, localPlayerId, onPlayerClick, onRespawn }: MiniMapProps) {
 	const [collapsed, setCollapsed] = useState(true);
 	const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
+	const collectorHive = useMemo(() => hives.find((hive) => hive.id === COLLECTOR_HIVE_ID), [hives]);
 
 	const localPlayer = useMemo(
 		() => players.find((player) => player.id === localPlayerId),
@@ -99,8 +119,8 @@ export function MiniMap({ players, localPlayerId, onPlayerClick, onRespawn }: Mi
 	);
 
 	const bounds = useMemo(
-		() => resolveBounds(players, localPlayer),
-		[localPlayer, players],
+		() => resolveBounds(players, collectorHive, localPlayer),
+		[collectorHive, localPlayer, players],
 	);
 
 	const markers = useMemo<MiniMapMarker[]>(() => {
@@ -134,6 +154,30 @@ export function MiniMap({ players, localPlayerId, onPlayerClick, onRespawn }: Mi
 			longitudeLabel: formatLongitude(localPlayer?.x ?? 0),
 		};
 	}, [localPlayer?.x, localPlayer?.y]);
+	const collectorPoi = useMemo<MiniMapPoi | undefined>(() => {
+		if (!collectorHive) {
+			return undefined;
+		}
+
+		return {
+			id: collectorHive.id,
+			label: "Colmeia coletora",
+			left: clampPercent(((collectorHive.x - bounds.minX) / bounds.width) * 100),
+			top: clampPercent((1 - (collectorHive.y - bounds.minY) / bounds.height) * 100),
+		};
+	}, [bounds.height, bounds.minX, bounds.minY, bounds.width, collectorHive]);
+	const flowerPoi = useMemo<MiniMapPoi | undefined>(() => {
+		if (!flowerInteraction) {
+			return undefined;
+		}
+
+		return {
+			id: flowerInteraction.flowerId,
+			label: flowerInteraction.phase === "collecting" ? "Flor em coleta" : "Flor alvo",
+			left: clampPercent(((flowerInteraction.flowerX - bounds.minX) / bounds.width) * 100),
+			top: clampPercent((1 - (flowerInteraction.flowerY - bounds.minY) / bounds.height) * 100),
+		};
+	}, [bounds.height, bounds.minX, bounds.minY, bounds.width, flowerInteraction]);
 
 	return (
 		<aside
@@ -179,6 +223,24 @@ export function MiniMap({ players, localPlayerId, onPlayerClick, onRespawn }: Mi
 						<span className="mini-map__compass mini-map__compass--s">S</span>
 						<span className="mini-map__compass mini-map__compass--w">O</span>
 						<span className="mini-map__compass mini-map__compass--e">L</span>
+
+						{collectorPoi ? (
+							<div
+								className="mini-map__marker"
+								style={{ left: `${collectorPoi.left}%`, top: `${collectorPoi.top}%` }}
+							>
+								<span className="mini-map__collector-marker" aria-label={collectorPoi.label} />
+							</div>
+						) : null}
+
+						{flowerPoi ? (
+							<div
+								className="mini-map__marker"
+								style={{ left: `${flowerPoi.left}%`, top: `${flowerPoi.top}%` }}
+							>
+								<span className={`mini-map__flower-marker${flowerInteraction?.phase === "collecting" ? " mini-map__flower-marker--collecting" : ""}`} aria-label={flowerPoi.label} />
+							</div>
+						) : null}
 
 						{markers.map((player) =>
 							player.isLocal ? (
@@ -244,11 +306,20 @@ export function MiniMap({ players, localPlayerId, onPlayerClick, onRespawn }: Mi
 								📍
 							</span>
 							<span>
-								{targetPlayer
+								{flowerPoi
+									? flowerPoi.label
+									: targetPlayer
 									? `Lat ${formatLatitude(targetPlayer.y)}, Long ${formatLongitude(targetPlayer.x)}`
 									: `Lat ${localCoordinates.latitudeLabel}, Long ${localCoordinates.longitudeLabel}`}
 							</span>
 						</div>
+
+						{collectorPoi ? (
+							<div className="mini-map__coordinates mini-map__coordinates--collector" aria-label="Ponto de entrega principal">
+								<span className="mini-map__collector-dot" aria-hidden="true" />
+								<span>Coletor principal visível</span>
+							</div>
+						) : null}
 					</div>
 				</>
 			) : null}
