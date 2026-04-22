@@ -45,6 +45,14 @@ interface MiniMapPoi {
 }
 
 const COLLECTOR_HIVE_ID = "hive:collector";
+const COLLECTOR_HIVE_FALLBACK: WorldHiveState = {
+	id: COLLECTOR_HIVE_ID,
+	x: 0.5,
+	y: 0.5,
+	scale: 2.4,
+	toneColor: "#d7963a",
+	glowColor: "#ffe08a",
+};
 
 function clampPercent(value: number): number {
 	return Math.min(100, Math.max(0, value));
@@ -114,7 +122,7 @@ function resolveBounds(
 export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, localPlayerId, onClearTargets, onCollectorClick, onPlayerClick, onRespawn }: MiniMapProps) {
 	const [collapsed, setCollapsed] = useState(true);
 	const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
-	const collectorHive = useMemo(() => hives.find((hive) => hive.id === COLLECTOR_HIVE_ID), [hives]);
+	const collectorHive = useMemo(() => hives.find((hive) => hive.id === COLLECTOR_HIVE_ID) ?? COLLECTOR_HIVE_FALLBACK, [hives]);
 
 	useEffect(() => {
 		const handleKeyDown = (event: KeyboardEvent) => {
@@ -184,11 +192,7 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 			longitudeLabel: formatLongitude(localPlayer?.x ?? 0),
 		};
 	}, [localPlayer?.x, localPlayer?.y]);
-	const collectorPoi = useMemo<MiniMapPoi | undefined>(() => {
-		if (!collectorHive) {
-			return undefined;
-		}
-
+	const collectorPoi = useMemo<MiniMapPoi>(() => {
 		return {
 			id: collectorHive.id,
 			label: "Colmeia coletora",
@@ -256,14 +260,12 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 						<span className="mini-map__compass mini-map__compass--w">O</span>
 						<span className="mini-map__compass mini-map__compass--e">L</span>
 
-						{collectorPoi ? (
-							<div
-								className="mini-map__marker"
-								style={{ left: `${collectorPoi.left}%`, top: `${collectorPoi.top}%` }}
-							>
-								<span className="mini-map__collector-marker" aria-label={collectorPoi.label} />
-							</div>
-						) : null}
+						<div
+							className="mini-map__marker"
+							style={{ left: `${collectorPoi.left}%`, top: `${collectorPoi.top}%` }}
+						>
+							<span className="mini-map__collector-marker" aria-label={collectorPoi.label} />
+						</div>
 
 						{flowerPoi ? (
 							<div
@@ -341,22 +343,20 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 								</button>
 							) : null}
 
-							{collectorHive ? (
-								<button
-									type="button"
-									className={`mini-map__action-button${isCollectorTargeted ? " mini-map__action-button--active" : ""}`}
-									aria-label="Ir andando para a colmeia coletora"
-									onClick={() => onCollectorClick?.(collectorHive)}
-								>
-									<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-										<path d="M7 10c0-3 2.2-5 5-5s5 2 5 5" />
-										<path d="M6 10h12" />
-										<path d="M8 10v7" />
-										<path d="M16 10v7" />
-										<path d="M8 17c0 1.7 1.8 3 4 3s4-1.3 4-3" />
-									</svg>
-								</button>
-							) : null}
+							<button
+								type="button"
+								className={`mini-map__action-button mini-map__action-button--collector${isCollectorTargeted ? " mini-map__action-button--active" : ""}`}
+								aria-label="Ir andando para a colmeia coletora"
+								onClick={() => onCollectorClick?.(collectorHive)}
+							>
+								<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+									<path d="M7 10c0-3 2.2-5 5-5s5 2 5 5" />
+									<path d="M6 10h12" />
+									<path d="M8 10v7" />
+									<path d="M16 10v7" />
+									<path d="M8 17c0 1.7 1.8 3 4 3s4-1.3 4-3" />
+								</svg>
+							</button>
 						</div>
 
 						<div className="mini-map__coordinates" aria-label="Coordenadas atuais">
