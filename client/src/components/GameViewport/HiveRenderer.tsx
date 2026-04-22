@@ -108,6 +108,8 @@ export function HiveRenderer({
 		return null;
 	}
 
+	return (
+		<group>
 			{hiveMeshSources.map((source, sourceIndex) => (
 				<InstancedHiveLayer
 					key={`hive-model:${sourceIndex}`}
@@ -126,6 +128,8 @@ export function HiveRenderer({
 					}}
 				/>
 			))}
+		</group>
+	);
 }
 
 /**

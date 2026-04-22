@@ -110,6 +110,8 @@ export function FlowerRenderer({
 		return null;
 	}
 
+	return (
+		<group>
 			{flowerMeshSources.map((source, sourceIndex) => (
 				<InstancedFlowerLayer
 					key={`flower-model:${sourceIndex}`}
@@ -128,6 +130,8 @@ export function FlowerRenderer({
 					}}
 				/>
 			))}
+		</group>
+	);
 }
 
 /**
