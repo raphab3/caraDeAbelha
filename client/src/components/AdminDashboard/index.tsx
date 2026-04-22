@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import { AdminPlayersCard } from "../AdminPlayersCard";
 import { useBackendHealth } from "../../hooks/useBackendHealth";
 import { useClientFPS } from "../../hooks/useClientFPS";
 import { useServerMetrics } from "../../hooks/useServerMetrics";
@@ -76,6 +77,8 @@ export function AdminDashboard() {
         <MetricCard label="Ping" value={backendHealth.latencyMs !== undefined ? `${backendHealth.latencyMs} ms` : "--"} />
         <MetricCard label="API health" value={resolveHealthLabel(backendHealth.state)} />
       </div>
+
+      <AdminPlayersCard />
     </div>
   );
 }

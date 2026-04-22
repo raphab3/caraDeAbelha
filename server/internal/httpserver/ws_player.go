@@ -11,24 +11,28 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
 
+	now := hub.now()
+
 	profile, ok := hub.profiles[profileKey]
 	if !ok {
 		spawnX, spawnY := profileSpawnPosition(profileKey)
 		spawnX, spawnY = hub.clampWorldPosition(spawnX, spawnY)
 		profile = &playerState{
-			ID:        buildPlayerID(profileKey),
-			Username:  username,
-			X:         spawnX,
-			Y:         spawnY,
-			Speed:     defaultPlayerSpeed,
-			UpdatedAt: hub.now(),
+			ID:         buildPlayerID(profileKey),
+			Username:   username,
+			X:          spawnX,
+			Y:          spawnY,
+			Speed:      defaultPlayerSpeed,
+			UpdatedAt:  now,
+			LastSeenAt: now,
 		}
 		hub.profiles[profileKey] = profile
 	}
 
-	hub.advancePlayerLocked(profile, hub.now())
+	hub.advancePlayerLocked(profile, now)
 
 	profile.Username = username
+	profile.LastSeenAt = now
 	replacedClient := hub.clients[profile.ID]
 
 	client := &clientSession{
@@ -42,6 +46,23 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 	hub.tick++
 
 	return client, replacedClient, nil
+}
+
+func (hub *gameHub) touchPlayerLastSeen(clientID string, seenAt time.Time) {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	client, ok := hub.clients[clientID]
+	if !ok || client == nil {
+		return
+	}
+
+	profile, ok := hub.profiles[client.profileKey]
+	if !ok || profile == nil {
+		return
+	}
+
+	profile.LastSeenAt = seenAt
 }
 
 func (hub *gameHub) unregister(client *clientSession) bool {

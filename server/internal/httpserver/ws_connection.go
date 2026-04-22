@@ -39,7 +39,9 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	connection.SetPongHandler(func(string) error {
-		return connection.SetReadDeadline(hub.now().Add(hub.pongWait))
+		now := hub.now()
+		hub.touchPlayerLastSeen(client.id, now)
+		return connection.SetReadDeadline(now.Add(hub.pongWait))
 	})
 
 	stopPingLoop := make(chan struct{})
@@ -70,7 +72,10 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if err := connection.SetReadDeadline(hub.now().Add(hub.pongWait)); err != nil {
+		now := hub.now()
+		hub.touchPlayerLastSeen(client.id, now)
+
+		if err := connection.SetReadDeadline(now.Add(hub.pongWait)); err != nil {
 			return
 		}
 

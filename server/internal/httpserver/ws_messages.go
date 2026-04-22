@@ -10,14 +10,15 @@ type playerAction struct {
 }
 
 type playerState struct {
-	ID        string    `json:"id"`
-	Username  string    `json:"username"`
-	X         float64   `json:"x"`
-	Y         float64   `json:"y"`
-	TargetX   *float64  `json:"targetX,omitempty"`
-	TargetY   *float64  `json:"targetY,omitempty"`
-	Speed     float64   `json:"speed"`
-	UpdatedAt time.Time `json:"-"`
+	ID         string    `json:"id"`
+	Username   string    `json:"username"`
+	X          float64   `json:"x"`
+	Y          float64   `json:"y"`
+	TargetX    *float64  `json:"targetX,omitempty"`
+	TargetY    *float64  `json:"targetY,omitempty"`
+	Speed      float64   `json:"speed"`
+	UpdatedAt  time.Time `json:"-"`
+	LastSeenAt time.Time `json:"-"`
 }
 
 type sessionMessage struct {

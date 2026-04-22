@@ -29,6 +29,36 @@ export interface ServerMetricsState {
   error?: string;
 }
 
+export interface AdminPlayerSummaryDTO {
+  id: string;
+  username: string;
+  online: boolean;
+  lastSeenAt?: string;
+}
+
+export interface AdminPlayersResponse {
+  status: string;
+  service: string;
+  timestamp: string;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  players: AdminPlayerSummaryDTO[];
+}
+
+export interface AdminPlayersState {
+  state: "loading" | "online" | "offline";
+  service?: string;
+  updatedAt?: string;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  players: AdminPlayerSummaryDTO[];
+  error?: string;
+}
+
 export interface WorldPlayerState {
   id: string;
   username: string;
