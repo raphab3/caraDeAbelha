@@ -16,12 +16,12 @@ Execution preference: `codebase + ui-ux-pro-max + Context7`
 
 ## Task list
 
-- [ ] `TASK-MBP-01` Bootstrap do dominio `MapBuilder` com tipos, catalogo, base procedural e store Zustand.
-- [ ] `TASK-MBP-02` Registrar a rota `/admin/builder` e montar a workbench administrativa com header, canvas region, inspector e asset shelf.
-- [ ] `TASK-MBP-03` Implementar a exportacao de stage alinhada ao contrato atual do parser Go.
-- [ ] `TASK-MBP-04` Implementar o canvas 3D com base procedural, snapping, gesto de pintura e antispam por `x:y:z`.
-- [ ] `TASK-MBP-05` Implementar renderizacao editavel dos props, delete sem click-through e inspector de selecao.
-- [ ] `TASK-MBP-06` Fechar a integracao end-to-end do builder e validar os criterios principais da spec.
+- [x] `TASK-MBP-01` Bootstrap do dominio `MapBuilder` com tipos, catalogo, base procedural e store Zustand.
+- [x] `TASK-MBP-02` Registrar a rota `/admin/builder` e montar a workbench administrativa com header, canvas region, inspector e asset shelf.
+- [x] `TASK-MBP-03` Implementar a exportacao de stage alinhada ao contrato atual do parser Go.
+- [x] `TASK-MBP-04` Implementar o canvas 3D com base procedural, snapping, gesto de pintura e antispam por `x:y:z` OBS: validar responsividade da tela e usar o modo tela cheia para criar mapas.
+- [x] `TASK-MBP-05` Implementar renderizacao editavel dos props, delete sem click-through e inspector de selecao.
+- [x] `TASK-MBP-06` Fechar a integracao end-to-end do builder e validar os criterios principais da spec.
 
 ## Detalhamento
 

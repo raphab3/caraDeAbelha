@@ -29,6 +29,12 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     description: "Geracao e exportacao.",
     badge: "tool",
   },
+  {
+    to: "/admin/builder",
+    label: "Map Builder Pro",
+    description: "Autoria visual de stages.",
+    badge: "editor",
+  },
 ];
 
 function resolveNavItemClassName(isActive: boolean): string {

@@ -58,7 +58,7 @@ const FOG_FAR_PADDING = 3;
 const VIEWPORT_CAMERA = {
   base: 18,
   initialPositionRatio: [1, 0.34, 1.08] as const,
-  maxZoomDistance: 30,
+  maxZoomDistance: 20,
   minZoomDistance: 7.5,
   sceneSpanRatio: 0.3,
 } as const;
