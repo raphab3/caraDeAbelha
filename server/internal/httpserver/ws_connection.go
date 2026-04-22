@@ -112,6 +112,16 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		case "respawn":
 			shouldBroadcast = hub.respawnPlayer(client.id)
 
+		case "collect_flower":
+			nodeID, ok := raw["nodeId"].(string)
+			if !ok {
+				continue
+			}
+			shouldBroadcast = hub.collectFlower(client.id, nodeID)
+
+		case "deposit_honey":
+			shouldBroadcast = hub.depositHoney(client.id)
+
 		case "unlock_zone":
 			zoneID, ok := raw["zoneId"].(string)
 			if !ok {

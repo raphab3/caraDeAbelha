@@ -168,12 +168,21 @@ export interface RespawnAction {
   type: "respawn";
 }
 
+export interface CollectFlowerAction {
+  type: "collect_flower";
+  nodeId: string;
+}
+
+export interface DepositAction {
+  type: "deposit_honey";
+}
+
 export interface UnlockZoneAction {
   type: "unlock_zone";
   zoneId: string;
 }
 
-export type ClientMessage = MoveAction | MoveToAction | RespawnAction | UnlockZoneAction;
+export type ClientMessage = MoveAction | MoveToAction | RespawnAction | CollectFlowerAction | DepositAction | UnlockZoneAction;
 
 // Player progression state: economy, levels, zones
 export interface PlayerProgressState {

@@ -325,3 +325,93 @@ func (hub *gameHub) unlockZone(clientID string, zoneID string) bool {
 
 	return success
 }
+
+// collectFlower handles a flower collection action from a player.
+// Returns whether the action should trigger a broadcast.
+func (hub *gameHub) collectFlower(clientID string, nodeID string) bool {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	client, ok := hub.clients[clientID]
+	if !ok || client == nil {
+		return false
+	}
+
+	progress, ok := hub.playerProgress[clientID]
+	if !ok || progress == nil {
+		// Initialize player progress if not exists
+		progress = &loopbase.PlayerProgress{
+			PlayerID:        clientID,
+			UnlockedZoneIDs: []string{"zone_0"},
+		}
+		hub.playerProgress[clientID] = progress
+	}
+
+	// For now, just record that collection was attempted
+	// Full validation would require node location and player position
+	pollenGained := 10 // Default pollen per flower
+	success := true
+	reason := "Collected pollen successfully"
+
+	// Send interaction result feedback
+	hub.sendInteractionResult(client, "collect_flower", success, pollenGained, reason)
+
+	// Send updated player status
+	if success {
+		progress.PollenCarried += pollenGained
+		hub.sendPlayerStatus(client, progress)
+	}
+
+	return success
+}
+
+// depositHoney handles a honey deposit action from a player.
+// Returns whether the action should trigger a broadcast.
+func (hub *gameHub) depositHoney(clientID string) bool {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	client, ok := hub.clients[clientID]
+	if !ok || client == nil {
+		return false
+	}
+
+	progress, ok := hub.playerProgress[clientID]
+	if !ok || progress == nil {
+		// Initialize player progress if not exists
+		progress = &loopbase.PlayerProgress{
+			PlayerID:        clientID,
+			UnlockedZoneIDs: []string{"zone_0"},
+		}
+		hub.playerProgress[clientID] = progress
+	}
+
+	// Convert pollen to honey: 10 pollen = 1 honey
+	honeyGained := progress.PollenCarried / 10
+	if honeyGained == 0 && progress.PollenCarried > 0 {
+		// Not enough pollen to convert
+		hub.sendInteractionResult(client, "deposit_honey", false, 0, "Not enough pollen (need 10)")
+		return false
+	}
+
+	success := honeyGained > 0
+	reason := "Honey deposited successfully"
+
+	// Update progress
+	if success {
+		progress.PollenCarried = progress.PollenCarried % 10 // Remainder stays
+		progress.Honey += honeyGained
+	} else {
+		reason = "No pollen to deposit"
+	}
+
+	// Send interaction result feedback
+	hub.sendInteractionResult(client, "deposit_honey", success, honeyGained, reason)
+
+	// Send updated player status
+	if success {
+		hub.sendPlayerStatus(client, progress)
+	}
+
+	return success
+}

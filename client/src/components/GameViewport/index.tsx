@@ -25,8 +25,6 @@ import { MiniMap } from "./MiniMap";
 import { type TapTargetingConfig, type TapTargetingHandlers, useTapTargeting } from "./useTapTargeting";
 import type {
   GameSessionState,
-  MapZone,
-  PlayerProgressState,
   RenderPerformanceSnapshot,
   WorldChunkState,
   WorldPlayerState,
@@ -794,9 +792,9 @@ interface HiveCoreProps {
   localPlayerId?: string;
   localPlayerPositionRef: MutableRefObject<Vector3>;
   onMoveToTarget: (x: number, z: number) => void;
+  onFlowerClick?: (flowerId: string) => void;
+  onHiveClick?: () => void;
   tapTargetingConfig?: Partial<TapTargetingConfig>;
-  zones?: MapZone[];
-  playerProgress?: PlayerProgressState;
 }
 
 function HiveCore({
@@ -810,6 +808,8 @@ function HiveCore({
   localPlayerId,
   localPlayerPositionRef,
   onMoveToTarget,
+  onFlowerClick,
+  onHiveClick,
   tapTargetingConfig,
 }: HiveCoreProps) {
   const [moveTargetMarker, setMoveTargetMarker] = useState<MoveTargetMarkerState | null>(null);
@@ -925,6 +925,8 @@ function HiveCore({
           chunks={chunks}
           detailFocus={detailFocus}
           terrainPointerHandlers={pointerHandlers}
+          onFlowerClick={onFlowerClick}
+          onHiveClick={onHiveClick}
         />
       </Suspense>
 
@@ -964,6 +966,8 @@ interface GameViewportProps {
   onPerformanceChange: (snapshot: RenderPerformanceSnapshot) => void;
   onMoveToTarget: (x: number, z: number) => void;
   onRespawn: () => void;
+  onFlowerClick?: (flowerId: string) => void;
+  onHiveClick?: () => void;
   tapTargetingConfig?: Partial<TapTargetingConfig>;
 }
 
@@ -981,6 +985,8 @@ export function GameViewport({
   onPerformanceChange,
   onMoveToTarget,
   onRespawn,
+  onFlowerClick,
+  onHiveClick,
   tapTargetingConfig,
 }: GameViewportProps) {
   const localPlayer = useMemo(
@@ -1038,6 +1044,8 @@ export function GameViewport({
           localPlayerId={localPlayerId}
           localPlayerPositionRef={localPlayerPositionRef}
           onMoveToTarget={onMoveToTarget}
+          onFlowerClick={onFlowerClick}
+          onHiveClick={onHiveClick}
           tapTargetingConfig={tapTargetingConfig}
           players={nearbyPlayers}
         />
