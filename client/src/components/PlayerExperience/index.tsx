@@ -83,6 +83,7 @@ export default function PlayerExperience() {
               connectionState={gameSession.connectionState}
               flowerInteraction={gameSession.flowerInteraction}
               hiveInteraction={gameSession.hiveInteraction}
+              lastInteraction={gameSession.lastInteraction}
               localPlayerId={gameSession.localPlayerId}
               onClearTargets={gameSession.clearTargets}
               onFlowerClick={gameSession.targetFlower}

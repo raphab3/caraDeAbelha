@@ -27,6 +27,7 @@ import type {
   FlowerInteractionState,
   GameSessionState,
   HiveInteractionState,
+  InteractionResult,
   RenderPerformanceSnapshot,
   WorldChunkState,
   WorldFlowerState,
@@ -68,6 +69,7 @@ const MOVEMENT_VECTOR_EPSILON = 0.0001;
 // The bee visually faces local -X, so movement yaw must treat local +X as the tail.
 const BEE_IDLE_YAW = -Math.PI / 2;
 const BEE_MOVEMENT_YAW_OFFSET = Math.PI / 2;
+const DEFAULT_FLOWER_COLLECT_DURATION_MS = 1150;
 
 const beeBodyGeometry = new SphereGeometry(0.62, 32, 32);
 const beeStripeGeometry = new BoxGeometry(0.12, 0.9, 1.18);
@@ -1074,6 +1076,7 @@ interface HiveCoreProps {
   chunkSize: number;
   connectionState: GameSessionState["connectionState"];
   flowerInteraction?: FlowerInteractionState;
+  flowerCollectDurationMs?: number;
   hiveInteraction?: HiveInteractionState;
   fogFar: number;
   fogNear: number;
@@ -1092,6 +1095,7 @@ function HiveCore({
   chunkSize,
   connectionState,
   flowerInteraction,
+  flowerCollectDurationMs,
   hiveInteraction,
   fogFar,
   fogNear,
@@ -1237,6 +1241,8 @@ function HiveCore({
           chunkSize={chunkSize}
           chunks={chunks}
           detailFocus={detailFocus}
+          flowerCollectDurationMs={flowerCollectDurationMs}
+          flowerInteraction={flowerInteraction}
           terrainPointerHandlers={pointerHandlers}
           onFlowerClick={onFlowerClick}
           selectedFlowerId={flowerInteraction?.flowerId}
@@ -1293,6 +1299,7 @@ interface GameViewportProps {
   connectionState: GameSessionState["connectionState"];
   flowerInteraction?: FlowerInteractionState;
   hiveInteraction?: HiveInteractionState;
+  lastInteraction?: InteractionResult;
   localPlayerId?: string;
   onPerformanceChange: (snapshot: RenderPerformanceSnapshot) => void;
   onMoveToTarget: (x: number, z: number) => void;
@@ -1307,6 +1314,20 @@ function toChunkCoord(worldPos: number, chunkSize: number): number {
   return Math.floor(worldPos / chunkSize);
 }
 
+function resolveFlowerCollectDurationMs(lastInteraction: InteractionResult | undefined): number {
+  if (!lastInteraction || lastInteraction.action !== "collect_flower") {
+    return DEFAULT_FLOWER_COLLECT_DURATION_MS;
+  }
+
+  const levelMatch = lastInteraction.reason.match(/nivel\s+(\d+)/i);
+  const level = Number(levelMatch?.[1]);
+  if (!Number.isFinite(level)) {
+    return DEFAULT_FLOWER_COLLECT_DURATION_MS;
+  }
+
+  return 700 + level * 450;
+}
+
 export function GameViewport({
   players,
   chunks,
@@ -1315,6 +1336,7 @@ export function GameViewport({
   connectionState,
   flowerInteraction,
   hiveInteraction,
+  lastInteraction,
   localPlayerId,
   onPerformanceChange,
   onMoveToTarget,
@@ -1354,6 +1376,10 @@ export function GameViewport({
     });
   }, [players, localPlayer, chunkSize, renderDistance]);
   const visibleHives = useMemo(() => collectVisibleHives(chunks), [chunks]);
+  const flowerCollectDurationMs = useMemo(
+    () => resolveFlowerCollectDurationMs(lastInteraction),
+    [lastInteraction],
+  );
 
   return (
     <div className="viewport-canvas-shell">
@@ -1375,6 +1401,7 @@ export function GameViewport({
           chunkSize={chunkSize}
           connectionState={connectionState}
           flowerInteraction={flowerInteraction}
+          flowerCollectDurationMs={flowerCollectDurationMs}
           hiveInteraction={hiveInteraction}
           fogFar={fogDistances.far}
           fogNear={fogDistances.near}

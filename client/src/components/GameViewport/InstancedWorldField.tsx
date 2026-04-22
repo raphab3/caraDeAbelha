@@ -13,7 +13,7 @@ import {
 	Object3D,
 } from "three";
 
-import type { MapZone, PlayerProgressState, WorldChunkState, WorldFlowerState, WorldHiveState } from "../../types/game";
+import type { FlowerInteractionState, MapZone, PlayerProgressState, WorldChunkState, WorldFlowerState, WorldHiveState } from "../../types/game";
 import {
 	TERRAIN_BLOCK_SCALE,
 	toSceneAxis,
@@ -213,6 +213,8 @@ export function InstancedWorldField({
 	onFlowerClick,
 	onHiveClick,
 	selectedFlowerId,
+	flowerInteraction,
+	flowerCollectDurationMs,
 	selectedHiveId,
 	zones,
 	playerProgress,
@@ -224,6 +226,8 @@ export function InstancedWorldField({
 	onFlowerClick?: (flower: WorldFlowerState) => void;
 	onHiveClick?: (hive: WorldHiveState) => void;
 	selectedFlowerId?: string;
+	flowerInteraction?: FlowerInteractionState;
+	flowerCollectDurationMs?: number;
 	selectedHiveId?: string;
 	zones?: MapZone[];
 	playerProgress?: PlayerProgressState;
@@ -371,6 +375,8 @@ export function InstancedWorldField({
 
 			{/* Entity renderers: flowers and hives */}
 			<FlowerRenderer
+				collectDurationMs={flowerCollectDurationMs}
+				flowerInteraction={flowerInteraction}
 				flowers={visibleFlowers}
 				onFlowerClick={handleFlowerClick}
 				selectedFlowerId={selectedFlowerId}
