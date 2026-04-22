@@ -269,7 +269,9 @@ export function InstancedWorldField({
 		[treeModel.scene],
 	);
 
-	// Extract flowers and hives from chunks, respecting detail focus
+	// Extract flowers from chunks sorted by proximity to the detail focus.
+	// Capped to 200 nearest flowers to keep per-mesh draw calls manageable.
+	const MAX_VISIBLE_FLOWERS = 200;
 	const visibleFlowers = useMemo(() => {
 		const flowers = [];
 		for (const chunk of chunks) {
@@ -277,8 +279,19 @@ export function InstancedWorldField({
 				flowers.push(flower);
 			}
 		}
-		return flowers;
-	}, [chunks]);
+		if (flowers.length <= MAX_VISIBLE_FLOWERS || !detailFocus) {
+			return flowers;
+		}
+		const fx = detailFocus.x;
+		const fy = detailFocus.y;
+		return flowers
+			.sort((a, b) => {
+				const da = (a.x - fx) ** 2 + (a.y - fy) ** 2;
+				const db = (b.x - fx) ** 2 + (b.y - fy) ** 2;
+				return da - db;
+			})
+			.slice(0, MAX_VISIBLE_FLOWERS);
+	}, [chunks, detailFocus]);
 
 	const visibleHives = useMemo(() => {
 		const hives = [];
