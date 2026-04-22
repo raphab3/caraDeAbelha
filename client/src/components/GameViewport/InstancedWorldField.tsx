@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useGLTF } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
 import {
@@ -28,7 +28,6 @@ import { ZoneGateRenderer } from "./ZoneGateRenderer";
 const TERRAIN_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/block-grass.glb";
 const TREE_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/tree-pine-small.glb";
 const WATER_LAYER_THICKNESS = TERRAIN_BLOCK_SCALE * 0.18;
-const TREE_DETAIL_DISTANCE = 24;
 
 interface DetailFocus {
 	x: number;
@@ -53,20 +52,7 @@ interface InstancedModelMeshSource {
 	material: Material;
 }
 
-function isWithinDetailRange(
-	detailFocus: DetailFocus | undefined,
-	worldX: number,
-	worldY: number,
-	maxDistance: number,
-): boolean {
-	if (!detailFocus) {
-		return true;
-	}
-
-	return Math.hypot(worldX - detailFocus.x, worldY - detailFocus.y) <= maxDistance;
-}
-
-function buildWorldField(chunks: WorldChunkState[], detailFocus?: DetailFocus): WorldFieldBuild {
+function buildWorldField(chunks: WorldChunkState[]): WorldFieldBuild {
 	const grassTerrainInstances: InstanceConfig[] = [];
 	const stoneTerrainInstances: InstanceConfig[] = [];
 	const waterTerrainInstances: InstanceConfig[] = [];
@@ -101,10 +87,6 @@ function buildWorldField(chunks: WorldChunkState[], detailFocus?: DetailFocus): 
 		}
 
 		for (const tree of chunk.trees) {
-			if (!isWithinDetailRange(detailFocus, tree.x, tree.y, TREE_DETAIL_DISTANCE)) {
-				continue;
-			}
-
 			const baseX = toSceneAxis(tree.x);
 			const baseZ = toSceneAxis(tree.y);
 
@@ -169,7 +151,7 @@ function InstancedLayer({
 	const meshRef = useRef<InstancedMesh>(null);
 	const dummy = useMemo(() => new Object3D(), []);
 
-	useEffect(() => {
+	useLayoutEffect(() => {
 		const mesh = meshRef.current;
 		if (!mesh) {
 			return;
@@ -200,6 +182,7 @@ function InstancedLayer({
 		}
 
 		mesh.instanceMatrix.needsUpdate = true;
+		mesh.computeBoundingSphere();
 	}, [dummy, instances]);
 
 	if (instances.length === 0) {
@@ -240,9 +223,11 @@ export function InstancedWorldField({
 	zones?: MapZone[];
 	playerProgress?: PlayerProgressState;
 }) {
+	// Terrain and trees are static map features — only rebuild when visible chunks change,
+	// not on every player position update. detailFocus is intentionally excluded.
 	const worldField = useMemo(
-		() => buildWorldField(chunks, detailFocus),
-		[chunks, detailFocus?.x, detailFocus?.y],
+		() => buildWorldField(chunks),
+		[chunks],
 	);
 	const terrainModel = useGLTF(TERRAIN_MODEL_PATH);
 	const treeModel = useGLTF(TREE_MODEL_PATH);
@@ -303,6 +288,20 @@ export function InstancedWorldField({
 		return hives;
 	}, [chunks]);
 
+	// Stable callbacks so FlowerVisual/HiveVisual memo stays effective across ticks.
+	const handleFlowerClick = useCallback(
+		(_event: ThreeEvent<PointerEvent>, flowerId: string, _index: number) => {
+			onFlowerClick?.(flowerId);
+		},
+		[onFlowerClick],
+	);
+	const handleHiveClick = useCallback(
+		(_event: ThreeEvent<PointerEvent>, hiveId: string, _index: number) => {
+			onHiveClick?.(hiveId);
+		},
+		[onHiveClick],
+	);
+
 	useEffect(() => {
 		return () => {
 			terrainBoxGeometry.dispose();
@@ -359,11 +358,7 @@ export function InstancedWorldField({
 			{/* Entity renderers: flowers and hives */}
 			<FlowerRenderer
 				flowers={visibleFlowers}
-				onFlowerClick={
-					onFlowerClick
-						? (_event: ThreeEvent<PointerEvent>, flowerId: string, _index: number) => onFlowerClick(flowerId)
-						: undefined
-				}
+				onFlowerClick={handleFlowerClick}
 			/>
 
 			{/* Trees: decorative entities without interaction */}
@@ -381,11 +376,7 @@ export function InstancedWorldField({
 			{/* Hive renderer */}
 			<HiveRenderer
 				hives={visibleHives}
-				onHiveClick={
-					onHiveClick
-						? (_event: ThreeEvent<PointerEvent>, hiveId: string, _index: number) => onHiveClick(hiveId)
-						: undefined
-				}
+				onHiveClick={handleHiveClick}
 			/>
 
 			{/* Zone gate renderer: gates for locked zones */}
