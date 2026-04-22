@@ -27,7 +27,6 @@ func newRuntimeTestHub(now time.Time) *gameHub {
 			return now
 		},
 	}
-
 	hub.initializeWorldEntities()
 	return hub
 }
@@ -137,6 +136,43 @@ func TestProcessWorldInteractionsDepositsHoneyAutomatically(t *testing.T) {
 
 	if progress.XP <= 0 {
 		t.Fatalf("expected deposit to award XP, got %d", progress.XP)
+	}
+}
+
+func TestSnapshotForPlayerIncludesAuthoredStageData(t *testing.T) {
+	hub := newRuntimeTestHub(time.Date(2026, time.April, 23, 11, 0, 0, 0, time.UTC))
+	viewer := &playerState{
+		ID:       "player:viewer",
+		Username: "viewer",
+		X:        0,
+		Y:        0,
+	}
+	hub.players[viewer.ID] = viewer
+
+	snapshot := hub.snapshotForPlayerLocked(viewer)
+
+	if snapshot.StageID == "" {
+		t.Fatalf("expected snapshot to include stageId")
+	}
+
+	if snapshot.StageName == "" {
+		t.Fatalf("expected snapshot to include stage name")
+	}
+
+	if snapshot.AudioBGM == "" {
+		t.Fatalf("expected snapshot to include authored bgm")
+	}
+
+	if len(snapshot.Props) == 0 {
+		t.Fatalf("expected snapshot to include authored props")
+	}
+
+	if snapshot.Props[0].AssetPath == "" {
+		t.Fatalf("expected snapshot prop to include asset path")
+	}
+
+	if len(snapshot.Landmarks) == 0 {
+		t.Fatalf("expected snapshot to include landmarks")
 	}
 }
 

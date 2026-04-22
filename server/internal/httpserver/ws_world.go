@@ -27,13 +27,65 @@ func (hub *gameHub) snapshotForPlayerLocked(viewer *playerState) worldStateMessa
 	return worldStateMessage{
 		Type:           "state",
 		Tick:           hub.tick,
+		StageID:        hub.world.stageID,
+		StageName:      hub.world.displayName,
+		AudioBGM:       hub.world.audio.BGM,
 		Players:        players,
 		Chunks:         hub.buildVisibleChunksLocked(centerChunkX, centerChunkY),
+		Props:          hub.buildWorldPropsState(),
+		Landmarks:      hub.buildWorldLandmarksState(),
 		CenterChunkX:   centerChunkX,
 		CenterChunkY:   centerChunkY,
 		RenderDistance: worldRenderDistance,
 		ChunkSize:      worldChunkSize,
 	}
+}
+
+func (hub *gameHub) buildWorldPropsState() []worldPropState {
+	if len(hub.world.props) == 0 {
+		return nil
+	}
+
+	props := make([]worldPropState, 0, len(hub.world.props))
+	for _, prop := range hub.world.props {
+		definition, _ := resolveWorldPrefabDefinition(prop.PrefabID)
+		props = append(props, worldPropState{
+			ID:        prop.ID,
+			PrefabID:  prop.PrefabID,
+			AssetPath: definition.AssetPath,
+			Category:  definition.Category,
+			X:         prop.X,
+			Y:         prop.Y,
+			Z:         prop.Z,
+			Scale:     prop.Scale,
+			Yaw:       prop.Yaw,
+			ZoneID:    prop.ZoneID,
+			Tag:       prop.Tag,
+		})
+	}
+
+	return props
+}
+
+func (hub *gameHub) buildWorldLandmarksState() []worldLandmarkState {
+	if len(hub.world.landmarks) == 0 {
+		return nil
+	}
+
+	landmarks := make([]worldLandmarkState, 0, len(hub.world.landmarks))
+	for _, landmark := range hub.world.landmarks {
+		landmarks = append(landmarks, worldLandmarkState{
+			ID:          landmark.ID,
+			DisplayName: landmark.DisplayName,
+			X:           landmark.X,
+			Y:           landmark.Y,
+			Z:           landmark.Z,
+			ZoneID:      landmark.ZoneID,
+			Tag:         landmark.Tag,
+		})
+	}
+
+	return landmarks
 }
 
 func buildPlayerID(profileKey string) string {

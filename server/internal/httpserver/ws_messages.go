@@ -50,12 +50,41 @@ type sessionMessage struct {
 type worldStateMessage struct {
 	Type           string            `json:"type"`
 	Tick           uint64            `json:"tick"`
+	StageID        string            `json:"stageId,omitempty"`
+	StageName      string            `json:"stageName,omitempty"`
+	AudioBGM       string            `json:"audioBgm,omitempty"`
 	Players        []playerState     `json:"players"`
 	Chunks         []worldChunkState `json:"chunks"`
+	Props          []worldPropState  `json:"props,omitempty"`
+	Landmarks      []worldLandmarkState `json:"landmarks,omitempty"`
 	CenterChunkX   int               `json:"centerChunkX"`
 	CenterChunkY   int               `json:"centerChunkY"`
 	RenderDistance int               `json:"renderDistance"`
 	ChunkSize      float64           `json:"chunkSize"`
+}
+
+type worldPropState struct {
+	ID        string  `json:"id"`
+	PrefabID  string  `json:"prefabId"`
+	AssetPath string  `json:"assetPath"`
+	Category  string  `json:"category"`
+	X         float64 `json:"x"`
+	Y         float64 `json:"y"`
+	Z         float64 `json:"z"`
+	Scale     float64 `json:"scale"`
+	Yaw       float64 `json:"yaw"`
+	ZoneID    string  `json:"zoneId,omitempty"`
+	Tag       string  `json:"tag,omitempty"`
+}
+
+type worldLandmarkState struct {
+	ID          string  `json:"id"`
+	DisplayName string  `json:"displayName"`
+	X           float64 `json:"x"`
+	Y           float64 `json:"y"`
+	Z           float64 `json:"z"`
+	ZoneID      string  `json:"zoneId,omitempty"`
+	Tag         string  `json:"tag,omitempty"`
 }
 
 type worldFlowerState struct {
