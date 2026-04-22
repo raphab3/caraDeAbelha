@@ -133,6 +133,106 @@ func TestMetricsReportsActivePlayers(t *testing.T) {
 	}
 }
 
+func TestAdminPlayersEndpointReturnsPaginatedOnlineFirst(t *testing.T) {
+	baseTime := time.Date(2026, time.April, 21, 12, 0, 0, 0, time.UTC)
+	hub := &gameHub{
+		clients: map[string]*clientSession{
+			"player:alpha": {
+				id:         "player:alpha",
+				profileKey: "alpha",
+			},
+			"player:beta": {
+				id:         "player:beta",
+				profileKey: "beta",
+			},
+		},
+		players: map[string]*playerState{
+			"player:alpha": {ID: "player:alpha"},
+			"player:beta":  {ID: "player:beta"},
+		},
+		profiles: map[string]*playerState{
+			"alpha": {
+				ID:         "player:alpha",
+				Username:   "Alpha",
+				LastSeenAt: baseTime.Add(-time.Minute),
+			},
+			"beta": {
+				ID:         "player:beta",
+				Username:   "Beta",
+				LastSeenAt: baseTime.Add(-3 * time.Minute),
+			},
+			"zeta": {
+				ID:         "player:zeta",
+				Username:   "Zeta",
+				LastSeenAt: baseTime.Add(-20 * time.Second),
+			},
+		},
+		world: loadWorldLayout(),
+		now: func() time.Time {
+			return baseTime
+		},
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/admin/players", hub.handleAdminPlayers)
+	testServer := httptest.NewServer(mux)
+	defer testServer.Close()
+
+	response, err := http.Get(testServer.URL + "/admin/players?page=1&pageSize=2")
+	if err != nil {
+		t.Fatalf("request admin players: %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, response.StatusCode)
+	}
+
+	var payload adminPlayersResponse
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode admin players response: %v", err)
+	}
+
+	if payload.Total != 3 {
+		t.Fatalf("expected total 3, got %d", payload.Total)
+	}
+
+	if payload.TotalPages != 2 {
+		t.Fatalf("expected totalPages 2, got %d", payload.TotalPages)
+	}
+
+	if len(payload.Players) != 2 {
+		t.Fatalf("expected 2 players on first page, got %d", len(payload.Players))
+	}
+
+	if payload.Players[0].Username != "Alpha" || !payload.Players[0].Online {
+		t.Fatalf("expected Alpha online first, got %+v", payload.Players[0])
+	}
+
+	if payload.Players[1].Username != "Beta" || !payload.Players[1].Online {
+		t.Fatalf("expected Beta online second, got %+v", payload.Players[1])
+	}
+
+	responsePageTwo, err := http.Get(testServer.URL + "/admin/players?page=2&pageSize=2")
+	if err != nil {
+		t.Fatalf("request admin players page two: %v", err)
+	}
+	defer responsePageTwo.Body.Close()
+
+	var payloadPageTwo adminPlayersResponse
+	if err := json.NewDecoder(responsePageTwo.Body).Decode(&payloadPageTwo); err != nil {
+		t.Fatalf("decode admin players page two: %v", err)
+	}
+
+	if len(payloadPageTwo.Players) != 1 {
+		t.Fatalf("expected 1 player on second page, got %d", len(payloadPageTwo.Players))
+	}
+
+	if payloadPageTwo.Players[0].Username != "Zeta" || payloadPageTwo.Players[0].Online {
+		t.Fatalf("expected offline Zeta on second page, got %+v", payloadPageTwo.Players[0])
+	}
+}
+
 func TestWebSocketMoveBroadcastsState(t *testing.T) {
 	handler := NewHandler()
 	testServer := httptest.NewServer(handler)
