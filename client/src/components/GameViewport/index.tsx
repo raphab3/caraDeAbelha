@@ -32,7 +32,9 @@ import type {
   WorldChunkState,
   WorldFlowerState,
   WorldHiveState,
+  WorldLandmarkState,
   WorldPlayerState,
+  WorldPropState,
 } from "../../types/game";
 import { usePlayerControls } from "../../hooks/usePlayerControls";
 import {
@@ -1073,6 +1075,8 @@ function InfiniteGround({
 interface HiveCoreProps {
   players: WorldPlayerState[];
   chunks: WorldChunkState[];
+  props: WorldPropState[];
+  landmarks: WorldLandmarkState[];
   chunkSize: number;
   connectionState: GameSessionState["connectionState"];
   flowerInteraction?: FlowerInteractionState;
@@ -1092,6 +1096,8 @@ interface HiveCoreProps {
 function HiveCore({
   players,
   chunks,
+  props,
+  landmarks,
   chunkSize,
   connectionState,
   flowerInteraction,
@@ -1243,6 +1249,8 @@ function HiveCore({
           detailFocus={detailFocus}
           flowerCollectDurationMs={flowerCollectDurationMs}
           flowerInteraction={flowerInteraction}
+          landmarks={landmarks}
+          props={props}
           terrainPointerHandlers={pointerHandlers}
           onFlowerClick={onFlowerClick}
           selectedFlowerId={flowerInteraction?.flowerId}
@@ -1294,6 +1302,8 @@ function HiveCore({
 interface GameViewportProps {
   players: WorldPlayerState[];
   chunks: WorldChunkState[];
+  props: WorldPropState[];
+  landmarks: WorldLandmarkState[];
   chunkSize: number;
   renderDistance: number;
   connectionState: GameSessionState["connectionState"];
@@ -1331,6 +1341,8 @@ function resolveFlowerCollectDurationMs(lastInteraction: InteractionResult | und
 export function GameViewport({
   players,
   chunks,
+  props,
+  landmarks,
   chunkSize,
   renderDistance,
   connectionState,
@@ -1406,11 +1418,13 @@ export function GameViewport({
           fogFar={fogDistances.far}
           fogNear={fogDistances.near}
           groundInputSize={viewportScale.groundInputSize}
+          landmarks={landmarks}
           localPlayerId={localPlayerId}
           localPlayerPositionRef={localPlayerPositionRef}
           onMoveToTarget={onMoveToTarget}
           onFlowerClick={onFlowerClick}
           onHiveClick={onHiveClick}
+          props={props}
           tapTargetingConfig={tapTargetingConfig}
           players={nearbyPlayers}
         />

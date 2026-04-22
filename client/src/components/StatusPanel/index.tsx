@@ -41,7 +41,7 @@ export function StatusPanel({ backendHealth, gameSession, apiUrl, renderPerforma
   const activeWorldObjects = gameSession.chunks.reduce(
     (total, chunk) => total + chunk.flowers.length + chunk.trees.length + chunk.hives.length,
     0,
-  );
+  ) + gameSession.props.length + gameSession.landmarks.length;
 
   return (
     <aside className="status-panel" aria-label="Estado atual do ambiente">

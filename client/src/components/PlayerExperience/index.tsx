@@ -7,6 +7,7 @@ import { PwaInstallPrompt } from "../PwaInstallPrompt";
 import { GameHUD } from "../../game/hud";
 import { useFullscreenTarget } from "../../hooks/useFullscreenTarget";
 import { useGameSession } from "../../hooks/useGameSession";
+import { useStageBgm } from "../../hooks/useStageBgm";
 
 const USERNAME_STORAGE_KEY = "cara-de-abelha.username";
 
@@ -25,6 +26,11 @@ export default function PlayerExperience() {
   const { targetRef, isFullscreen, isSupported, requestFullscreen, toggleFullscreen } =
     useFullscreenTarget<HTMLDivElement>();
   const gameSession = useGameSession(activeUsername, connectionAttempt);
+
+  useStageBgm({
+    enabled: hasJoinedSession && gameSession.connectionState === "connected",
+    src: gameSession.audioBgm,
+  });
 
   useEffect(() => {
     if (gameSession.connectionState !== "connected" || !gameSession.localUsername) {
@@ -83,6 +89,7 @@ export default function PlayerExperience() {
               connectionState={gameSession.connectionState}
               flowerInteraction={gameSession.flowerInteraction}
               hiveInteraction={gameSession.hiveInteraction}
+              landmarks={gameSession.landmarks}
               lastInteraction={gameSession.lastInteraction}
               localPlayerId={gameSession.localPlayerId}
               onClearTargets={gameSession.clearTargets}
@@ -92,6 +99,7 @@ export default function PlayerExperience() {
               onPerformanceChange={ignoreRenderPerformance}
               onRespawn={gameSession.respawn}
               players={gameSession.players}
+              props={gameSession.props}
               renderDistance={gameSession.renderDistance}
             />
           </div>

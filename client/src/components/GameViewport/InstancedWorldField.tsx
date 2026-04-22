@@ -13,7 +13,16 @@ import {
 	Object3D,
 } from "three";
 
-import type { FlowerInteractionState, MapZone, PlayerProgressState, WorldChunkState, WorldFlowerState, WorldHiveState } from "../../types/game";
+import type {
+	FlowerInteractionState,
+	MapZone,
+	PlayerProgressState,
+	WorldChunkState,
+	WorldFlowerState,
+	WorldHiveState,
+	WorldLandmarkState,
+	WorldPropState,
+} from "../../types/game";
 import {
 	TERRAIN_BLOCK_SCALE,
 	toSceneAxis,
@@ -23,6 +32,7 @@ import {
 import type { TapTargetingHandlers } from "./useTapTargeting";
 import { FlowerRenderer } from "./FlowerRenderer";
 import { HiveRenderer } from "./HiveRenderer";
+import { StagePropRenderer } from "./StagePropRenderer";
 import { ZoneGateRenderer } from "./ZoneGateRenderer";
 
 const TERRAIN_MODEL_PATH = "/kenney_platformer-kit/Models/GLB format/block-grass.glb";
@@ -216,6 +226,8 @@ export function InstancedWorldField({
 	flowerInteraction,
 	flowerCollectDurationMs,
 	selectedHiveId,
+	landmarks,
+	props,
 	zones,
 	playerProgress,
 }: {
@@ -229,6 +241,8 @@ export function InstancedWorldField({
 	flowerInteraction?: FlowerInteractionState;
 	flowerCollectDurationMs?: number;
 	selectedHiveId?: string;
+	landmarks: WorldLandmarkState[];
+	props: WorldPropState[];
 	zones?: MapZone[];
 	playerProgress?: PlayerProgressState;
 }) {
@@ -393,6 +407,8 @@ export function InstancedWorldField({
 					material={source.material}
 				/>
 			))}
+
+			<StagePropRenderer landmarks={landmarks} props={props} />
 
 			{/* Hive renderer */}
 			<HiveRenderer

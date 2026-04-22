@@ -48,6 +48,8 @@ function createInitialState(
   return {
     connectionState,
     localUsername,
+    props: [],
+    landmarks: [],
     players: [],
     chunks: [],
     centerChunkX: 0,
@@ -359,8 +361,13 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
         setGameSession((current) => ({
           ...current,
           connectionState: "connected",
+          stageId: message.stageId,
+          stageName: message.stageName,
+          audioBgm: message.audioBgm,
           players: message.players,
           chunks: message.chunks,
+          props: message.props,
+          landmarks: message.landmarks,
           centerChunkX: message.centerChunkX,
           centerChunkY: message.centerChunkY,
           renderDistance: message.renderDistance,

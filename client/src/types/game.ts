@@ -115,6 +115,30 @@ export interface WorldChunkState {
   hives: WorldHiveState[];
 }
 
+export interface WorldPropState {
+  id: string;
+  prefabId: string;
+  assetPath: string;
+  category: string;
+  x: number;
+  y: number;
+  z: number;
+  scale: number;
+  yaw: number;
+  zoneId?: string;
+  tag?: string;
+}
+
+export interface WorldLandmarkState {
+  id: string;
+  displayName: string;
+  x: number;
+  y: number;
+  z: number;
+  zoneId?: string;
+  tag?: string;
+}
+
 // Map zone metadata - defines spatial boundaries of game regions
 export interface MapZone {
   id: string;
@@ -137,8 +161,13 @@ export interface MapTransition {
 export interface WorldStateMessage {
   type: "state";
   tick: number;
+  stageId?: string;
+  stageName?: string;
+  audioBgm?: string;
   players: WorldPlayerState[];
   chunks: WorldChunkState[];
+  props: WorldPropState[];
+  landmarks: WorldLandmarkState[];
   centerChunkX: number;
   centerChunkY: number;
   renderDistance: number;
@@ -261,8 +290,13 @@ export interface GameSessionState {
   connectionState: "idle" | "connecting" | "connected" | "disconnected";
   localPlayerId?: string;
   localUsername?: string;
+  stageId?: string;
+  stageName?: string;
+  audioBgm?: string;
   players: WorldPlayerState[];
   chunks: WorldChunkState[];
+  props: WorldPropState[];
+  landmarks: WorldLandmarkState[];
   centerChunkX: number;
   centerChunkY: number;
   renderDistance: number;
