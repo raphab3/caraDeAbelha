@@ -38,22 +38,73 @@ type worldTransition struct {
 	Type     string  `json:"type"`
 }
 
+type worldStageAudio struct {
+	BGM string `json:"bgm"`
+}
+
+type worldBounds struct {
+	X1 float64 `json:"x1"`
+	X2 float64 `json:"x2"`
+	Z1 float64 `json:"z1"`
+	Z2 float64 `json:"z2"`
+}
+
+type worldEdgeBehavior struct {
+	Type           string      `json:"type"`
+	PlayableBounds worldBounds `json:"playableBounds"`
+	OutlandsBounds worldBounds `json:"outlandsBounds"`
+}
+
+type worldPrefabPlacement struct {
+	ID       string  `json:"id"`
+	PrefabID string  `json:"prefabId"`
+	X        float64 `json:"x"`
+	Y        float64 `json:"y"`
+	Z        float64 `json:"z"`
+	Scale    float64 `json:"scale"`
+	Yaw      float64 `json:"yaw"`
+	ZoneID   string  `json:"zoneId"`
+	Tag      string  `json:"tag"`
+}
+
+type worldLandmark struct {
+	ID          string  `json:"id"`
+	DisplayName string  `json:"displayName"`
+	X           float64 `json:"x"`
+	Y           float64 `json:"y"`
+	Z           float64 `json:"z"`
+	ZoneID      string  `json:"zoneId"`
+	Tag         string  `json:"tag"`
+}
+
 // worldMapContainer supports both legacy (array) and new (object) formats
 type worldMapContainer struct {
-	Tiles       []worldMapRecord  `json:"tiles"`
-	Zones       []worldZone       `json:"zones"`
-	Transitions []worldTransition `json:"transitions"`
+	StageID      string                 `json:"stageId"`
+	DisplayName  string                 `json:"displayName"`
+	Audio        worldStageAudio        `json:"audio"`
+	EdgeBehavior *worldEdgeBehavior     `json:"edgeBehavior"`
+	Tiles        []worldMapRecord       `json:"tiles"`
+	Props        []worldPrefabPlacement `json:"props"`
+	Zones        []worldZone            `json:"zones"`
+	Transitions  []worldTransition      `json:"transitions"`
+	Landmarks    []worldLandmark        `json:"landmarks"`
 }
 
 type worldLayout struct {
-	chunks      map[string]worldChunkState
-	zones       []worldZone
-	transitions []worldTransition
-	hasBounds   bool
-	minX        float64
-	maxX        float64
-	minY        float64
-	maxY        float64
+	stageID      string
+	displayName  string
+	audio        worldStageAudio
+	edgeBehavior *worldEdgeBehavior
+	chunks       map[string]worldChunkState
+	props        []worldPrefabPlacement
+	zones        []worldZone
+	transitions  []worldTransition
+	landmarks    []worldLandmark
+	hasBounds    bool
+	minX         float64
+	maxX         float64
+	minY         float64
+	maxY         float64
 }
 
 const fallbackSpawnHiveX = 6.5
@@ -147,22 +198,30 @@ func parseWorldLayout(worldBytes []byte) (worldLayout, error) {
 
 func parseWorldLayoutFromContainer(container worldMapContainer) (worldLayout, error) {
 	records := container.Tiles
+	props := container.Props
 	zones := container.Zones
 	transitions := container.Transitions
+	landmarks := container.Landmarks
 
 	if len(records) == 0 {
 		return worldLayout{}, fmt.Errorf("world map is empty")
 	}
 
 	layout := worldLayout{
-		chunks:      make(map[string]worldChunkState),
-		zones:       zones,
-		transitions: transitions,
-		hasBounds:   true,
-		minX:        math.Inf(1),
-		maxX:        math.Inf(-1),
-		minY:        math.Inf(1),
-		maxY:        math.Inf(-1),
+		stageID:      strings.TrimSpace(container.StageID),
+		displayName:  strings.TrimSpace(container.DisplayName),
+		audio:        container.Audio,
+		edgeBehavior: container.EdgeBehavior,
+		chunks:       make(map[string]worldChunkState),
+		props:        append([]worldPrefabPlacement{}, props...),
+		zones:        zones,
+		transitions:  transitions,
+		landmarks:    append([]worldLandmark{}, landmarks...),
+		hasBounds:    true,
+		minX:         math.Inf(1),
+		maxX:         math.Inf(-1),
+		minY:         math.Inf(1),
+		maxY:         math.Inf(-1),
 	}
 
 	for _, record := range records {
@@ -250,6 +309,20 @@ func parseWorldLayoutFromContainer(container worldMapContainer) (worldLayout, er
 		layout.maxY = math.Max(layout.maxY, tileCenterY)
 	}
 
+	for _, prop := range props {
+		layout.minX = math.Min(layout.minX, prop.X)
+		layout.maxX = math.Max(layout.maxX, prop.X)
+		layout.minY = math.Min(layout.minY, prop.Z)
+		layout.maxY = math.Max(layout.maxY, prop.Z)
+	}
+
+	for _, landmark := range landmarks {
+		layout.minX = math.Min(layout.minX, landmark.X)
+		layout.maxX = math.Max(layout.maxX, landmark.X)
+		layout.minY = math.Min(layout.minY, landmark.Z)
+		layout.maxY = math.Max(layout.maxY, landmark.Z)
+	}
+
 	for chunkKey, chunk := range layout.chunks {
 		sort.Slice(chunk.Tiles, func(left int, right int) bool {
 			if chunk.Tiles[left].Z == chunk.Tiles[right].Z {
@@ -269,6 +342,23 @@ func parseWorldLayoutFromContainer(container worldMapContainer) (worldLayout, er
 		})
 		layout.chunks[chunkKey] = chunk
 	}
+
+	sort.Slice(layout.props, func(left int, right int) bool {
+		if layout.props[left].PrefabID == layout.props[right].PrefabID {
+			if layout.props[left].Z == layout.props[right].Z {
+				return layout.props[left].X < layout.props[right].X
+			}
+			return layout.props[left].Z < layout.props[right].Z
+		}
+		return layout.props[left].PrefabID < layout.props[right].PrefabID
+	})
+
+	sort.Slice(layout.landmarks, func(left int, right int) bool {
+		if layout.landmarks[left].DisplayName == layout.landmarks[right].DisplayName {
+			return layout.landmarks[left].ID < layout.landmarks[right].ID
+		}
+		return layout.landmarks[left].DisplayName < layout.landmarks[right].DisplayName
+	})
 
 	ensureFallbackSpawnHive(&layout)
 

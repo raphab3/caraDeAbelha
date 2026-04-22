@@ -142,6 +142,71 @@ func TestMapContainerParsing(t *testing.T) {
 	}
 }
 
+func TestExpandedStageMapParsing(t *testing.T) {
+	data := worldMapContainer{
+		StageID:     "stage:starter-basin",
+		DisplayName: "Bacia do Primeiro Voo",
+		Audio: worldStageAudio{
+			BGM: "assets/rpg-adventure.mp3",
+		},
+		EdgeBehavior: &worldEdgeBehavior{
+			Type: "outlands_return_corridor",
+			PlayableBounds: worldBounds{X1: -10, X2: 10, Z1: -10, Z2: 10},
+			OutlandsBounds: worldBounds{X1: -20, X2: 20, Z1: -20, Z2: 20},
+		},
+		Tiles: []worldMapRecord{
+			{X: 0, Y: 0, Z: 0, Type: "grass", Prop: nil},
+		},
+		Props: []worldPrefabPlacement{
+			{ID: "prop:cliff-01", PrefabID: "terrain/cliff-high", X: 8, Y: 2, Z: 6, Scale: 1.2, ZoneID: "zone_0", Tag: "terrain"},
+		},
+		Landmarks: []worldLandmark{
+			{ID: "landmark:arch", DisplayName: "Arco de Pedra", X: 12, Y: 3, Z: 9, ZoneID: "zone_0", Tag: "navigation"},
+		},
+		Zones: []worldZone{
+			{ID: "zone_0", Name: "Vale Inicial", X1: -10, X2: 10, Z1: -10, Z2: 10},
+		},
+	}
+
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		t.Fatalf("marshal expanded container: %v", err)
+	}
+
+	layout, err := parseWorldLayout(bytes)
+	if err != nil {
+		t.Fatalf("parse expanded world layout: %v", err)
+	}
+
+	if layout.stageID != data.StageID {
+		t.Fatalf("expected stageID %q, got %q", data.StageID, layout.stageID)
+	}
+
+	if layout.displayName != data.DisplayName {
+		t.Fatalf("expected displayName %q, got %q", data.DisplayName, layout.displayName)
+	}
+
+	if layout.audio.BGM != data.Audio.BGM {
+		t.Fatalf("expected BGM %q, got %q", data.Audio.BGM, layout.audio.BGM)
+	}
+
+	if layout.edgeBehavior == nil || layout.edgeBehavior.Type != data.EdgeBehavior.Type {
+		t.Fatalf("expected edge behavior type %q", data.EdgeBehavior.Type)
+	}
+
+	if len(layout.props) != 1 || layout.props[0].PrefabID != "terrain/cliff-high" {
+		t.Fatalf("expected one rich prop prefab, got %#v", layout.props)
+	}
+
+	if len(layout.landmarks) != 1 || layout.landmarks[0].DisplayName != "Arco de Pedra" {
+		t.Fatalf("expected one landmark, got %#v", layout.landmarks)
+	}
+
+	if layout.maxX < 12 || layout.maxY < 9 {
+		t.Fatalf("expected authored props and landmarks to contribute to bounds, got maxX=%v maxY=%v", layout.maxX, layout.maxY)
+	}
+}
+
 // TestLegacyMapFormatBackwardCompatibility verifies legacy array format still works
 func TestLegacyMapFormatBackwardCompatibility(t *testing.T) {
 	// Legacy format: just an array of tile records
