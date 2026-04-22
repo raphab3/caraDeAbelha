@@ -4,6 +4,7 @@ import { Suspense, type ElementRef, type MutableRefObject, useCallback, useEffec
 import {
   BoxGeometry,
   CircleGeometry,
+  ConeGeometry,
   DoubleSide,
   IcosahedronGeometry,
   InstancedMesh,
@@ -51,16 +52,21 @@ const SCENE_EDGE_CAMERA_DISTANCE_RATIO = 0.44;
 const FOG_NEAR_RATIO = 0.62;
 const FOG_FAR_PADDING = 4;
 const BEE_TURN_RESPONSE = 10;
-const BEE_MODEL_FORWARD_YAW_OFFSET = Math.PI / 2;
+// Important: the black rear piece is the stinger, not the head.
+// The bee visually faces local -X, so movement yaw must treat local +X as the tail.
+const BEE_IDLE_YAW = -Math.PI / 2;
+const BEE_MOVEMENT_YAW_OFFSET = Math.PI / 2;
 
 const beeBodyGeometry = new SphereGeometry(0.62, 32, 32);
 const beeStripeGeometry = new BoxGeometry(0.12, 0.9, 1.18);
-const beeHeadGeometry = new SphereGeometry(0.28, 24, 24);
+const beeStingerGeometry = new ConeGeometry(0.18, 0.46, 20);
 const beeWingGeometry = new SphereGeometry(0.26, 24, 24);
 const localMarkerGeometry = new RingGeometry(0.78, 1.04, 40);
 const moveTargetRingGeometry = new RingGeometry(0.22, 0.38, 36);
 const moveTargetCoreGeometry = new CircleGeometry(0.1, 24);
 const disconnectedBeaconGeometry = new IcosahedronGeometry(0.38, 0);
+
+beeStingerGeometry.rotateZ(-Math.PI / 2);
 
 const localMarkerMaterial = new MeshBasicMaterial({
   color: "#fff1a8",
@@ -98,7 +104,7 @@ const disconnectedBeaconMaterial = new MeshStandardMaterial({
 
 const BEE_LEFT_STRIPE_OFFSET = new Vector3(-0.35, 0, 0);
 const BEE_RIGHT_STRIPE_OFFSET = new Vector3(0.35, 0, 0);
-const BEE_HEAD_OFFSET = new Vector3(0.7, 0, 0);
+const BEE_STINGER_OFFSET = new Vector3(0.84, 0, 0);
 const BEE_LEFT_WING_OFFSET = new Vector3(-0.08, 0.44, -0.3);
 const BEE_RIGHT_WING_OFFSET = new Vector3(-0.08, 0.44, 0.3);
 
@@ -211,7 +217,7 @@ function resolveTargetYaw(deltaX: number, deltaZ: number): number | null {
     return null;
   }
 
-  return Math.atan2(deltaX, deltaZ) + BEE_MODEL_FORWARD_YAW_OFFSET;
+  return Math.atan2(deltaX, deltaZ) + BEE_MOVEMENT_YAW_OFFSET;
 }
 
 function smoothYawRotation(currentYaw: number, targetYaw: number, delta: number): number {
@@ -344,7 +350,7 @@ function BeeActor({ player, drift, accentColor, isLocal, surfaceIndex, trackedPo
   });
 
   return (
-    <group ref={groupRef} position={initialPosition} rotation={[0, BEE_MODEL_FORWARD_YAW_OFFSET, 0]}>
+    <group ref={groupRef} position={initialPosition} rotation={[0, BEE_IDLE_YAW, 0]}>
       {isLocal ? (
         <mesh position={[0, -0.56, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <primitive attach="geometry" object={localMarkerGeometry} />
@@ -360,7 +366,7 @@ function BeeActor({ player, drift, accentColor, isLocal, surfaceIndex, trackedPo
 
       <mesh castShadow geometry={beeStripeGeometry} material={beeStripeMaterial} position={[0.35, 0, 0]} />
 
-      <mesh castShadow geometry={beeHeadGeometry} material={beeStripeMaterial} position={[0.7, 0, 0]} />
+      <mesh castShadow geometry={beeStingerGeometry} material={beeStripeMaterial} position={[0.84, 0, 0]} />
 
       <mesh
         ref={leftWingRef}
@@ -413,14 +419,14 @@ function RemoteBeesInstanced({ players, surfaceIndex }: { players: WorldPlayerSt
   const stripeLeftRef = useRef<InstancedMesh>(null);
   const stripeCenterRef = useRef<InstancedMesh>(null);
   const stripeRightRef = useRef<InstancedMesh>(null);
-  const headRef = useRef<InstancedMesh>(null);
+  const stingerRef = useRef<InstancedMesh>(null);
   const leftWingRef = useRef<InstancedMesh>(null);
   const rightWingRef = useRef<InstancedMesh>(null);
   const bodyDummy = useMemo(() => new Object3D(), []);
   const stripeLeftDummy = useMemo(() => new Object3D(), []);
   const stripeCenterDummy = useMemo(() => new Object3D(), []);
   const stripeRightDummy = useMemo(() => new Object3D(), []);
-  const headDummy = useMemo(() => new Object3D(), []);
+  const stingerDummy = useMemo(() => new Object3D(), []);
   const leftWingDummy = useMemo(() => new Object3D(), []);
   const rightWingDummy = useMemo(() => new Object3D(), []);
   const instancesRef = useRef<RemoteBeeInstance[]>([]);
@@ -435,7 +441,7 @@ function RemoteBeesInstanced({ players, surfaceIndex }: { players: WorldPlayerSt
       const authoritativeZ = toSceneAxis(player.y);
       const desiredX = hasMoveTarget(player) ? toSceneAxis(player.targetX) : authoritativeX;
       const desiredZ = hasMoveTarget(player) ? toSceneAxis(player.targetY) : authoritativeZ;
-      const initialYaw = resolveTargetYaw(desiredX - authoritativeX, desiredZ - authoritativeZ) ?? BEE_MODEL_FORWARD_YAW_OFFSET;
+      const initialYaw = resolveTargetYaw(desiredX - authoritativeX, desiredZ - authoritativeZ) ?? BEE_IDLE_YAW;
       const initialHeight = resolveBeeSceneHeight(surfaceIndex, player.x, player.y, 0, index * 0.9);
 
       if (previous) {
@@ -462,7 +468,7 @@ function RemoteBeesInstanced({ players, surfaceIndex }: { players: WorldPlayerSt
     const stripeLeftMesh = stripeLeftRef.current;
     const stripeCenterMesh = stripeCenterRef.current;
     const stripeRightMesh = stripeRightRef.current;
-    const headMesh = headRef.current;
+    const stingerMesh = stingerRef.current;
     const leftWingMesh = leftWingRef.current;
     const rightWingMesh = rightWingRef.current;
 
@@ -471,7 +477,7 @@ function RemoteBeesInstanced({ players, surfaceIndex }: { players: WorldPlayerSt
       !stripeLeftMesh ||
       !stripeCenterMesh ||
       !stripeRightMesh ||
-      !headMesh ||
+      !stingerMesh ||
       !leftWingMesh ||
       !rightWingMesh
     ) {
@@ -482,7 +488,7 @@ function RemoteBeesInstanced({ players, surfaceIndex }: { players: WorldPlayerSt
     stripeLeftMesh.count = instances.length;
     stripeCenterMesh.count = instances.length;
     stripeRightMesh.count = instances.length;
-    headMesh.count = instances.length;
+    stingerMesh.count = instances.length;
     leftWingMesh.count = instances.length;
     rightWingMesh.count = instances.length;
 
@@ -550,8 +556,8 @@ function RemoteBeesInstanced({ players, surfaceIndex }: { players: WorldPlayerSt
       applyBeePartTransform(stripeRightDummy, currentPosition, BEE_RIGHT_STRIPE_OFFSET, instance.rotationY);
       stripeRightMesh.setMatrixAt(index, stripeRightDummy.matrix);
 
-      applyBeePartTransform(headDummy, currentPosition, BEE_HEAD_OFFSET, instance.rotationY);
-      headMesh.setMatrixAt(index, headDummy.matrix);
+      applyBeePartTransform(stingerDummy, currentPosition, BEE_STINGER_OFFSET, instance.rotationY);
+      stingerMesh.setMatrixAt(index, stingerDummy.matrix);
 
       applyBeePartTransform(
         leftWingDummy,
@@ -578,7 +584,7 @@ function RemoteBeesInstanced({ players, surfaceIndex }: { players: WorldPlayerSt
     stripeLeftMesh.instanceMatrix.needsUpdate = true;
     stripeCenterMesh.instanceMatrix.needsUpdate = true;
     stripeRightMesh.instanceMatrix.needsUpdate = true;
-    headMesh.instanceMatrix.needsUpdate = true;
+    stingerMesh.instanceMatrix.needsUpdate = true;
     leftWingMesh.instanceMatrix.needsUpdate = true;
     rightWingMesh.instanceMatrix.needsUpdate = true;
   });
@@ -593,7 +599,7 @@ function RemoteBeesInstanced({ players, surfaceIndex }: { players: WorldPlayerSt
       <instancedMesh ref={stripeLeftRef} args={[beeStripeGeometry, beeStripeMaterial, players.length]} castShadow frustumCulled={false} />
       <instancedMesh ref={stripeCenterRef} args={[beeStripeGeometry, beeStripeMaterial, players.length]} castShadow frustumCulled={false} />
       <instancedMesh ref={stripeRightRef} args={[beeStripeGeometry, beeStripeMaterial, players.length]} castShadow frustumCulled={false} />
-      <instancedMesh ref={headRef} args={[beeHeadGeometry, beeStripeMaterial, players.length]} castShadow frustumCulled={false} />
+      <instancedMesh ref={stingerRef} args={[beeStingerGeometry, beeStripeMaterial, players.length]} castShadow frustumCulled={false} />
       <instancedMesh ref={leftWingRef} args={[beeWingGeometry, beeWingMaterial, players.length]} frustumCulled={false} />
       <instancedMesh ref={rightWingRef} args={[beeWingGeometry, beeWingMaterial, players.length]} frustumCulled={false} />
       <RemoteBeeNameplates players={players} surfaceIndex={surfaceIndex} />
