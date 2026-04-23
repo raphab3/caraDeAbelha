@@ -5,6 +5,7 @@ interface AdminLayoutProps {
   children: ReactNode;
   title: string;
   description: string;
+  headerMode?: "default" | "hidden";
 }
 
 interface AdminNavItem {
@@ -55,7 +56,7 @@ function resolveNavBadgeClassName(isActive: boolean): string {
   ].join(" ");
 }
 
-export function AdminLayout({ children, title, description }: AdminLayoutProps) {
+export function AdminLayout({ children, title, description, headerMode = "default" }: AdminLayoutProps) {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(251,191,36,0.18),_transparent_26%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] text-slate-100">
       <div className="mx-auto flex min-h-screen w-full max-w-[1600px] flex-col gap-6 px-4 py-4 md:px-6 lg:flex-row lg:px-8 lg:py-6">
@@ -96,14 +97,16 @@ export function AdminLayout({ children, title, description }: AdminLayoutProps) 
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1 rounded-[32px] border border-white/10 bg-slate-900/60 p-4 shadow-[0_28px_80px_rgba(2,6,23,0.38)] backdrop-blur md:p-6">
-          <header className="rounded-[28px] border border-white/8 bg-black/20 px-5 py-5 md:px-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-200/70">Painel operacional</p>
-            <h2 className="mt-3 text-2xl font-semibold text-white">{title}</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-300">{description}</p>
-          </header>
+        <main className="min-w-0 flex flex-1 flex-col rounded-[32px] border border-white/10 bg-slate-900/60 p-4 shadow-[0_28px_80px_rgba(2,6,23,0.38)] backdrop-blur md:p-6">
+          {headerMode === "default" ? (
+            <header className="rounded-[28px] border border-white/8 bg-black/20 px-5 py-5 md:px-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-200/70">Painel operacional</p>
+              <h2 className="mt-3 text-2xl font-semibold text-white">{title}</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-300">{description}</p>
+            </header>
+          ) : null}
 
-          <section className="mt-6 min-w-0">{children}</section>
+          <section className={["min-w-0 flex-1", headerMode === "default" ? "mt-6" : ""].join(" ").trim()}>{children}</section>
         </main>
       </div>
     </div>

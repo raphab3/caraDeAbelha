@@ -5,7 +5,7 @@ SHELL := /bin/bash
 build: server-test client-build
 
 up:
-	docker compose up --build -d --force-recreate --remove-orphans
+	docker compose up -d --build --force-recreate --remove-orphans
 
 down:
 	docker compose down
@@ -17,7 +17,7 @@ db-down:
 	docker compose stop db
 
 infra-up:
-	docker compose up --build -d --force-recreate server db
+	docker compose up -d --build --force-recreate server db
 
 infra-down:
 	docker compose down

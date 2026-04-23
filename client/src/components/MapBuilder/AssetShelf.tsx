@@ -30,11 +30,11 @@ export function AssetShelf({ items, selectedPrefabId, onSelect }: AssetShelfProp
   }, [items]);
 
   return (
-    <section className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(2,6,23,0.84),rgba(2,6,23,0.96))] p-3 shadow-[0_20px_50px_rgba(2,6,23,0.38)] backdrop-blur md:p-4">
-      <div className="flex items-start justify-between gap-4">
+    <section className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(2,6,23,0.88),rgba(2,6,23,0.94))] p-3 shadow-[0_18px_44px_rgba(2,6,23,0.32)] backdrop-blur-xl md:p-4">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Biblioteca de itens</p>
-          <p className="mt-1 text-sm leading-6 text-slate-300">Escolha um item para adicionar ao mapa.</p>
+          <p className="mt-1 text-xs leading-5 text-slate-300">Selecione um item e pinte direto no mapa.</p>
         </div>
         <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">
           {selectedPrefabId ? "1 item ativo" : "nenhum item ativo"}
@@ -43,9 +43,9 @@ export function AssetShelf({ items, selectedPrefabId, onSelect }: AssetShelfProp
 
       <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
         {groupedItems.map(([category, categoryItems]) => (
-          <section key={category} className="min-w-[240px] shrink-0 rounded-[24px] border border-white/10 bg-black/20 p-3">
+          <section key={category} className="min-w-[200px] max-w-[220px] shrink-0 rounded-[22px] border border-white/10 bg-black/20 p-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-200/72">{CATEGORY_LABELS[category]}</p>
-            <div className="mt-3 grid gap-2">
+            <div className="mt-3 grid max-h-[168px] gap-2 overflow-y-auto pr-1">
               {categoryItems.map((item) => {
                 const isSelected = item.prefabId === selectedPrefabId;
 
@@ -53,7 +53,7 @@ export function AssetShelf({ items, selectedPrefabId, onSelect }: AssetShelfProp
                   <button
                     key={item.prefabId}
                     className={[
-                      "flex min-h-11 w-full items-center justify-between gap-3 rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition-colors",
+                      "flex min-h-10 w-full items-center justify-between gap-3 rounded-2xl border px-3 py-2.5 text-left text-sm font-semibold transition-colors",
                       isSelected
                         ? "border-amber-300/45 bg-amber-300/16 text-amber-100"
                         : "border-white/10 bg-white/5 text-slate-100 hover:border-amber-200/20 hover:bg-white/10",

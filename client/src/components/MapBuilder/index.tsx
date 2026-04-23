@@ -92,12 +92,14 @@ export default function MapBuilder() {
   };
 
   return (
-    <div ref={targetRef} className="min-w-0">
+    <div ref={targetRef} className="min-h-0 min-w-0 h-full">
       <MapBuilderLayout
         header={
           <HeaderControls
             currentTool={editorState.currentTool}
             defaultY={mapInfo.defaultY}
+            isFullscreen={isFullscreen}
+            isFullscreenSupported={isFullscreenSupported}
             mapName={mapInfo.name}
             mapSize={mapInfo.size}
             onDefaultYChange={setDefaultY}
@@ -106,17 +108,14 @@ export default function MapBuilder() {
             onMapNameChange={setMapName}
             onMapSizeChange={setMapSize}
             onProceduralSeedChange={setProceduralSeed}
+            onToggleFullscreen={() => {
+              void toggleFullscreen();
+            }}
             onToolChange={setCurrentTool}
             proceduralSeed={proceduralBase.seed}
           />
         }
-        canvas={
-          <BuilderCanvas
-            isFullscreen={isFullscreen}
-            isFullscreenSupported={isFullscreenSupported}
-            onToggleFullscreen={toggleFullscreen}
-          />
-        }
+        canvas={<BuilderCanvas />}
         inspector={
           <SelectionInspector
             currentTool={editorState.currentTool}

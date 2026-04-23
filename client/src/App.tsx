@@ -67,6 +67,7 @@ function AdminMapBuilderRoute() {
   return (
     <AdminLayout
       description="Monte o mapa, ajuste a base e organize os elementos antes de exportar."
+      headerMode="hidden"
       title="Map Builder Pro"
     >
       <Suspense

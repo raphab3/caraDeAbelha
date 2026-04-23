@@ -1,4 +1,4 @@
-import { Html, OrbitControls } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import { DoubleSide, MOUSE, type Mesh } from "three";
@@ -21,12 +21,6 @@ const CAMERA_MAX_DISTANCE = 48;
 const CAMERA_MIN_DISTANCE = 8;
 const CAMERA_ROTATE_SPEED = 0.82;
 const CAMERA_ZOOM_SPEED = 0.9;
-
-interface BuilderCanvasProps {
-  isFullscreen: boolean;
-  isFullscreenSupported: boolean;
-  onToggleFullscreen: () => Promise<void>;
-}
 
 interface PaintStrokeState {
   active: boolean;
@@ -73,8 +67,6 @@ function SceneContent({
   hoveredCell,
   interactionPlaneSize,
   mapSize,
-  maxTileElevation,
-  occupiedKeys,
   onHoverCell,
   onItemPointerDown,
   onPaintCell,
@@ -89,8 +81,6 @@ function SceneContent({
   hoveredCell: { x: number; y: number; z: number } | null;
   interactionPlaneSize: number;
   mapSize: number;
-  maxTileElevation: number;
-  occupiedKeys: Set<string>;
   onHoverCell: (pointX: number, pointZ: number) => void;
   onItemPointerDown: (itemId: string) => void;
   onPaintCell: (pointX: number, pointZ: number) => void;
@@ -151,20 +141,6 @@ function SceneContent({
       />
       {hoveredCell ? <HoverMarker cell={hoveredCell} /> : null}
 
-      <Html fullscreen>
-        <div className="pointer-events-none absolute left-4 top-4 flex flex-wrap gap-2">
-          <span className="rounded-full border border-white/10 bg-slate-950/78 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-100">
-            grid {mapSize}x{mapSize}
-          </span>
-          <span className="rounded-full border border-white/10 bg-slate-950/78 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-100">
-            altura max {maxTileElevation}
-          </span>
-          <span className="rounded-full border border-white/10 bg-slate-950/78 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-100">
-            ocupacao {occupiedKeys.size}
-          </span>
-        </div>
-      </Html>
-
       <OrbitControls
         dampingFactor={0.08}
         enableDamping
@@ -187,7 +163,7 @@ function SceneContent({
   );
 }
 
-export function BuilderCanvas({ isFullscreen, isFullscreenSupported, onToggleFullscreen }: BuilderCanvasProps) {
+export function BuilderCanvas() {
   const mapInfo = useMapBuilderStore((state) => state.mapInfo);
   const proceduralBase = useMapBuilderStore((state) => state.proceduralBase);
   const placedItems = useMapBuilderStore((state) => state.placedItems);
@@ -203,10 +179,6 @@ export function BuilderCanvas({ isFullscreen, isFullscreenSupported, onToggleFul
   const occupiedKeys = useMemo(
     () => new Set(placedItems.map((item) => buildPlacedItemKey(item.x, item.y, item.z))),
     [placedItems],
-  );
-  const maxTileElevation = useMemo(
-    () => proceduralBase.tiles.reduce((max, tile) => Math.max(max, tile.y), 0),
-    [proceduralBase.tiles],
   );
   const tileElevationByCell = useMemo(
     () => new Map(proceduralBase.tiles.map((tile) => [buildSurfaceKey(tile.x, tile.z), tile.y] as const)),
@@ -303,7 +275,7 @@ export function BuilderCanvas({ isFullscreen, isFullscreenSupported, onToggleFul
   };
 
   return (
-    <div className="relative h-full min-h-[52vh] overflow-hidden lg:min-h-[60vh]">
+    <div className="relative h-full min-h-[72vh] overflow-hidden lg:min-h-[calc(100vh-3.5rem)]">
       <Canvas
         camera={{ position: [cameraDistance, cameraDistance * 0.52, cameraDistance], fov: 52 }}
         dpr={[1, 1.8]}
@@ -315,8 +287,6 @@ export function BuilderCanvas({ isFullscreen, isFullscreenSupported, onToggleFul
           hoveredCell={editorState.hoveredCell}
           interactionPlaneSize={interactionPlaneSize}
           mapSize={mapInfo.size}
-          maxTileElevation={maxTileElevation}
-          occupiedKeys={occupiedKeys}
           onHoverCell={updateHoveredCell}
           onItemPointerDown={handleItemPointerDown}
           onPaintCell={tryPaintCell}
@@ -328,29 +298,6 @@ export function BuilderCanvas({ isFullscreen, isFullscreenSupported, onToggleFul
           tiles={proceduralBase.tiles}
         />
       </Canvas>
-
-      <div className="pointer-events-none absolute inset-x-4 bottom-4 flex flex-wrap items-end justify-between gap-3">
-        <div className="max-w-xl rounded-[24px] border border-white/10 bg-slate-950/78 px-4 py-3 text-sm leading-6 text-slate-200 shadow-[0_18px_40px_rgba(2,6,23,0.3)] backdrop-blur">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Edicao do mapa</p>
-          <p className="mt-1">
-            Clique e arraste para pintar no grid.
-          </p>
-        </div>
-
-        <div className="pointer-events-auto flex flex-wrap gap-2">
-          {isFullscreenSupported ? (
-            <button
-              className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/10 bg-slate-950/78 px-4 text-sm font-semibold text-white transition-colors hover:border-amber-200/30 hover:bg-slate-900"
-              onClick={() => {
-                void onToggleFullscreen();
-              }}
-              type="button"
-            >
-              {isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
-            </button>
-          ) : null}
-        </div>
-      </div>
     </div>
   );
 }
