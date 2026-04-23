@@ -1,29 +1,30 @@
 SHELL := /bin/bash
+COMPOSE ?= docker-compose
 
 .PHONY: up down db-up db-down infra-up infra-down logs build server server-test client client-build setup-client
 
 build: server-test client-build
 
 up:
-	docker compose up -d --build --force-recreate --remove-orphans
+	$(COMPOSE) up -d --build --force-recreate --remove-orphans
 
 down:
-	docker compose down
+	$(COMPOSE) down
 
 db-up:
-	docker compose up -d db
+	$(COMPOSE) up -d db
 
 db-down:
-	docker compose stop db
+	$(COMPOSE) stop db
 
 infra-up:
-	docker compose up -d --build --force-recreate server db
+	$(COMPOSE) up -d --build --force-recreate server db
 
 infra-down:
-	docker compose down
+	$(COMPOSE) down
 
 logs:
-	docker compose logs -f db server client
+	$(COMPOSE) logs -f db server client
 
 server:
 	cd server && go run ./cmd/server
