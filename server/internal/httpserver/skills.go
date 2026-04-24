@@ -9,8 +9,9 @@ import (
 const skillSlotCount = 4
 
 const (
-	skillStateReady    = "ready"
-	skillStateCooldown = "cooldown"
+	skillStateReady             = "ready"
+	skillStateCooldown          = "cooldown"
+	defaultMaxSkillUpgradeLevel = 99
 )
 
 type beeSkillDefinition struct {
@@ -40,7 +41,7 @@ var beeSkillCatalog = []beeSkillDefinition{
 		BaseCooldownMs:      1800,
 		BasePower:           0,
 		BaseDistance:        impulsoDashDistance,
-		MaxUpgradeLevel:     3,
+		MaxUpgradeLevel:     defaultMaxSkillUpgradeLevel,
 		UpgradeCostBase:     35,
 		UpgradeCostStep:     25,
 		CooldownStepPercent: 0.12,
@@ -56,7 +57,7 @@ var beeSkillCatalog = []beeSkillDefinition{
 		BaseCooldownMs:      2500,
 		BasePower:           1,
 		BaseDistance:        ferraoProjectileDistance,
-		MaxUpgradeLevel:     3,
+		MaxUpgradeLevel:     defaultMaxSkillUpgradeLevel,
 		UpgradeCostBase:     45,
 		UpgradeCostStep:     30,
 		CooldownStepPercent: 0.10,
@@ -72,7 +73,7 @@ var beeSkillCatalog = []beeSkillDefinition{
 		BaseCooldownMs:      6000,
 		BasePower:           1,
 		BaseDistance:        0,
-		MaxUpgradeLevel:     3,
+		MaxUpgradeLevel:     defaultMaxSkillUpgradeLevel,
 		UpgradeCostBase:     60,
 		UpgradeCostStep:     40,
 		CooldownStepPercent: 0.08,
@@ -88,7 +89,7 @@ var beeSkillCatalog = []beeSkillDefinition{
 		BaseCooldownMs:      8000,
 		BasePower:           1,
 		BaseDistance:        0,
-		MaxUpgradeLevel:     3,
+		MaxUpgradeLevel:     defaultMaxSkillUpgradeLevel,
 		UpgradeCostBase:     75,
 		UpgradeCostStep:     50,
 		CooldownStepPercent: 0.08,

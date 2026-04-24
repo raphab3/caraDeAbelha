@@ -1,5 +1,7 @@
 import type { SkillCatalogEntry } from "../types/game";
 
+const DEFAULT_MAX_SKILL_UPGRADE_LEVEL = 99;
+
 export const DEFAULT_SKILL_CATALOG: SkillCatalogEntry[] = [
   {
     id: "skill:impulso",
@@ -10,7 +12,7 @@ export const DEFAULT_SKILL_CATALOG: SkillCatalogEntry[] = [
     baseCooldownMs: 1800,
     basePower: 0,
     baseDistance: 1.8,
-    maxUpgradeLevel: 3,
+    maxUpgradeLevel: DEFAULT_MAX_SKILL_UPGRADE_LEVEL,
   },
   {
     id: "skill:atirar-ferrao",
@@ -21,7 +23,7 @@ export const DEFAULT_SKILL_CATALOG: SkillCatalogEntry[] = [
     baseCooldownMs: 2500,
     basePower: 1,
     baseDistance: 4.2,
-    maxUpgradeLevel: 3,
+    maxUpgradeLevel: DEFAULT_MAX_SKILL_UPGRADE_LEVEL,
   },
   {
     id: "skill:slime-de-mel",
@@ -32,7 +34,7 @@ export const DEFAULT_SKILL_CATALOG: SkillCatalogEntry[] = [
     baseCooldownMs: 6000,
     basePower: 1,
     baseDistance: 0,
-    maxUpgradeLevel: 3,
+    maxUpgradeLevel: DEFAULT_MAX_SKILL_UPGRADE_LEVEL,
   },
   {
     id: "skill:flor-de-nectar",
@@ -43,7 +45,7 @@ export const DEFAULT_SKILL_CATALOG: SkillCatalogEntry[] = [
     baseCooldownMs: 8000,
     basePower: 1,
     baseDistance: 0,
-    maxUpgradeLevel: 3,
+    maxUpgradeLevel: DEFAULT_MAX_SKILL_UPGRADE_LEVEL,
   },
 ];
 

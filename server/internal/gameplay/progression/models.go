@@ -26,12 +26,10 @@ type Attributes struct {
 // ItemInstance represents a single equipped item with metadata.
 //
 // ItemID: References an item from a catalog (e.g., "sword_iron", "armor_leather").
-//
-//	Used to look up stat bonuses and visual properties.
+//         Used to look up stat bonuses and visual properties.
 //
 // Slot: Which equipment slot this item occupies (e.g., "main_hand", "armor").
-//
-//	Must match one of the EQUIPMENT_SLOT constants.
+//       Must match one of the EQUIPMENT_SLOT constants.
 //
 // JSON Marshaling:
 // - ItemID → itemId (camelCase)

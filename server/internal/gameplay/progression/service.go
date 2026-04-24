@@ -23,7 +23,7 @@ import (
 // In-memory map for now. Future: Replace with database for persistence.
 // Map key: playerID, value: PlayerProgression pointer.
 type ProgressionService struct {
-	mu           sync.RWMutex
+	mu          sync.RWMutex
 	progressions map[string]*PlayerProgression
 }
 
@@ -59,10 +59,10 @@ func NewProgressionService() *ProgressionService {
 // - No "overflow XP" mechanic (keeps accounting simple)
 
 const (
-	MaxLevel               = uint32(99)
-	baseXPPerLevel         = uint64(100)
-	basePollenCapacity     = uint32(40)
-	pollenCapacityPerLevel = uint32(5)
+	MaxLevel                = uint32(99)
+	baseXPPerLevel          = uint64(100)
+	basePollenCapacity      = uint32(40)
+	pollenCapacityPerLevel  = uint32(5)
 )
 
 // calculateXPRequiredForLevel computes the XP needed to advance to the next level.
@@ -188,7 +188,6 @@ func (s *ProgressionService) AddXP(playerID string, amount uint64) (leveledUp bo
 //   - HP: +2 per level (level 5 = base 20 + 2*4 = 28 HP)
 //   - Damage: +1 per level
 //   - Armor: +0.5 per level (stored as uint32, so rounds down)
-//
 // - EquipmentBonus: Sum of stat modifiers from all equipped items
 //
 // Example:
