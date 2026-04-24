@@ -20,6 +20,7 @@ import {
 	toTerrainSurfaceY,
 	type WorldSurfaceIndex,
 } from "./worldSurface";
+import { resolveModelGroundOffsetY } from "./modelAnchoring";
 
 interface InstancedModelMeshSource {
 	geometry: BufferGeometry;
@@ -37,6 +38,7 @@ interface InstancedAssetMeshProps {
 	material: Material;
 	props: WorldPropState[];
 	surfaceIndex: WorldSurfaceIndex;
+	groundOffsetY: number;
 }
 
 function resolvePropSceneY(item: WorldPropState, surfaceIndex: WorldSurfaceIndex): number {
@@ -69,7 +71,7 @@ function collectInstancedModelMeshes(root: Group): InstancedModelMeshSource[] {
 }
 
 
-function InstancedAssetMesh({ geometry, material, props, surfaceIndex }: InstancedAssetMeshProps) {
+function InstancedAssetMesh({ geometry, material, props, surfaceIndex, groundOffsetY }: InstancedAssetMeshProps) {
 	const meshRef = useRef<InstancedMesh>(null);
 	const dummy = useMemo(() => new Object3D(), []);
 
@@ -82,7 +84,11 @@ function InstancedAssetMesh({ geometry, material, props, surfaceIndex }: Instanc
 		mesh.count = props.length;
 		for (let index = 0; index < props.length; index += 1) {
 			const item = props[index];
-			dummy.position.set(toSceneAxis(item.x), resolvePropSceneY(item, surfaceIndex), toSceneAxis(item.z));
+			dummy.position.set(
+				toSceneAxis(item.x),
+				resolvePropSceneY(item, surfaceIndex) + groundOffsetY * item.scale,
+				toSceneAxis(item.z),
+			);
 			dummy.rotation.set(0, item.yaw, 0);
 			dummy.scale.setScalar(item.scale);
 			dummy.updateMatrix();
@@ -90,7 +96,7 @@ function InstancedAssetMesh({ geometry, material, props, surfaceIndex }: Instanc
 		}
 
 		mesh.instanceMatrix.needsUpdate = true;
-	}, [dummy, props, surfaceIndex]);
+	}, [dummy, groundOffsetY, props, surfaceIndex]);
 
 	return (
 		<instancedMesh
@@ -106,6 +112,7 @@ function InstancedAssetMesh({ geometry, material, props, surfaceIndex }: Instanc
 function InstancedAssetLayer({ assetPath, props, surfaceIndex }: InstancedAssetLayerProps) {
 	const gltf = useGLTF(normalizeAssetPath(assetPath));
 	const meshSources = useMemo(() => collectInstancedModelMeshes(gltf.scene), [gltf.scene]);
+	const groundOffsetY = useMemo(() => resolveModelGroundOffsetY(gltf.scene), [gltf.scene]);
 
 	return (
 		<>
@@ -116,6 +123,7 @@ function InstancedAssetLayer({ assetPath, props, surfaceIndex }: InstancedAssetL
 					material={source.material}
 					props={props}
 					surfaceIndex={surfaceIndex}
+					groundOffsetY={groundOffsetY}
 				/>
 			))}
 		</>

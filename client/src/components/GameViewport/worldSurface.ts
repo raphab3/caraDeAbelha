@@ -23,15 +23,8 @@ export function resolveTerrainElevation(value: number): number {
 		return value * 1.9;
 	}
 
-	if (value <= 0) {
-		return value * 1.2;
-	}
-
-	if (value < 1) {
-		return value * 1.1;
-	}
-
-	return 1.1 + value * 1.45;
+	// Keep authored elevations aligned to whole terrain blocks so cliffs stack cleanly.
+	return value;
 }
 
 export function toWorldAxis(value: number): number {

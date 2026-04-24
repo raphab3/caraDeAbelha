@@ -1,11 +1,13 @@
 import { Clone, useGLTF } from "@react-three/drei";
 import type { ThreeEvent } from "@react-three/fiber";
+import { useMemo } from "react";
 
 import { MAP_BUILDER_CATALOG, getMapBuilderCatalogItem } from "./catalog";
 import {
   toSceneAxis,
   toTerrainSurfaceY,
 } from "../GameViewport/worldSurface";
+import { resolveModelGroundOffsetY } from "../GameViewport/modelAnchoring";
 import type { PlacedItem } from "./types";
 
 interface PlacedItemsRendererProps {
@@ -56,6 +58,7 @@ function PlacedItemInstance({
 }) {
   const catalogItem = getMapBuilderCatalogItem(item.prefabId);
   const gltf = useGLTF(normalizeAssetPath(catalogItem?.assetPath ?? ""));
+  const groundOffsetY = useMemo(() => resolveModelGroundOffsetY(gltf.scene), [gltf.scene]);
 
   if (!catalogItem) {
     return null;
@@ -67,7 +70,11 @@ function PlacedItemInstance({
         event.stopPropagation();
         onItemPointerDown(event, item.id);
       }}
-      position={[toSceneAxis(item.x), resolvePlacedItemSceneY(item, tileElevationByCell), toSceneAxis(item.z)]}
+      position={[
+        toSceneAxis(item.x),
+        resolvePlacedItemSceneY(item, tileElevationByCell) + groundOffsetY * item.scale,
+        toSceneAxis(item.z),
+      ]}
       rotation={[0, (item.rotationY * Math.PI) / 180, 0]}
       scale={[item.scale, item.scale, item.scale]}
     >

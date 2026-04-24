@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"log"
 	"os"
 	"path/filepath"
@@ -36,6 +37,7 @@ func seedBundledStages(store stageStore) {
 			log.Printf("skip bundled stage %s: %v", mapFile, err)
 			continue
 		}
+		source = normalizeBundledStageSource(mapFile, source)
 		validation := validateStageSource(source)
 		if len(validation.SourceJSON) == 0 {
 			log.Printf("skip bundled stage %s: empty JSON", mapFile)
@@ -104,4 +106,66 @@ func discoverStageSeedMapFiles() []string {
 		return files[left] < files[right]
 	})
 	return files
+}
+
+func normalizeBundledStageSource(mapFile string, source []byte) []byte {
+	stageID, displayName := deriveStageIdentityFromMapFile(mapFile)
+
+	var records []worldMapRecord
+	if err := json.Unmarshal(source, &records); err == nil && len(records) > 0 {
+		return marshalBundledStageSource(worldMapContainer{
+			StageID:     stageID,
+			DisplayName: displayName,
+			Audio:       worldStageAudio{BGM: "assets/rpg-adventure.mp3"},
+			Tiles:       records,
+			Zones:       []worldZone{},
+			Transitions: []worldTransition{},
+			Landmarks:   []worldLandmark{},
+		}, source)
+	}
+
+	var container worldMapContainer
+	if err := json.Unmarshal(source, &container); err != nil || len(container.Tiles) == 0 {
+		return source
+	}
+	if strings.TrimSpace(container.StageID) == "" {
+		container.StageID = stageID
+	}
+	if strings.TrimSpace(container.DisplayName) == "" {
+		container.DisplayName = displayName
+	}
+	if strings.TrimSpace(container.Audio.BGM) == "" {
+		container.Audio.BGM = "assets/rpg-adventure.mp3"
+	}
+	return marshalBundledStageSource(container, source)
+}
+
+func marshalBundledStageSource(container worldMapContainer, fallback []byte) []byte {
+	normalized, err := json.MarshalIndent(container, "", "  ")
+	if err != nil {
+		return fallback
+	}
+	return normalized
+}
+
+func deriveStageIdentityFromMapFile(mapFile string) (string, string) {
+	name := strings.TrimSuffix(filepath.Base(mapFile), filepath.Ext(mapFile))
+	name = strings.TrimPrefix(name, "map-")
+	name = strings.TrimPrefix(name, "stage-")
+	slug := slugifyStage(name)
+	return "stage:" + slug, humanizeStageSlug(slug)
+}
+
+func humanizeStageSlug(slug string) string {
+	parts := strings.Fields(strings.ReplaceAll(slug, "-", " "))
+	for index, part := range parts {
+		if part == "" {
+			continue
+		}
+		parts[index] = strings.ToUpper(part[:1]) + part[1:]
+	}
+	if len(parts) == 0 {
+		return "Imported Stage"
+	}
+	return strings.Join(parts, " ")
 }

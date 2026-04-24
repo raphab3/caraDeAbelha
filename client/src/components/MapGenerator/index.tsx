@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createNoise2D } from "simplex-noise";
 import seedrandom from "seedrandom";
 
+import { API_URL } from "../../game/env";
 import styles from "./MapGenerator.module.css";
 import type { LayoutStyle, MapGeneratorSettings, MapStats, MapTile, TerrainProp, TerrainType } from "./types";
 
@@ -44,6 +45,8 @@ const SCENARIO_PRESETS = [
 ] as const;
 
 const MIN_THRESHOLD_GAP = 0.05;
+const DEFAULT_STAGE_AUDIO = "assets/rpg-adventure.mp3";
+const DEFAULT_EDGE_BEHAVIOR_TYPE = "outlands_return_corridor";
 
 interface ControlFieldProps {
 	label: string;
@@ -94,6 +97,14 @@ function sanitizeSeed(seed: string): string {
 	const normalizedSeed = seed.trim() || DEFAULT_SETTINGS.seed;
 
 	return normalizedSeed.replace(/[^a-z0-9-_]+/gi, "-").replace(/^-+|-+$/g, "") || "mapa";
+}
+
+function humanizeSeed(seed: string): string {
+	return sanitizeSeed(seed)
+		.split("-")
+		.filter(Boolean)
+		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+		.join(" ") || "Mapa Gerado";
 }
 
 function buildTileKey(x: number, z: number): string {
@@ -369,6 +380,58 @@ function countMapStats(mapData: MapTile[]): MapStats {
 	);
 }
 
+function buildBounds(mapData: MapTile[]) {
+	const bounds = mapData.reduce(
+		(current, tile) => ({
+			minX: Math.min(current.minX, tile.x),
+			maxX: Math.max(current.maxX, tile.x),
+			minZ: Math.min(current.minZ, tile.z),
+			maxZ: Math.max(current.maxZ, tile.z),
+		}),
+		{ minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity },
+	);
+
+	return {
+		x1: bounds.minX - 0.5,
+		x2: bounds.maxX + 0.5,
+		z1: bounds.minZ - 0.5,
+		z2: bounds.maxZ + 0.5,
+	};
+}
+
+function expandBounds(bounds: ReturnType<typeof buildBounds>, padding: number) {
+	return {
+		x1: bounds.x1 - padding,
+		x2: bounds.x2 + padding,
+		z1: bounds.z1 - padding,
+		z2: bounds.z2 + padding,
+	};
+}
+
+function buildStagePayload(settings: MapGeneratorSettings, mapData: MapTile[]) {
+	const stageSlug = sanitizeSeed(settings.seed);
+	const playableBounds = buildBounds(mapData);
+	const outlandsPadding = Math.max(24, Math.ceil(settings.mapSize * 0.5));
+
+	return {
+		stageId: `stage:${stageSlug}`,
+		displayName: humanizeSeed(settings.seed),
+		audio: {
+			bgm: DEFAULT_STAGE_AUDIO,
+		},
+		edgeBehavior: {
+			type: DEFAULT_EDGE_BEHAVIOR_TYPE,
+			playableBounds,
+			outlandsBounds: expandBounds(playableBounds, outlandsPadding),
+		},
+		tiles: mapData,
+		props: [],
+		zones: [],
+		transitions: [],
+		landmarks: [],
+	};
+}
+
 function ControlField({ label, valueLabel, helperText, children }: ControlFieldProps) {
 	return (
 		<label className="flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/6 p-4 shadow-[0_16px_40px_rgba(15,23,42,0.18)] backdrop-blur-sm">
@@ -465,6 +528,8 @@ export default function MapGenerator({ embedded = false }: MapGeneratorProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const canvasFrameRef = useRef<HTMLDivElement>(null);
 	const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+	const [adminSaveMessage, setAdminSaveMessage] = useState<string>();
+	const [adminSaveError, setAdminSaveError] = useState<string>();
 
 	const settings = useMemo<MapGeneratorSettings>(
 		() => ({
@@ -594,7 +659,8 @@ export default function MapGenerator({ embedded = false }: MapGeneratorProps) {
 	};
 
 	const exportMap = () => {
-		const mapBlob = new Blob([JSON.stringify(mapData, null, 2)], {
+		const stagePayload = buildStagePayload(settings, mapData);
+		const mapBlob = new Blob([JSON.stringify(stagePayload, null, 2)], {
 			type: "application/json;charset=utf-8",
 		});
 		const objectUrl = window.URL.createObjectURL(mapBlob);
@@ -604,6 +670,32 @@ export default function MapGenerator({ embedded = false }: MapGeneratorProps) {
 		downloadAnchor.download = `map-${sanitizeSeed(seed)}.json`;
 		downloadAnchor.click();
 		window.URL.revokeObjectURL(objectUrl);
+	};
+
+	const saveStageToAdmin = async () => {
+		const stagePayload = buildStagePayload(settings, mapData);
+
+		setAdminSaveMessage("Enviando mapa para Stages...");
+		setAdminSaveError(undefined);
+
+		try {
+			const response = await fetch(`${API_URL}/admin/stages/import`, {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ sourceJson: JSON.stringify(stagePayload, null, 2), actor: "map-generator" }),
+			});
+
+			if (!response.ok) {
+				const errorPayload = await response.json().catch(() => undefined) as { error?: string; fields?: string[] } | undefined;
+				throw new Error([errorPayload?.error ?? `HTTP ${response.status}`, ...(errorPayload?.fields ?? [])].join(": "));
+			}
+
+			const result = await response.json() as { stage: { displayName: string }; version: { version: number } };
+			setAdminSaveMessage(`Mapa "${result.stage.displayName}" salvo em Stages como v${result.version.version}.`);
+		} catch (error) {
+			setAdminSaveMessage(undefined);
+			setAdminSaveError(error instanceof Error ? error.message : "Falha ao salvar mapa em Stages.");
+		}
 	};
 
 	const shellClassName = embedded
@@ -646,8 +738,17 @@ export default function MapGenerator({ embedded = false }: MapGeneratorProps) {
 							>
 								Exportar Mapa (JSON)
 							</button>
+							<button
+								className="inline-flex min-h-11 items-center justify-center rounded-full border border-emerald-200/30 bg-emerald-300/15 px-5 text-sm font-semibold text-emerald-50 transition hover:bg-emerald-300/24 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-200"
+								onClick={() => void saveStageToAdmin()}
+								type="button"
+							>
+								Salvar em Stages
+							</button>
 						</div>
 					</div>
+					{adminSaveMessage ? <p className="mt-4 text-sm font-medium text-emerald-200">{adminSaveMessage}</p> : null}
+					{adminSaveError ? <p className="mt-4 text-sm font-medium text-rose-200">{adminSaveError}</p> : null}
 				</header>
 
 				<section className={controlsGridClassName}>
@@ -806,9 +907,9 @@ export default function MapGenerator({ embedded = false }: MapGeneratorProps) {
 
 								<div className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-300/82">
 									<p className="font-semibold text-slate-100">Formato de saída</p>
-									<p className="mt-2">O export gera apenas a lista plana de tiles no formato exigido pelo servidor:</p>
+									<p className="mt-2">O export gera um stage completo, pronto para importar em Stages ou salvar em `server/maps`:</p>
 									<code className="mt-3 block rounded-2xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs text-slate-200">
-										{"{ x, y, z, type, prop }[]"}
+										{"{ stageId, displayName, tiles, props, zones }"}
 									</code>
 								</div>
 							</div>
