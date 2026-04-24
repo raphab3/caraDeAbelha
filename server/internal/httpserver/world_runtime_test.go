@@ -33,13 +33,18 @@ func newRuntimeTestHub(now time.Time) *gameHub {
 
 func firstActiveFlower(t *testing.T, hub *gameHub) *activeFlowerRuntime {
 	t.Helper()
+	// Prefer a flower in the starter meadow zone so the default player can collect it.
 	for _, flower := range hub.activeFlowers {
-		if flower != nil && flower.Available {
+		if flower == nil || !flower.Available {
+			continue
+		}
+		zoneID := hub.world.zoneIDAt(flower.Node.X, flower.Node.Y)
+		if zoneID == zones.StarterMeadowZoneID {
 			return flower
 		}
 	}
 
-	t.Fatal("expected at least one active flower")
+	t.Fatal("expected at least one active flower in the starter meadow zone")
 	return nil
 }
 
