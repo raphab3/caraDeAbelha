@@ -41,6 +41,9 @@ export const validateGameTypes = () => {
       { slot: 3, skillId: "", state: "ready", cooldownEndsAt: 0 },
     ],
     skillCatalog: DEFAULT_SKILL_CATALOG,
+    currentLife: 80,
+    maxLife: 100,
+    isDead: false,
   };
 
   console.assert(testProgress.pollenCarried === 50, "PlayerProgressState: pollenCarried mismatch");
@@ -87,6 +90,9 @@ export const validateGameTypes = () => {
       { slot: 3, skillId: "", state: "ready", cooldownEndsAt: 0 },
     ],
     skillCatalog: DEFAULT_SKILL_CATALOG,
+    currentLife: 75,
+    maxLife: 100,
+    isDead: false,
   };
 
   console.assert(testStatusMsg.type === "player_status", "PlayerStatusMessage: type mismatch");

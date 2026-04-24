@@ -51,21 +51,25 @@ type useSkillAction struct {
 }
 
 type playerState struct {
-	ID           string             `json:"id"`
-	Username     string             `json:"username"`
-	StageID      string             `json:"stageId,omitempty"`
-	X            float64            `json:"x"`
-	Y            float64            `json:"y"`
-	TargetX      *float64           `json:"targetX,omitempty"`
-	TargetY      *float64           `json:"targetY,omitempty"`
-	DestinationX *float64           `json:"destinationX,omitempty"`
-	DestinationY *float64           `json:"destinationY,omitempty"`
-	Speed        float64            `json:"speed"`
-	FacingX      float64            `json:"-"`
-	FacingY      float64            `json:"-"`
-	Route        []movementWaypoint `json:"-"`
-	UpdatedAt    time.Time          `json:"-"`
-	LastSeenAt   time.Time          `json:"-"`
+	ID             string             `json:"id"`
+	Username       string             `json:"username"`
+	StageID        string             `json:"stageId,omitempty"`
+	X              float64            `json:"x"`
+	Y              float64            `json:"y"`
+	TargetX        *float64           `json:"targetX,omitempty"`
+	TargetY        *float64           `json:"targetY,omitempty"`
+	DestinationX   *float64           `json:"destinationX,omitempty"`
+	DestinationY   *float64           `json:"destinationY,omitempty"`
+	Speed          float64            `json:"speed"`
+	CurrentLife    int                `json:"currentLife"`
+	MaxLife        int                `json:"maxLife"`
+	IsDead         bool               `json:"isDead"`
+	CombatTagUntil int64              `json:"combatTagUntil,omitempty"`
+	FacingX        float64            `json:"-"`
+	FacingY        float64            `json:"-"`
+	Route          []movementWaypoint `json:"-"`
+	UpdatedAt      time.Time          `json:"-"`
+	LastSeenAt     time.Time          `json:"-"`
 }
 
 type sessionMessage struct {
@@ -161,15 +165,16 @@ type worldChunkState struct {
 }
 
 type skillCatalogEntryMessage struct {
-	ID              string  `json:"id"`
-	Name            string  `json:"name"`
-	Role            string  `json:"role"`
-	Summary         string  `json:"summary"`
-	CostHoney       int     `json:"costHoney"`
-	BaseCooldownMs  int     `json:"baseCooldownMs"`
-	BasePower       float64 `json:"basePower"`
-	BaseDistance    float64 `json:"baseDistance"`
-	MaxUpgradeLevel int     `json:"maxUpgradeLevel"`
+	ID               string  `json:"id"`
+	Name             string  `json:"name"`
+	Role             string  `json:"role"`
+	Summary          string  `json:"summary"`
+	CostHoney        int     `json:"costHoney"`
+	EnergyCostPollen int     `json:"energyCostPollen"`
+	BaseCooldownMs   int     `json:"baseCooldownMs"`
+	BasePower        float64 `json:"basePower"`
+	BaseDistance     float64 `json:"baseDistance"`
+	MaxUpgradeLevel  int     `json:"maxUpgradeLevel"`
 }
 
 type skillUpgradeMessage struct {
@@ -219,25 +224,42 @@ type skillEffectsMessage struct {
 	Effects []skillEffectMessage `json:"effects"`
 }
 
+type combatEventMessage struct {
+	Type           string `json:"type"`
+	EventID        string `json:"eventId"`
+	EventKind      string `json:"eventKind"`
+	SourcePlayerID string `json:"sourcePlayerId,omitempty"`
+	TargetPlayerID string `json:"targetPlayerId"`
+	SkillID        string `json:"skillId,omitempty"`
+	Amount         int    `json:"amount"`
+	Reason         string `json:"reason,omitempty"`
+	Timestamp      int64  `json:"timestamp"`
+}
+
 // playerStatusMessage contains the player's progression state: pollen, capacity, honey, level, XP, skill points,
 // current zone and unlocked zones. Sent to the player whenever their progress changes.
 // This is the server-authoritative source of truth for player economy stats on the client.
 type playerStatusMessage struct {
-	Type            string                     `json:"type"`
-	PlayerID        string                     `json:"playerId"`
-	PollenCarried   int                        `json:"pollenCarried"`
-	PollenCapacity  int                        `json:"pollenCapacity"`
-	Honey           int                        `json:"honey"`
-	Level           int                        `json:"level"`
-	XP              int                        `json:"xp"`
-	SkillPoints     int                        `json:"skillPoints"`
-	CurrentZoneID   string                     `json:"currentZoneId"`
-	UnlockedZoneIDs []string                   `json:"unlockedZoneIds"`
-	OwnedSkillIDs   []string                   `json:"ownedSkillIds"`
-	EquippedSkills  []string                   `json:"equippedSkills"`
-	SkillUpgrades   []skillUpgradeMessage      `json:"skillUpgrades"`
-	SkillRuntime    []skillRuntimeMessage      `json:"skillRuntime"`
-	SkillCatalog    []skillCatalogEntryMessage `json:"skillCatalog"`
+	Type                  string                     `json:"type"`
+	PlayerID              string                     `json:"playerId"`
+	PollenCarried         int                        `json:"pollenCarried"`
+	PollenCapacity        int                        `json:"pollenCapacity"`
+	Honey                 int                        `json:"honey"`
+	Level                 int                        `json:"level"`
+	XP                    int                        `json:"xp"`
+	SkillPoints           int                        `json:"skillPoints"`
+	CurrentZoneID         string                     `json:"currentZoneId"`
+	UnlockedZoneIDs       []string                   `json:"unlockedZoneIds"`
+	OwnedSkillIDs         []string                   `json:"ownedSkillIds"`
+	EquippedSkills        []string                   `json:"equippedSkills"`
+	SkillUpgrades         []skillUpgradeMessage      `json:"skillUpgrades"`
+	SkillRuntime          []skillRuntimeMessage      `json:"skillRuntime"`
+	SkillCatalog          []skillCatalogEntryMessage `json:"skillCatalog"`
+	CurrentLife           int                        `json:"currentLife"`
+	MaxLife               int                        `json:"maxLife"`
+	IsDead                bool                       `json:"isDead"`
+	RespawnEndsAt         int64                      `json:"respawnEndsAt,omitempty"`
+	SpawnProtectionEndsAt int64                      `json:"spawnProtectionEndsAt,omitempty"`
 }
 
 // interactionResultMessage provides feedback on player actions like collecting flowers or depositing pollen.
@@ -292,6 +314,8 @@ func newPlayerStatusMessage(progress *loopbase.PlayerProgress) playerStatusMessa
 			SkillUpgrades:  []skillUpgradeMessage{},
 			SkillRuntime:   buildSkillRuntimeMessage(nil),
 			SkillCatalog:   buildSkillCatalogMessage(),
+			CurrentLife:    defaultMaxPlayerLife,
+			MaxLife:        defaultMaxPlayerLife,
 		}
 	}
 
@@ -301,21 +325,26 @@ func newPlayerStatusMessage(progress *loopbase.PlayerProgress) playerStatusMessa
 	progress.SkillRuntime = normalizeSkillRuntime(progress.SkillRuntime, equippedSkills, time.Now())
 
 	return playerStatusMessage{
-		Type:            "player_status",
-		PlayerID:        progress.PlayerID,
-		PollenCarried:   progress.PollenCarried,
-		PollenCapacity:  progress.PollenCapacity,
-		Honey:           progress.Honey,
-		Level:           progress.Level,
-		XP:              progress.XP,
-		SkillPoints:     progress.SkillPoints,
-		CurrentZoneID:   progress.CurrentZoneID,
-		UnlockedZoneIDs: progress.UnlockedZoneIDs,
-		OwnedSkillIDs:   ownedSkillIDs,
-		EquippedSkills:  equippedSkills,
-		SkillUpgrades:   buildSkillUpgradeMessage(progress.SkillUpgradeLevels, ownedSkillIDs),
-		SkillRuntime:    buildSkillRuntimeMessage(progress.SkillRuntime),
-		SkillCatalog:    buildSkillCatalogMessage(),
+		Type:                  "player_status",
+		PlayerID:              progress.PlayerID,
+		PollenCarried:         progress.PollenCarried,
+		PollenCapacity:        progress.PollenCapacity,
+		Honey:                 progress.Honey,
+		Level:                 progress.Level,
+		XP:                    progress.XP,
+		SkillPoints:           progress.SkillPoints,
+		CurrentZoneID:         progress.CurrentZoneID,
+		UnlockedZoneIDs:       progress.UnlockedZoneIDs,
+		OwnedSkillIDs:         ownedSkillIDs,
+		EquippedSkills:        equippedSkills,
+		SkillUpgrades:         buildSkillUpgradeMessage(progress.SkillUpgradeLevels, ownedSkillIDs),
+		SkillRuntime:          buildSkillRuntimeMessage(progress.SkillRuntime),
+		SkillCatalog:          buildSkillCatalogMessage(),
+		CurrentLife:           progress.CurrentLife,
+		MaxLife:               progress.MaxLife,
+		IsDead:                progress.IsDead,
+		RespawnEndsAt:         combatTimeMillis(progress.RespawnAt),
+		SpawnProtectionEndsAt: combatTimeMillis(progress.SpawnProtectionUntil),
 	}
 }
 
@@ -380,19 +409,27 @@ func buildSkillCatalogMessage() []skillCatalogEntryMessage {
 	message := make([]skillCatalogEntryMessage, 0, len(catalog))
 	for _, entry := range catalog {
 		message = append(message, skillCatalogEntryMessage{
-			ID:              entry.ID,
-			Name:            entry.Name,
-			Role:            entry.Role,
-			Summary:         entry.Summary,
-			CostHoney:       entry.CostHoney,
-			BaseCooldownMs:  entry.BaseCooldownMs,
-			BasePower:       entry.BasePower,
-			BaseDistance:    entry.BaseDistance,
-			MaxUpgradeLevel: entry.MaxUpgradeLevel,
+			ID:               entry.ID,
+			Name:             entry.Name,
+			Role:             entry.Role,
+			Summary:          entry.Summary,
+			CostHoney:        entry.CostHoney,
+			EnergyCostPollen: entry.EnergyCostPollen,
+			BaseCooldownMs:   entry.BaseCooldownMs,
+			BasePower:        entry.BasePower,
+			BaseDistance:     entry.BaseDistance,
+			MaxUpgradeLevel:  entry.MaxUpgradeLevel,
 		})
 	}
 
 	return message
+}
+
+func combatTimeMillis(value time.Time) int64 {
+	if value.IsZero() {
+		return 0
+	}
+	return value.UnixMilli()
 }
 
 // newInteractionResultMessage creates an interactionResultMessage for feedback.

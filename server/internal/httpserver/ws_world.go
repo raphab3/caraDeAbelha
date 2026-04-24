@@ -17,6 +17,8 @@ func (hub *gameHub) snapshotForPlayerLocked(viewer *playerState) worldStateMessa
 	// Todos os jogadores são sempre incluídos; o cliente filtra por distância no render 3D.
 	players := make([]playerState, 0, len(hub.players))
 	for _, player := range hub.players {
+		progress := hub.ensurePlayerProgressLocked(player.ID)
+		hub.ensurePlayerCombatLocked(player, progress, hub.now())
 		players = append(players, *player)
 	}
 

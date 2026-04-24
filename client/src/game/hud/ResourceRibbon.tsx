@@ -66,7 +66,12 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteract
     );
   }
 
-  const pollenPercent = (playerProgress.pollenCarried / playerProgress.pollenCapacity) * 100;
+  const pollenPercent = playerProgress.pollenCapacity > 0 ? (playerProgress.pollenCarried / playerProgress.pollenCapacity) * 100 : 0;
+  const lifePercent = playerProgress.maxLife > 0 ? (playerProgress.currentLife / playerProgress.maxLife) * 100 : 0;
+  const respawnSeconds =
+    playerProgress.isDead && playerProgress.respawnEndsAt
+      ? Math.max(0, Math.ceil((playerProgress.respawnEndsAt - Date.now()) / 1000))
+      : 0;
   // Estimate XP bar (assuming level progression)
   const xpPercent = (playerProgress.xp % 100); // Placeholder: 0-100 per level
   const flowerInteractionLabel =
@@ -103,9 +108,22 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteract
 
         {/* Resources Card */}
         <div className={[styles.pill, styles.resourcePill].join(" ")}>
+          <div className={styles.vitalBlock}>
+            <span className={styles.vitalLabel}>Vida</span>
+            <div className={styles.vitalValue}>
+              {playerProgress.currentLife}
+              <span>/ {playerProgress.maxLife}</span>
+            </div>
+            <div className={styles.lifeTrack}>
+              <div className={styles.lifeFill} style={{ width: `${lifePercent}%` }} />
+            </div>
+          </div>
+
+          <div className="w-px h-8 bg-slate-700/60" />
+
           {/* Pollen */}
           <div className="flex flex-col items-center">
-            <span className="text-[9px] font-bold text-amber-200/80 uppercase tracking-widest mb-1">Pólen</span>
+            <span className="text-[9px] font-bold text-amber-200/80 uppercase tracking-widest mb-1">Energia (Pólen)</span>
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.8)]" />
               <span className="text-base font-black text-white drop-shadow-md tracking-tight">
@@ -148,6 +166,15 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteract
                 <span className="mt-1 text-sm font-black">{flowerInteractionLabel}</span>
               </div>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {playerProgress.isDead ? (
+        <div className={styles.respawnWrap}>
+          <div className={styles.respawnStatus} role="status" aria-live="assertive">
+            <span>Abelha abatida</span>
+            <strong>Respawn em {respawnSeconds}s</strong>
           </div>
         </div>
       ) : null}

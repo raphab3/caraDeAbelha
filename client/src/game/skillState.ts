@@ -6,7 +6,16 @@ function normalizeSkillCatalog(skillCatalog: SkillCatalogEntry[] | undefined): S
     return DEFAULT_SKILL_CATALOG;
   }
 
-  return skillCatalog;
+  return skillCatalog.map((entry) => {
+    const fallback = DEFAULT_SKILL_CATALOG.find((item) => item.id === entry.id);
+    return {
+      ...entry,
+      energyCostPollen:
+        typeof entry.energyCostPollen === "number"
+          ? entry.energyCostPollen
+          : (fallback?.energyCostPollen ?? 0),
+    };
+  });
 }
 
 function normalizeOwnedSkillIds(ownedSkillIds: string[] | undefined): string[] {
@@ -79,6 +88,11 @@ export function normalizePlayerProgressState(playerProgress: PlayerProgressState
     skillUpgrades: normalizeSkillUpgrades(playerProgress.skillUpgrades, ownedSkillIds, skillCatalog),
     skillRuntime: normalizeSkillRuntime(playerProgress.skillRuntime, equippedSkills),
     skillCatalog,
+    currentLife: typeof playerProgress.currentLife === "number" ? playerProgress.currentLife : 100,
+    maxLife: typeof playerProgress.maxLife === "number" ? playerProgress.maxLife : 100,
+    isDead: Boolean(playerProgress.isDead),
+    respawnEndsAt: playerProgress.respawnEndsAt,
+    spawnProtectionEndsAt: playerProgress.spawnProtectionEndsAt,
   };
 }
 
@@ -97,5 +111,10 @@ export function playerProgressFromStatus(message: PlayerStatusMessage): PlayerPr
     skillUpgrades: message.skillUpgrades,
     skillRuntime: message.skillRuntime,
     skillCatalog: message.skillCatalog,
+    currentLife: message.currentLife,
+    maxLife: message.maxLife,
+    isDead: message.isDead,
+    respawnEndsAt: message.respawnEndsAt,
+    spawnProtectionEndsAt: message.spawnProtectionEndsAt,
   });
 }

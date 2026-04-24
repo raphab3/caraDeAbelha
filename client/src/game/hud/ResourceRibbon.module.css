@@ -53,6 +53,53 @@
   padding: 0.625rem 1.25rem;
 }
 
+.vitalBlock {
+  display: flex;
+  min-width: 8.5rem;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.vitalLabel {
+  margin-bottom: 0.25rem;
+  color: rgba(254, 202, 202, 0.86);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.vitalValue {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.vitalValue span {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.lifeTrack {
+  height: 0.32rem;
+  margin-top: 0.45rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(30, 41, 59, 0.92);
+}
+
+.lifeFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ef4444, #f97316, #facc15);
+  transition: width 180ms ease;
+}
+
 .flowerStatusWrap {
   display: flex;
   align-items: flex-start;
@@ -88,6 +135,42 @@
   transform: translateX(-50%);
   animation: bounce 1s infinite;
   pointer-events: none;
+}
+
+.respawnWrap {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.respawnStatus {
+  display: flex;
+  min-width: 16rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 1rem 1.4rem;
+  border: 1px solid rgba(248, 113, 113, 0.7);
+  border-radius: 0.75rem;
+  background: rgba(127, 29, 29, 0.84);
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.42);
+  color: #fff;
+  text-align: center;
+  backdrop-filter: blur(14px);
+}
+
+.respawnStatus span {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.respawnStatus strong {
+  font-size: 1.35rem;
 }
 
 .flash {

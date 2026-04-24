@@ -7,7 +7,7 @@ import { SkillLoadoutBar } from "./SkillLoadoutBar";
 import { ZoneUnlockPanel } from "./ZoneUnlockPanel";
 import styles from "./GameHUD.module.css";
 
-const BLOCKED_SKILL_REASON_CODES = new Set(["blocked_path", "empty_slot", "invalid_skill", "invalid_slot"]);
+const BLOCKED_SKILL_REASON_CODES = new Set(["blocked_path", "empty_slot", "invalid_skill", "invalid_slot", "insufficient_energy"]);
 
 export interface GameHUDProps {
   playerProgress: PlayerProgressState | undefined;

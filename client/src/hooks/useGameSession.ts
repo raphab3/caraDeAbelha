@@ -12,6 +12,7 @@ import type {
   HiveInteractionState,
   InteractionResult,
   PlayerStatusMessage,
+  CombatEventMessage,
   SessionMessage,
   WorldHiveState,
   WorldStateMessage,
@@ -52,6 +53,9 @@ function createDefaultPlayerProgress() {
       cooldownEndsAt: 0,
     })),
     skillCatalog: DEFAULT_SKILL_CATALOG,
+    currentLife: 100,
+    maxLife: 100,
+    isDead: false,
   });
 }
 
@@ -121,6 +125,14 @@ function isSkillEffectsMessage(message: unknown): message is SkillEffectsMessage
   }
 
   return "type" in message && message.type === "skill_effects";
+}
+
+function isCombatEventMessage(message: unknown): message is CombatEventMessage {
+  if (typeof message !== "object" || message === null) {
+    return false;
+  }
+
+  return "type" in message && message.type === "combat_event";
 }
 
 function mergeSkillEffects(current: SkillEffectState[], incoming: SkillEffectState[]): SkillEffectState[] {
@@ -405,6 +417,34 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
             ...current,
             skillEffects: mergeSkillEffects(current.skillEffects, activeEffects),
           }));
+          return;
+        }
+
+        if (isCombatEventMessage(message)) {
+          const actionByKind: Record<string, string> = {
+            damage: "combat_damage",
+            heal: "combat_heal",
+            death: "combat_death",
+            respawn: "combat_respawn",
+            blocked: "combat_blocked",
+          };
+          setGameSession((current) => ({
+            ...current,
+            lastInteraction: {
+              type: "interaction_result",
+              action: actionByKind[message.eventKind] ?? "combat_event",
+              success: message.eventKind !== "blocked",
+              amount: message.amount,
+              reason: message.reason ?? message.eventKind,
+              timestamp: message.timestamp,
+            },
+          }));
+          window.setTimeout(() => {
+            setGameSession((current) => ({
+              ...current,
+              lastInteraction: undefined,
+            }));
+          }, 2200);
           return;
         }
 

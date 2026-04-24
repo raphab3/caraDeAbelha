@@ -50,6 +50,7 @@ type gameHub struct {
 	activeFlowers     map[string]*activeFlowerRuntime
 	activeHives       map[string]*activeHiveRuntime
 	activeCollections map[string]*collectionState
+	activeCombatAreas map[string]skillEffectMessage
 	random            *rand.Rand
 	tick              uint64
 	now               func() time.Time

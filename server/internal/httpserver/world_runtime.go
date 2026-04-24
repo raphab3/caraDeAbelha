@@ -65,6 +65,7 @@ func (hub *gameHub) initializeWorldEntities() {
 	hub.activeFlowers = make(map[string]*activeFlowerRuntime)
 	hub.activeHives = make(map[string]*activeHiveRuntime)
 	hub.activeCollections = make(map[string]*collectionState)
+	hub.activeCombatAreas = make(map[string]skillEffectMessage)
 
 	if hub.random == nil {
 		hub.random = rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -272,6 +273,11 @@ func (hub *gameHub) processWorldInteractionsLocked(now time.Time) bool {
 		}
 
 		progress := hub.ensurePlayerProgressLocked(player.ID)
+		hub.ensurePlayerCombatLocked(player, progress, now)
+		if progress.IsDead {
+			delete(hub.activeCollections, player.ID)
+			continue
+		}
 		hub.updatePlayerZoneLocked(player, progress)
 		if hub.processHiveDepositLocked(player, progress) {
 			changed = true

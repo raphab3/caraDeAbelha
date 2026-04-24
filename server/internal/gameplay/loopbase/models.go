@@ -13,20 +13,29 @@ type PlayerSkillRuntime struct {
 // level, XP, skill points, and zone access.
 // This model is authoritative on the server and sent to the client as player_status.
 type PlayerProgress struct {
-	PlayerID        string    `json:"playerId"`
-	PollenCarried   int       `json:"pollenCarried"`
-	PollenCapacity  int       `json:"pollenCapacity"`
-	Honey           int       `json:"honey"`
-	Level           int       `json:"level"`
-	XP              int       `json:"xp"`
-	SkillPoints     int       `json:"skillPoints"`
-	CurrentZoneID   string    `json:"currentZoneId"`
-	UnlockedZoneIDs []string  `json:"unlockedZoneIds"`
-	OwnedSkillIDs   []string  `json:"ownedSkillIds"`
-	EquippedSkills  []string  `json:"equippedSkills"`
-	SkillUpgradeLevels map[string]int `json:"skillUpgradeLevels"`
-	SkillRuntime    []PlayerSkillRuntime `json:"skillRuntime"`
-	UpdatedAt       time.Time `json:"-"`
+	PlayerID             string               `json:"playerId"`
+	PollenCarried        int                  `json:"pollenCarried"`
+	PollenCapacity       int                  `json:"pollenCapacity"`
+	Honey                int                  `json:"honey"`
+	Level                int                  `json:"level"`
+	XP                   int                  `json:"xp"`
+	SkillPoints          int                  `json:"skillPoints"`
+	CurrentZoneID        string               `json:"currentZoneId"`
+	UnlockedZoneIDs      []string             `json:"unlockedZoneIds"`
+	OwnedSkillIDs        []string             `json:"ownedSkillIds"`
+	EquippedSkills       []string             `json:"equippedSkills"`
+	SkillUpgradeLevels   map[string]int       `json:"skillUpgradeLevels"`
+	SkillRuntime         []PlayerSkillRuntime `json:"skillRuntime"`
+	CurrentLife          int                  `json:"currentLife"`
+	MaxLife              int                  `json:"maxLife"`
+	IsDead               bool                 `json:"isDead"`
+	LastDamageAt         time.Time            `json:"-"`
+	LastLifeRegenAt      time.Time            `json:"-"`
+	RespawnAt            time.Time            `json:"-"`
+	SpawnProtectionUntil time.Time            `json:"-"`
+	CombatTagUntil       time.Time            `json:"-"`
+	SlowUntil            time.Time            `json:"-"`
+	UpdatedAt            time.Time            `json:"-"`
 }
 
 // FlowerNode represents a world flower that players can collect pollen from.

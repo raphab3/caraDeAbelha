@@ -58,6 +58,11 @@ export const InteractionFeed = ({ lastInteraction }: InteractionFeedProps) => {
       equip_skill: interaction.success ? "Skill equipada" : "Nao equipou",
       upgrade_skill: interaction.success ? "Skill melhorada" : "Upgrade falhou",
       use_skill: interaction.success ? "Skill acionada" : "Skill indisponivel",
+      combat_damage: "Dano recebido",
+      combat_heal: "Vida restaurada",
+      combat_death: "Abelha abatida",
+      combat_respawn: "Respawn concluido",
+      combat_blocked: "Combate bloqueado",
       collect_pollen: "Coletou polen",
       interact_hive: "Visitou colmeia",
       failed_collection: "Falha na coleta",
@@ -100,6 +105,14 @@ export const InteractionFeed = ({ lastInteraction }: InteractionFeedProps) => {
 
     if (lastInteraction.action === "use_skill") {
       return `Slot ${lastInteraction.amount}`;
+    }
+
+    if (lastInteraction.action === "combat_damage") {
+      return `-${lastInteraction.amount} vida`;
+    }
+
+    if (lastInteraction.action === "combat_heal" || lastInteraction.action === "combat_respawn") {
+      return `+${lastInteraction.amount} vida`;
     }
 
     if (lastInteraction.action === "upgrade_skill") {

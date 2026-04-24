@@ -49,6 +49,7 @@ func (hub *gameHub) ensurePlayerProgressLocked(playerID string) *loopbase.Player
 		SkillUpgradeLevels: map[string]int{},
 		SkillRuntime:       normalizeSkillRuntime(nil, make([]string, skillSlotCount), hub.now()),
 	}
+	hub.ensurePlayerCombatLocked(nil, progress, hub.now())
 
 	hub.playerProgress[playerID] = progress
 	return progress
@@ -109,6 +110,7 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 	profile.LastSeenAt = now
 	replacedClient := hub.clients[profile.ID]
 	progress := hub.ensurePlayerProgressLocked(profile.ID)
+	hub.ensurePlayerCombatLocked(profile, progress, now)
 	hub.resetPlayerToAccessibleSpawnLocked(profile, now)
 	hub.updatePlayerZoneLocked(profile, progress)
 
@@ -206,9 +208,14 @@ func (hub *gameHub) movePlayer(clientID string, direction string) bool {
 	if !ok {
 		return false
 	}
+	if hub.isPlayerActionBlockedByDeathLocked(clientID, "move") {
+		return false
+	}
 
 	now := hub.now()
 	hub.advanceActivePlayersLocked(now)
+	progress := hub.ensurePlayerProgressLocked(clientID)
+	progress.SpawnProtectionUntil = time.Time{}
 	nextX := player.X
 	nextY := player.Y
 
@@ -254,9 +261,14 @@ func (hub *gameHub) movePlayerTo(clientID string, x float64, z float64) bool {
 	if !ok {
 		return false
 	}
+	if hub.isPlayerActionBlockedByDeathLocked(clientID, "move_to") {
+		return false
+	}
 
 	now := hub.now()
 	hub.advanceActivePlayersLocked(now)
+	progress := hub.ensurePlayerProgressLocked(clientID)
+	progress.SpawnProtectionUntil = time.Time{}
 	targetX, targetY := x, z
 	if !hub.world.containsMovementPosition(targetX, targetY) {
 		hub.clearPlayerMovementLocked(player)
@@ -301,6 +313,13 @@ func (hub *gameHub) respawnPlayer(clientID string) bool {
 
 	now := hub.now()
 	hub.advanceActivePlayersLocked(now)
+	progress := hub.ensurePlayerProgressLocked(clientID)
+	hub.ensurePlayerCombatLocked(player, progress, now)
+	if progress.IsDead {
+		hub.sendInteractionResultWithCode(client, "respawn", false, 0, "Respawn automatico em andamento", "respawn_pending")
+		hub.sendPlayerStatus(client, progress)
+		return false
+	}
 
 	spawnX, spawnY := profileSpawnPosition(client.profileKey)
 	spawnX, spawnY = hub.clampWorldPosition(spawnX, spawnY)
@@ -334,6 +353,9 @@ func (hub *gameHub) stepMovingPlayers() bool {
 			changed = true
 		}
 	}
+	if hub.processCombatRuntimeLocked(now) {
+		changed = true
+	}
 	if hub.processWorldInteractionsLocked(now) {
 		changed = true
 	}
@@ -361,6 +383,12 @@ func (hub *gameHub) runMovementLoop(interval time.Duration) {
 
 func (hub *gameHub) advancePlayerLocked(player *playerState, now time.Time) bool {
 	if player == nil {
+		return false
+	}
+	progress := hub.ensurePlayerProgressLocked(player.ID)
+	hub.ensurePlayerCombatLocked(player, progress, now)
+	if progress.IsDead {
+		player.UpdatedAt = now
 		return false
 	}
 
@@ -811,6 +839,9 @@ func (hub *gameHub) unlockZone(clientID string, zoneID string) bool {
 func (hub *gameHub) collectFlower(clientID string, nodeID string) bool {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
+	if hub.isPlayerActionBlockedByDeathLocked(clientID, "collect_flower") {
+		return false
+	}
 
 	client := hub.clients[clientID]
 	if client != nil {
@@ -847,6 +878,9 @@ func (hub *gameHub) findFlowerForPlayerLocked(player *playerState, flowerID stri
 func (hub *gameHub) depositHoney(clientID string) bool {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
+	if hub.isPlayerActionBlockedByDeathLocked(clientID, "deposit_honey") {
+		return false
+	}
 
 	client, ok := hub.clients[clientID]
 	if !ok || client == nil {
@@ -860,6 +894,9 @@ func (hub *gameHub) depositHoney(clientID string) bool {
 func (hub *gameHub) buySkill(clientID string, skillID string) bool {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
+	if hub.isPlayerActionBlockedByDeathLocked(clientID, "buy_skill") {
+		return false
+	}
 
 	client, ok := hub.clients[clientID]
 	if !ok || client == nil {
@@ -873,6 +910,7 @@ func (hub *gameHub) buySkill(clientID string, skillID string) bool {
 	}
 
 	progress := hub.ensurePlayerProgressLocked(clientID)
+	progress.SpawnProtectionUntil = time.Time{}
 	progress.OwnedSkillIDs = normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
 	progress.SkillUpgradeLevels = normalizeSkillUpgradeLevels(progress.SkillUpgradeLevels, progress.OwnedSkillIDs)
 	progress.EquippedSkills = normalizeEquippedSkills(progress.EquippedSkills, progress.OwnedSkillIDs)
@@ -903,6 +941,9 @@ func (hub *gameHub) buySkill(clientID string, skillID string) bool {
 func (hub *gameHub) upgradeSkill(clientID string, skillID string) bool {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
+	if hub.isPlayerActionBlockedByDeathLocked(clientID, "upgrade_skill") {
+		return false
+	}
 
 	client, ok := hub.clients[clientID]
 	if !ok || client == nil {
@@ -916,6 +957,7 @@ func (hub *gameHub) upgradeSkill(clientID string, skillID string) bool {
 	}
 
 	progress := hub.ensurePlayerProgressLocked(clientID)
+	progress.SpawnProtectionUntil = time.Time{}
 	progress.OwnedSkillIDs = normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
 	progress.SkillUpgradeLevels = normalizeSkillUpgradeLevels(progress.SkillUpgradeLevels, progress.OwnedSkillIDs)
 
@@ -954,6 +996,9 @@ func (hub *gameHub) upgradeSkill(clientID string, skillID string) bool {
 func (hub *gameHub) equipSkill(clientID string, skillID string, slot int) bool {
 	hub.mu.Lock()
 	defer hub.mu.Unlock()
+	if hub.isPlayerActionBlockedByDeathLocked(clientID, "equip_skill") {
+		return false
+	}
 
 	client, ok := hub.clients[clientID]
 	if !ok || client == nil {
@@ -971,6 +1016,7 @@ func (hub *gameHub) equipSkill(clientID string, skillID string, slot int) bool {
 	}
 
 	progress := hub.ensurePlayerProgressLocked(clientID)
+	progress.SpawnProtectionUntil = time.Time{}
 	progress.OwnedSkillIDs = normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
 	progress.SkillUpgradeLevels = normalizeSkillUpgradeLevels(progress.SkillUpgradeLevels, progress.OwnedSkillIDs)
 
@@ -1016,6 +1062,9 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 	}
 	now := hub.now()
 	hub.advanceActivePlayersLocked(now)
+	if hub.isPlayerActionBlockedByDeathLocked(clientID, "use_skill") {
+		return false
+	}
 
 	if slot < 0 || slot >= skillSlotCount {
 		hub.sendUseSkillFailure(client, useSkillReasonInvalidSlot, "Slot invalido")
@@ -1023,6 +1072,7 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 	}
 
 	progress := hub.ensurePlayerProgressLocked(clientID)
+	progress.SpawnProtectionUntil = time.Time{}
 	progress.OwnedSkillIDs = normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
 	progress.SkillUpgradeLevels = normalizeSkillUpgradeLevels(progress.SkillUpgradeLevels, progress.OwnedSkillIDs)
 	progress.EquippedSkills = normalizeEquippedSkills(progress.EquippedSkills, progress.OwnedSkillIDs)
@@ -1046,6 +1096,9 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 		hub.sendPlayerStatus(client, progress)
 		return false
 	}
+	if !hub.consumeSkillEnergyLocked(client, progress, skill) {
+		return false
+	}
 
 	shouldBroadcast := false
 	var skillEffects []skillEffectMessage
@@ -1054,6 +1107,7 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 	case "skill:impulso":
 		effect, ok := hub.triggerImpulsoLocked(player, slot, now, currentLevel)
 		if !ok {
+			progress.PollenCarried += skill.EnergyCostPollen
 			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Sem espaco livre para usar Impulso agora")
 			return false
 		}
@@ -1062,23 +1116,34 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 	case "skill:atirar-ferrao":
 		effect, ok := hub.triggerAtirarFerraoLocked(player, slot, now, currentLevel)
 		if !ok {
+			progress.PollenCarried += skill.EnergyCostPollen
 			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Sem direcao valida para disparar o Ferrão")
 			return false
+		}
+		if target := hub.resolveProjectileHitLocked(player, effect); target != nil {
+			effect.ToX = target.X
+			effect.ToY = target.Y
+			hub.applyDamageLocked(player, target, int(math.Round(defaultFerraoDamage*effect.Power)), skillID, now)
+			shouldBroadcast = true
 		}
 		skillEffects = []skillEffectMessage{effect}
 	case "skill:slime-de-mel":
 		effect, ok := hub.triggerSlimeDeMelLocked(player, slot, now, currentLevel)
 		if !ok {
+			progress.PollenCarried += skill.EnergyCostPollen
 			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Nao foi possivel posicionar o Slime de Mel")
 			return false
 		}
+		hub.activeCombatAreas[effect.ID] = effect
 		skillEffects = []skillEffectMessage{effect}
 	case "skill:flor-de-nectar":
 		effect, ok := hub.triggerFlorDeNectarLocked(player, slot, now, currentLevel)
 		if !ok {
+			progress.PollenCarried += skill.EnergyCostPollen
 			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Nao foi possivel florescer Nectar agora")
 			return false
 		}
+		hub.activeCombatAreas[effect.ID] = effect
 		skillEffects = []skillEffectMessage{effect}
 	}
 

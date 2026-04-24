@@ -331,6 +331,24 @@ interface RemoteBeeInstance {
   drift: number;
 }
 
+function PlayerNameplate({ player, isLocal = false }: { player: WorldPlayerState; isLocal?: boolean }) {
+  const lifePercent = player.maxLife > 0 ? MathUtils.clamp((player.currentLife / player.maxLife) * 100, 0, 100) : 0;
+  return (
+    <div
+      className={[
+        styles.beeNameplate,
+        isLocal ? styles.beeNameplateLocal : "",
+        player.isDead ? styles.beeNameplateDead : "",
+      ].filter(Boolean).join(" ")}
+    >
+      <span>{player.isDead ? `${player.username} abatido` : player.username}</span>
+      <div className={styles.beeLifeTrack}>
+        <div className={styles.beeLifeFill} style={{ width: `${lifePercent}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function BeeActor({
   player,
   drift,
@@ -409,7 +427,8 @@ function BeeActor({
         ? nextFlightHeight
         : MathUtils.lerp(currentPosition.y, nextFlightHeight, 0.18);
 
-    groupRef.current.scale.setScalar(isCollecting ? 1 + Math.sin((elapsedTime + drift) * 10) * 0.035 : 1);
+    const collectPulse = isCollecting ? 1 + Math.sin((elapsedTime + drift) * 10) * 0.035 : 1;
+    groupRef.current.scale.setScalar(player.isDead ? 0.64 : collectPulse);
 
     const inputPreviewTarget = inputPreviewTargetRef?.current ?? null;
     const hasInputPreviewTarget = inputPreviewTarget !== null;
@@ -468,9 +487,7 @@ function BeeActor({
       />
 
       <Html center distanceFactor={8} position={[0, 1.42, 0]} sprite transform>
-        <div className={[styles.beeNameplate, isLocal ? styles.beeNameplateLocal : ""].filter(Boolean).join(" ")}>
-          {player.username}
-        </div>
+        <PlayerNameplate player={player} isLocal={isLocal} />
       </Html>
     </group>
   );
@@ -489,7 +506,7 @@ function RemoteBeeNameplates({ players, surfaceIndex }: { players: WorldPlayerSt
           ]}
         >
           <Html center distanceFactor={8} sprite transform>
-            <div className={styles.beeNameplate}>{player.username}</div>
+            <PlayerNameplate player={player} />
           </Html>
         </group>
       ))}
@@ -627,7 +644,7 @@ function RemoteBeesInstanced({ players, surfaceIndex }: { players: WorldPlayerSt
 
       bodyDummy.position.copy(currentPosition);
       bodyDummy.rotation.set(0, instance.rotationY, 0);
-      bodyDummy.scale.set(1, 1, 1);
+      bodyDummy.scale.set(1, player.isDead ? 0.42 : 1, 1);
       bodyDummy.updateMatrix();
       bodyMesh.setMatrixAt(index, bodyDummy.matrix);
 
@@ -1013,7 +1030,7 @@ function LocalPlayerMovementController({
   }, [connectionState, inputPreviewTargetRef, localMovementSourceRef, localPlayer]);
 
   useFrame((state) => {
-    if (connectionState !== "connected" || !localPlayer) {
+    if (connectionState !== "connected" || !localPlayer || localPlayer.isDead) {
       return;
     }
 

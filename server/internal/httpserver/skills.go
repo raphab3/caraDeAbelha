@@ -20,6 +20,7 @@ type beeSkillDefinition struct {
 	Role                string
 	Summary             string
 	CostHoney           int
+	EnergyCostPollen    int
 	BaseCooldownMs      int
 	BasePower           float64
 	BaseDistance        float64
@@ -38,6 +39,7 @@ var beeSkillCatalog = []beeSkillDefinition{
 		Role:                "mobilidade",
 		Summary:             "Arrancada curta para reposicionar a abelha.",
 		CostHoney:           40,
+		EnergyCostPollen:    10,
 		BaseCooldownMs:      1800,
 		BasePower:           0,
 		BaseDistance:        impulsoDashDistance,
@@ -54,6 +56,7 @@ var beeSkillCatalog = []beeSkillDefinition{
 		Role:                "dano",
 		Summary:             "Disparo ofensivo para a futura camada de combate.",
 		CostHoney:           60,
+		EnergyCostPollen:    18,
 		BaseCooldownMs:      2500,
 		BasePower:           1,
 		BaseDistance:        ferraoProjectileDistance,
@@ -70,6 +73,7 @@ var beeSkillCatalog = []beeSkillDefinition{
 		Role:                "controle",
 		Summary:             "Poça viscosa que prepara lentidão em inimigos.",
 		CostHoney:           80,
+		EnergyCostPollen:    26,
 		BaseCooldownMs:      6000,
 		BasePower:           1,
 		BaseDistance:        0,
@@ -86,6 +90,7 @@ var beeSkillCatalog = []beeSkillDefinition{
 		Role:                "suporte",
 		Summary:             "Broto de néctar para futura cura ou regeneração em área.",
 		CostHoney:           100,
+		EnergyCostPollen:    24,
 		BaseCooldownMs:      8000,
 		BasePower:           1,
 		BaseDistance:        0,

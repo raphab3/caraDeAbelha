@@ -1463,6 +1463,7 @@ func TestWebSocketUseSkillSendsInteractionResult(t *testing.T) {
 	progress := hub.ensurePlayerProgressLocked(session.PlayerID)
 	progress.OwnedSkillIDs = []string{"skill:impulso"}
 	progress.EquippedSkills = []string{"skill:impulso", "", "", ""}
+	progress.PollenCarried = progress.PollenCapacity
 	player := hub.players[session.PlayerID]
 	player.FacingX = 1
 	player.FacingY = 0
@@ -1549,6 +1550,7 @@ func TestWebSocketUseSkillCooldownReturnsStableReasonCode(t *testing.T) {
 	progress := hub.ensurePlayerProgressLocked(session.PlayerID)
 	progress.OwnedSkillIDs = []string{"skill:impulso"}
 	progress.EquippedSkills = []string{"skill:impulso", "", "", ""}
+	progress.PollenCarried = progress.PollenCapacity
 	player := hub.players[session.PlayerID]
 	player.FacingX = 1
 	player.FacingY = 0
@@ -1602,6 +1604,7 @@ func TestWebSocketUseAtirarFerraoEmitsProjectileEffect(t *testing.T) {
 	progress := hub.ensurePlayerProgressLocked(session.PlayerID)
 	progress.OwnedSkillIDs = []string{"skill:atirar-ferrao"}
 	progress.EquippedSkills = []string{"skill:atirar-ferrao", "", "", ""}
+	progress.PollenCarried = progress.PollenCapacity
 	player := hub.players[session.PlayerID]
 	player.FacingX = 1
 	player.FacingY = 0
@@ -1662,6 +1665,7 @@ func TestWebSocketUseSlimeDeMelEmitsGroundAreaEffect(t *testing.T) {
 	progress := hub.ensurePlayerProgressLocked(session.PlayerID)
 	progress.OwnedSkillIDs = []string{"skill:slime-de-mel"}
 	progress.EquippedSkills = []string{"skill:slime-de-mel", "", "", ""}
+	progress.PollenCarried = progress.PollenCapacity
 	hub.mu.Unlock()
 
 	if err := connection.WriteJSON(useSkillAction{Type: "use_skill", Slot: 0}); err != nil {
@@ -1715,6 +1719,7 @@ func TestWebSocketUseFlorDeNectarEmitsSupportAreaEffectWithUpgrade(t *testing.T)
 	progress.OwnedSkillIDs = []string{"skill:flor-de-nectar"}
 	progress.SkillUpgradeLevels = map[string]int{"skill:flor-de-nectar": 2}
 	progress.EquippedSkills = []string{"skill:flor-de-nectar", "", "", ""}
+	progress.PollenCarried = progress.PollenCapacity
 	hub.mu.Unlock()
 
 	if err := connection.WriteJSON(useSkillAction{Type: "use_skill", Slot: 0}); err != nil {

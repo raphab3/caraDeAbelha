@@ -118,6 +118,10 @@ export interface WorldPlayerState {
   destinationX?: number;
   destinationY?: number;
   speed: number;
+  currentLife: number;
+  maxLife: number;
+  isDead: boolean;
+  combatTagUntil?: number;
 }
 
 export interface WorldFlowerState {
@@ -301,6 +305,7 @@ export interface SkillCatalogEntry {
   role: string;
   summary: string;
   costHoney: number;
+  energyCostPollen: number;
   baseCooldownMs: number;
   basePower: number;
   baseDistance: number;
@@ -364,6 +369,11 @@ export interface PlayerProgressState {
   skillUpgrades: SkillUpgradeState[];
   skillRuntime: PlayerSkillRuntimeState[];
   skillCatalog: SkillCatalogEntry[];
+  currentLife: number;
+  maxLife: number;
+  isDead: boolean;
+  respawnEndsAt?: number;
+  spawnProtectionEndsAt?: number;
 }
 
 // Result of a player interaction (collect, deposit, etc.)
@@ -380,6 +390,18 @@ export interface InteractionResult {
 export interface SkillEffectsMessage {
   type: "skill_effects";
   effects: SkillEffectState[];
+}
+
+export interface CombatEventMessage {
+  type: "combat_event";
+  eventId: string;
+  eventKind: "damage" | "heal" | "death" | "respawn" | "blocked" | string;
+  sourcePlayerId?: string;
+  targetPlayerId: string;
+  skillId?: string;
+  amount: number;
+  reason?: string;
+  timestamp: number;
 }
 
 export interface FlowerInteractionState {
@@ -414,6 +436,11 @@ export interface PlayerStatusMessage {
   skillUpgrades: SkillUpgradeState[];
   skillRuntime: PlayerSkillRuntimeState[];
   skillCatalog: SkillCatalogEntry[];
+  currentLife: number;
+  maxLife: number;
+  isDead: boolean;
+  respawnEndsAt?: number;
+  spawnProtectionEndsAt?: number;
 }
 
 // Zone info within zone state - metadata about a zone including unlock cost and boundaries
@@ -436,7 +463,7 @@ export interface ZoneStateMessage {
   unlockedZoneIds: string[];
 }
 
-export type ServerMessage = SessionMessage | WorldStateMessage | PlayerStatusMessage | InteractionResult | ZoneStateMessage | SkillEffectsMessage;
+export type ServerMessage = SessionMessage | WorldStateMessage | PlayerStatusMessage | InteractionResult | ZoneStateMessage | SkillEffectsMessage | CombatEventMessage;
 
 export interface GameSessionState {
   connectionState: "idle" | "connecting" | "connected" | "disconnected";
