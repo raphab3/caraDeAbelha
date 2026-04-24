@@ -2,12 +2,27 @@ package httpserver
 
 import (
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/loopbase"
 	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/zones"
+)
+
+const (
+	useSkillReasonInvalidSlot  = "invalid_slot"
+	useSkillReasonEmptySlot    = "empty_slot"
+	useSkillReasonInvalidSkill = "invalid_skill"
+	useSkillReasonCooldown     = "cooldown_active"
+	useSkillReasonBlockedPath  = "blocked_path"
+	skillEffectKindDash        = "dash"
+	skillEffectStateActive     = "active"
+	impulsoDashDistance        = 1.8
+	impulsoDashMinDistance     = 0.18
+	impulsoDashSampleDistance  = 0.14
+	impulsoDashDuration        = 320 * time.Millisecond
 )
 
 func (hub *gameHub) ensurePlayerProgressLocked(playerID string) *loopbase.PlayerProgress {
@@ -56,6 +71,8 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 				X:          spawnX,
 				Y:          spawnY,
 				Speed:      defaultPlayerSpeed,
+				FacingX:    1,
+				FacingY:    0,
 				UpdatedAt:  now,
 				LastSeenAt: now,
 			}
@@ -76,6 +93,10 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 	profile.Username = username
 	if strings.TrimSpace(profile.StageID) == "" {
 		profile.StageID = hub.world.stageID
+	}
+	if math.Abs(profile.FacingX) <= movementStopDistance && math.Abs(profile.FacingY) <= movementStopDistance {
+		profile.FacingX = 1
+		profile.FacingY = 0
 	}
 	profile.LastSeenAt = now
 	replacedClient := hub.clients[profile.ID]
@@ -210,6 +231,7 @@ func (hub *gameHub) movePlayer(clientID string, direction string) bool {
 		return false
 	}
 
+	hub.updatePlayerFacingLocked(player, nextX-player.X, nextY-player.Y)
 	hub.setPlayerTargetLocked(player, nextX, nextY, now)
 	hub.tick++
 
@@ -398,8 +420,23 @@ func (hub *gameHub) advancePlayerLocked(player *playerState, now time.Time) bool
 
 	player.X = nextX
 	player.Y = nextY
+	hub.updatePlayerFacingLocked(player, deltaX, deltaY)
 	player.UpdatedAt = now
 	return true
+}
+
+func (hub *gameHub) updatePlayerFacingLocked(player *playerState, deltaX float64, deltaY float64) {
+	if player == nil {
+		return
+	}
+
+	distance := math.Hypot(deltaX, deltaY)
+	if distance <= movementStopDistance {
+		return
+	}
+
+	player.FacingX = deltaX / distance
+	player.FacingY = deltaY / distance
 }
 
 func (hub *gameHub) setPlayerTargetLocked(player *playerState, x float64, y float64, now time.Time) {
@@ -416,6 +453,7 @@ func (hub *gameHub) setPlayerTargetLocked(player *playerState, x float64, y floa
 		return
 	}
 
+	hub.updatePlayerFacingLocked(player, x-player.X, y-player.Y)
 	player.TargetX = &x
 	player.TargetY = &y
 	player.UpdatedAt = now
@@ -433,6 +471,7 @@ func (hub *gameHub) setPlayerRouteLocked(player *playerState, waypoints []moveme
 	}
 
 	first := waypoints[0]
+	hub.updatePlayerFacingLocked(player, first.X-player.X, first.Y-player.Y)
 	player.TargetX = &first.X
 	player.TargetY = &first.Y
 	if len(waypoints) > 1 {
@@ -460,9 +499,111 @@ func (hub *gameHub) advancePlayerRouteTargetLocked(player *playerState, now time
 	}
 
 	player.Route = append([]movementWaypoint{}, player.Route[1:]...)
+	hub.updatePlayerFacingLocked(player, next.X-player.X, next.Y-player.Y)
 	player.TargetX = &next.X
 	player.TargetY = &next.Y
 	player.UpdatedAt = now
+}
+
+func (hub *gameHub) resolveSkillDirectionLocked(player *playerState) (float64, float64) {
+	if player == nil {
+		return 1, 0
+	}
+
+	if player.TargetX != nil && player.TargetY != nil {
+		deltaX := *player.TargetX - player.X
+		deltaY := *player.TargetY - player.Y
+		distance := math.Hypot(deltaX, deltaY)
+		if distance > movementStopDistance {
+			return deltaX / distance, deltaY / distance
+		}
+	}
+
+	distance := math.Hypot(player.FacingX, player.FacingY)
+	if distance > movementStopDistance {
+		return player.FacingX / distance, player.FacingY / distance
+	}
+
+	return 1, 0
+}
+
+func (hub *gameHub) resolveImpulsoDestinationLocked(player *playerState, directionX float64, directionY float64) (float64, float64, bool) {
+	if player == nil {
+		return 0, 0, false
+	}
+
+	lastValidX := player.X
+	lastValidY := player.Y
+	moved := false
+	steps := int(math.Ceil(impulsoDashDistance / impulsoDashSampleDistance))
+
+	for step := 1; step <= steps; step++ {
+		travel := math.Min(impulsoDashDistance, float64(step)*impulsoDashSampleDistance)
+		candidateX, candidateY := hub.clampWorldPosition(player.X+directionX*travel, player.Y+directionY*travel)
+		if !hub.isTraversableSegmentLocked(player, player.X, player.Y, candidateX, candidateY) {
+			break
+		}
+		if !hub.world.isTraversablePosition(candidateX, candidateY) || !hub.canPlayerAccessPositionLocked(player, candidateX, candidateY) {
+			break
+		}
+
+		lastValidX = candidateX
+		lastValidY = candidateY
+		moved = true
+	}
+
+	if !moved || math.Hypot(lastValidX-player.X, lastValidY-player.Y) < impulsoDashMinDistance {
+		return 0, 0, false
+	}
+
+	return lastValidX, lastValidY, true
+}
+
+func (hub *gameHub) sendUseSkillFailure(client *clientSession, reasonCode string, reason string) {
+	hub.sendInteractionResultWithCode(client, "use_skill", false, 0, reason, reasonCode)
+}
+
+func (hub *gameHub) triggerImpulsoLocked(player *playerState, slot int, now time.Time) (skillEffectMessage, bool) {
+	if player == nil {
+		return skillEffectMessage{}, false
+	}
+
+	directionX, directionY := hub.resolveSkillDirectionLocked(player)
+	fromX := player.X
+	fromY := player.Y
+	toX, toY, ok := hub.resolveImpulsoDestinationLocked(player, directionX, directionY)
+	if !ok {
+		return skillEffectMessage{}, false
+	}
+
+	hub.clearPlayerMovementLocked(player)
+	player.X = toX
+	player.Y = toY
+	hub.updatePlayerFacingLocked(player, directionX, directionY)
+	player.UpdatedAt = now
+
+	startedAt := now.UnixMilli()
+	expiresAt := now.Add(impulsoDashDuration).UnixMilli()
+	effectID := "skillfx:" + player.ID + ":" + strconv.Itoa(slot) + ":" + strconv.FormatInt(startedAt, 10)
+
+	return skillEffectMessage{
+		ID:            effectID,
+		OwnerPlayerID: player.ID,
+		SkillID:       "skill:impulso",
+		Slot:          slot,
+		StageID:       player.StageID,
+		Kind:          skillEffectKindDash,
+		State:         skillEffectStateActive,
+		FromX:         fromX,
+		FromY:         fromY,
+		ToX:           toX,
+		ToY:           toY,
+		DirectionX:    directionX,
+		DirectionY:    directionY,
+		DurationMs:    int(impulsoDashDuration / time.Millisecond),
+		StartedAt:     startedAt,
+		ExpiresAt:     expiresAt,
+	}, true
 }
 
 func (hub *gameHub) clearPlayerRouteLocked(player *playerState) {
@@ -681,45 +822,66 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 	if !ok || client == nil {
 		return false
 	}
+	player, ok := hub.players[clientID]
+	if !ok || player == nil {
+		return false
+	}
+	now := hub.now()
+	hub.advanceActivePlayersLocked(now)
 
 	if slot < 0 || slot >= skillSlotCount {
-		hub.sendInteractionResult(client, "use_skill", false, 0, "Slot invalido")
+		hub.sendUseSkillFailure(client, useSkillReasonInvalidSlot, "Slot invalido")
 		return false
 	}
 
 	progress := hub.ensurePlayerProgressLocked(clientID)
 	progress.OwnedSkillIDs = normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
 	progress.EquippedSkills = normalizeEquippedSkills(progress.EquippedSkills, progress.OwnedSkillIDs)
-	progress.SkillRuntime = normalizeSkillRuntime(progress.SkillRuntime, progress.EquippedSkills, hub.now())
+	progress.SkillRuntime = normalizeSkillRuntime(progress.SkillRuntime, progress.EquippedSkills, now)
 
 	skillID := progress.EquippedSkills[slot]
 	if strings.TrimSpace(skillID) == "" {
-		hub.sendInteractionResult(client, "use_skill", false, 0, "Nenhuma skill equipada neste slot")
+		hub.sendUseSkillFailure(client, useSkillReasonEmptySlot, "Equipe uma skill neste slot antes de usar")
 		return false
 	}
 
 	skill, ok := findBeeSkillDefinition(skillID)
 	if !ok {
-		hub.sendInteractionResult(client, "use_skill", false, 0, "Skill invalida")
+		hub.sendUseSkillFailure(client, useSkillReasonInvalidSkill, "Skill invalida")
 		return false
 	}
 
 	runtime := progress.SkillRuntime[slot]
-	if runtime.State == skillStateCooldown && runtime.CooldownEndsAt.After(hub.now()) {
-		hub.sendInteractionResult(client, "use_skill", false, 0, "Skill em cooldown")
+	if runtime.State == skillStateCooldown && runtime.CooldownEndsAt.After(now) {
+		hub.sendUseSkillFailure(client, useSkillReasonCooldown, "A skill ainda esta em cooldown")
 		hub.sendPlayerStatus(client, progress)
 		return false
+	}
+
+	shouldBroadcast := false
+	var skillEffects []skillEffectMessage
+	if skillID == "skill:impulso" {
+		effect, ok := hub.triggerImpulsoLocked(player, slot, now)
+		if !ok {
+			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Sem espaco livre para usar Impulso agora")
+			return false
+		}
+		skillEffects = []skillEffectMessage{effect}
+		shouldBroadcast = true
 	}
 
 	progress.SkillRuntime[slot] = loopbase.PlayerSkillRuntime{
 		Slot:           slot,
 		SkillID:        skillID,
 		State:          skillStateCooldown,
-		CooldownEndsAt: hub.now().Add(skillCooldownForSkill(skillID)),
+		CooldownEndsAt: now.Add(skillCooldownForSkill(skillID)),
 	}
-	progress.UpdatedAt = hub.now()
+	progress.UpdatedAt = now
 
 	hub.sendInteractionResult(client, "use_skill", true, slot+1, skill.Name)
 	hub.sendPlayerStatus(client, progress)
-	return false
+	if len(skillEffects) > 0 {
+		hub.sendSkillEffectsToStageLocked(player.StageID, skillEffects)
+	}
+	return shouldBroadcast
 }

@@ -15,6 +15,8 @@ import type {
   SessionMessage,
   WorldHiveState,
   WorldStateMessage,
+  SkillEffectState,
+  SkillEffectsMessage,
   WorldChunkState,
   WorldFlowerState,
   WorldPlayerState,
@@ -68,6 +70,7 @@ function createInitialState(
     renderDistance: 0,
     chunkSize: 0,
     tick: 0,
+    skillEffects: [],
   };
 }
 
@@ -109,6 +112,30 @@ function isZoneStateMessage(message: unknown): message is ZoneStateMessage {
   }
 
   return "type" in message && message.type === "zone_state";
+}
+
+function isSkillEffectsMessage(message: unknown): message is SkillEffectsMessage {
+  if (typeof message !== "object" || message === null) {
+    return false;
+  }
+
+  return "type" in message && message.type === "skill_effects";
+}
+
+function mergeSkillEffects(current: SkillEffectState[], incoming: SkillEffectState[]): SkillEffectState[] {
+  const now = Date.now();
+  const byId = new Map(current.filter((effect) => effect.expiresAt > now).map((effect) => [effect.id, effect]));
+
+  for (const effect of incoming) {
+    if (effect.expiresAt <= now) {
+      byId.delete(effect.id);
+      continue;
+    }
+
+    byId.set(effect.id, effect);
+  }
+
+  return Array.from(byId.values()).sort((left, right) => left.expiresAt - right.expiresAt);
 }
 
 function resolveDisconnectError(reason?: string): string {
@@ -245,6 +272,7 @@ function resolveHiveInteraction(
 export function useGameSession(username?: string, reconnectKey = 0): GameSessionController {
   const [gameSession, setGameSession] = useState<GameSessionState>(createInitialState("idle"));
   const clientRef = useRef<WSClient | null>(null);
+  const skillEffectTimeoutsRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     if (!username) {
@@ -259,6 +287,24 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
 
     const client = new WSClient(socketUrl.toString());
     let active = true;
+
+    const scheduleSkillEffectCleanup = (effect: SkillEffectState) => {
+      const remainingMs = Math.max(0, effect.expiresAt - Date.now());
+      const existingTimeoutId = skillEffectTimeoutsRef.current.get(effect.id);
+      if (existingTimeoutId !== undefined) {
+        window.clearTimeout(existingTimeoutId);
+      }
+
+      const timeoutId = window.setTimeout(() => {
+        skillEffectTimeoutsRef.current.delete(effect.id);
+        setGameSession((current) => ({
+          ...current,
+          skillEffects: current.skillEffects.filter((item) => item.id !== effect.id),
+        }));
+      }, remainingMs + 32);
+
+      skillEffectTimeoutsRef.current.set(effect.id, timeoutId);
+    };
 
     const disconnectSession = (reason?: string) => {
       if (!active) {
@@ -325,6 +371,10 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
         }
 
         if (isInteractionResultMessage(message)) {
+          if (message.action === "use_skill" && message.success) {
+            return;
+          }
+
           setGameSession((current) => ({
             ...current,
             flowerInteraction:
@@ -335,7 +385,6 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
             lastInteraction: message,
           }));
 
-          // Clear interaction feedback after 3 seconds
           const timeoutId = window.setTimeout(() => {
             setGameSession((current) => ({
               ...current,
@@ -346,6 +395,16 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
           return () => {
             window.clearTimeout(timeoutId);
           };
+        }
+
+        if (isSkillEffectsMessage(message)) {
+          const activeEffects = message.effects.filter((effect) => effect.expiresAt > Date.now());
+          activeEffects.forEach(scheduleSkillEffectCleanup);
+          setGameSession((current) => ({
+            ...current,
+            skillEffects: mergeSkillEffects(current.skillEffects, activeEffects),
+          }));
+          return;
         }
 
         if (isZoneStateMessage(message)) {
@@ -418,6 +477,11 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
       active = false;
       window.removeEventListener("offline", handleOffline);
       client.disconnect();
+
+      for (const timeoutId of skillEffectTimeoutsRef.current.values()) {
+        window.clearTimeout(timeoutId);
+      }
+      skillEffectTimeoutsRef.current.clear();
 
       if (clientRef.current === client) {
         clientRef.current = null;

@@ -9,6 +9,7 @@ import type {
   PlayerProgressState,
   PlayerStatusMessage,
   GameSessionState,
+  SkillEffectsMessage,
   ServerMessage,
 } from "../types/game";
 import { DEFAULT_SKILL_CATALOG } from "../game/skillCatalog";
@@ -50,6 +51,7 @@ export const validateGameTypes = () => {
     success: true,
     amount: 25,
     reason: "",
+    reasonCode: "",
     timestamp: Date.now(),
   };
 
@@ -84,6 +86,30 @@ export const validateGameTypes = () => {
   console.assert(testStatusMsg.playerId === "p1", "PlayerStatusMessage: playerId mismatch");
   console.assert(testStatusMsg.pollenCarried === 75, "PlayerStatusMessage: pollenCarried mismatch");
 
+  const testSkillEffectsMessage: SkillEffectsMessage = {
+    type: "skill_effects",
+    effects: [
+      {
+        id: "skillfx:test",
+        ownerPlayerId: "p1",
+        skillId: "skill:impulso",
+        slot: 0,
+        stageId: "stage:starter-basin",
+        kind: "dash",
+        state: "active",
+        fromX: 1,
+        fromY: 1,
+        toX: 2.4,
+        toY: 1,
+        directionX: 1,
+        directionY: 0,
+        durationMs: 420,
+        startedAt: Date.now(),
+        expiresAt: Date.now() + 420,
+      },
+    ],
+  };
+
   // Validate GameSessionState includes progress fields
   const testSessionState: GameSessionState = {
     connectionState: "connected",
@@ -103,6 +129,7 @@ export const validateGameTypes = () => {
     tick: 123,
     playerProgress: testProgress,
     lastInteraction: testInteraction,
+    skillEffects: testSkillEffectsMessage.effects,
   };
 
   console.assert(
@@ -117,6 +144,7 @@ export const validateGameTypes = () => {
   // Validate ServerMessage union includes new types
   const statusMsgAsServerMessage: ServerMessage = testStatusMsg;
   const interactionAsServerMessage: ServerMessage = testInteraction;
+  const skillEffectsAsServerMessage: ServerMessage = testSkillEffectsMessage;
 
   console.assert(
     (statusMsgAsServerMessage as PlayerStatusMessage).type === "player_status",
@@ -125,6 +153,10 @@ export const validateGameTypes = () => {
   console.assert(
     (interactionAsServerMessage as InteractionResult).type === "interaction_result",
     "ServerMessage union: InteractionResult not included"
+  );
+  console.assert(
+    (skillEffectsAsServerMessage as SkillEffectsMessage).type === "skill_effects",
+    "ServerMessage union: SkillEffectsMessage not included"
   );
 
   console.log("✓ All game type validations passed");

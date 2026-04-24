@@ -30,6 +30,7 @@ import type {
   HiveInteractionState,
   InteractionResult,
   RenderPerformanceSnapshot,
+  SkillEffectState,
   WorldChunkState,
   WorldFlowerState,
   WorldHiveState,
@@ -86,6 +87,8 @@ const moveTargetCoreGeometry = new CircleGeometry(0.1, 24);
 const flowerTargetRingGeometry = new RingGeometry(0.3, 0.5, 42);
 const flowerTargetCoreGeometry = new CircleGeometry(0.12, 24);
 const disconnectedBeaconGeometry = new IcosahedronGeometry(0.38, 0);
+const impulseTrailOrbGeometry = new SphereGeometry(0.12, 14, 14);
+const impulseTrailRingGeometry = new RingGeometry(0.18, 0.3, 24);
 
 beeStingerGeometry.rotateZ(-Math.PI / 2);
 
@@ -783,6 +786,80 @@ function HiveTargetMarker({
   );
 }
 
+function DashTrailEffect({ effect, surfaceIndex }: { effect: SkillEffectState; surfaceIndex: WorldSurfaceIndex }) {
+  const groupRef = useRef<Group>(null);
+  const trailPoints = useMemo(
+    () => Array.from({ length: 5 }, (_, index) => {
+      const ratio = index / 4;
+      const worldX = MathUtils.lerp(effect.fromX, effect.toX, ratio);
+      const worldY = MathUtils.lerp(effect.fromY, effect.toY, ratio);
+
+      return {
+        position: [
+          toSceneAxis(worldX),
+          resolveBeeSceneHeight(surfaceIndex, worldX, worldY, 0, ratio) + 0.1 + ratio * 0.05,
+          toSceneAxis(worldY),
+        ] as const,
+        scale: 0.65 + ratio * 0.7,
+        opacity: 0.2 + ratio * 0.12,
+      };
+    }),
+    [effect.fromX, effect.fromY, effect.toX, effect.toY, surfaceIndex],
+  );
+  const ringPosition = useMemo(
+    () => [
+      toSceneAxis(effect.toX),
+      resolveTargetMarkerSceneY(surfaceIndex, effect.toX, effect.toY) + 0.05,
+      toSceneAxis(effect.toY),
+    ] as const,
+    [effect.toX, effect.toY, surfaceIndex],
+  );
+
+  useFrame((state) => {
+    if (!groupRef.current) {
+      return;
+    }
+
+    const lifeProgress = MathUtils.clamp((Date.now() - effect.startedAt) / Math.max(effect.durationMs, 1), 0, 1);
+    groupRef.current.rotation.y = state.clock.elapsedTime * 2.4;
+    groupRef.current.scale.setScalar(1 - lifeProgress * 0.1);
+  });
+
+  return (
+    <group ref={groupRef} renderOrder={34}>
+      {trailPoints.map((point, index) => (
+        <mesh key={`${effect.id}:trail:${index}`} position={point.position} renderOrder={34} scale={point.scale}>
+          <primitive attach="geometry" object={impulseTrailOrbGeometry} />
+          <meshBasicMaterial color="#fde68a" opacity={point.opacity} transparent depthWrite={false} />
+        </mesh>
+      ))}
+
+      <mesh position={ringPosition} renderOrder={35} rotation={[-Math.PI / 2, 0, 0]}>
+        <primitive attach="geometry" object={impulseTrailRingGeometry} />
+        <meshBasicMaterial color="#facc15" opacity={0.88} transparent depthWrite={false} side={DoubleSide} />
+      </mesh>
+    </group>
+  );
+}
+
+function SkillEffectsLayer({ skillEffects, surfaceIndex }: { skillEffects: SkillEffectState[]; surfaceIndex: WorldSurfaceIndex }) {
+  if (skillEffects.length === 0) {
+    return null;
+  }
+
+  return (
+    <group>
+      {skillEffects.map((effect) => {
+        if (effect.kind !== "dash") {
+          return null;
+        }
+
+        return <DashTrailEffect key={effect.id} effect={effect} surfaceIndex={surfaceIndex} />;
+      })}
+    </group>
+  );
+}
+
 function collectVisibleHives(chunks: WorldChunkState[]): WorldHiveState[] {
   const hives: WorldHiveState[] = [];
 
@@ -1102,6 +1179,7 @@ interface HiveCoreProps {
   onMoveToTarget: (x: number, z: number) => void;
   onFlowerClick?: (flower: WorldFlowerState) => void;
   onHiveClick?: (hive: WorldHiveState) => void;
+  skillEffects: SkillEffectState[];
   tapTargetingConfig?: Partial<TapTargetingConfig>;
 }
 
@@ -1123,6 +1201,7 @@ function HiveCore({
   onMoveToTarget,
   onFlowerClick,
   onHiveClick,
+  skillEffects,
   tapTargetingConfig,
 }: HiveCoreProps) {
   const [moveTargetMarker, setMoveTargetMarker] = useState<MoveTargetMarkerState | null>(null);
@@ -1299,6 +1378,7 @@ function HiveCore({
       ) : null}
 
       <RemoteBeesInstanced players={remotePlayers} surfaceIndex={surfaceIndex} />
+  <SkillEffectsLayer skillEffects={skillEffects} surfaceIndex={surfaceIndex} />
 
       {connectionState === "disconnected" ? (
         <mesh
@@ -1329,6 +1409,7 @@ interface GameViewportProps {
   onRespawn: () => void;
   onFlowerClick?: (flower: WorldFlowerState) => void;
   onHiveClick?: (hive: WorldHiveState) => void;
+  skillEffects: SkillEffectState[];
   tapTargetingConfig?: Partial<TapTargetingConfig>;
 }
 
@@ -1368,6 +1449,7 @@ export function GameViewport({
   onRespawn,
   onFlowerClick,
   onHiveClick,
+  skillEffects,
   tapTargetingConfig,
 }: GameViewportProps) {
   const localPlayer = useMemo(
@@ -1433,6 +1515,7 @@ export function GameViewport({
           onFlowerClick={onFlowerClick}
           onHiveClick={onHiveClick}
           props={props}
+          skillEffects={skillEffects}
           tapTargetingConfig={tapTargetingConfig}
           players={nearbyPlayers}
         />

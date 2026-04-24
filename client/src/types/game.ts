@@ -304,6 +304,25 @@ export interface PlayerSkillRuntimeState {
   cooldownEndsAt: number;
 }
 
+export interface SkillEffectState {
+  id: string;
+  ownerPlayerId: string;
+  skillId: string;
+  slot: number;
+  stageId: string;
+  kind: "dash" | "projectile" | "ground-area" | "support-area" | string;
+  state: string;
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  directionX: number;
+  directionY: number;
+  durationMs: number;
+  startedAt: number;
+  expiresAt: number;
+}
+
 // Player progression state: economy, levels, zones
 export interface PlayerProgressState {
   pollenCarried: number;
@@ -327,7 +346,13 @@ export interface InteractionResult {
   success: boolean;
   amount: number; // pollen/honey involved
   reason: string; // error message or empty string
+  reasonCode?: string;
   timestamp: number; // Unix milliseconds
+}
+
+export interface SkillEffectsMessage {
+  type: "skill_effects";
+  effects: SkillEffectState[];
 }
 
 export interface FlowerInteractionState {
@@ -383,7 +408,7 @@ export interface ZoneStateMessage {
   unlockedZoneIds: string[];
 }
 
-export type ServerMessage = SessionMessage | WorldStateMessage | PlayerStatusMessage | InteractionResult | ZoneStateMessage;
+export type ServerMessage = SessionMessage | WorldStateMessage | PlayerStatusMessage | InteractionResult | ZoneStateMessage | SkillEffectsMessage;
 
 export interface GameSessionState {
   connectionState: "idle" | "connecting" | "connected" | "disconnected";
@@ -403,6 +428,7 @@ export interface GameSessionState {
   tick: number;
   playerProgress?: PlayerProgressState;
   lastInteraction?: InteractionResult;
+  skillEffects: SkillEffectState[];
   flowerInteraction?: FlowerInteractionState;
   hiveInteraction?: HiveInteractionState;
   zones?: MapZone[];

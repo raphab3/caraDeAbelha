@@ -116,6 +116,7 @@ export default function PlayerExperience() {
               players={gameSession.players}
               props={gameSession.props}
               renderDistance={gameSession.renderDistance}
+              skillEffects={gameSession.skillEffects}
             />
           </div>
         ) : (

@@ -205,14 +205,40 @@ func (hub *gameHub) sendPlayerStatus(client *clientSession, progress *loopbase.P
 // sendInteractionResult sends an interaction_result message to a client.
 // Called to provide immediate feedback on player actions like collecting flowers or depositing pollen.
 func (hub *gameHub) sendInteractionResult(client *clientSession, action string, success bool, amount int, reason string) {
+	hub.sendInteractionResultWithCode(client, action, success, amount, reason, "")
+}
+
+func (hub *gameHub) sendInteractionResultWithCode(client *clientSession, action string, success bool, amount int, reason string, reasonCode string) {
 	if client == nil {
 		return
 	}
 
 	timestamp := hub.now().UnixMilli()
-	message := newInteractionResultMessage(action, success, amount, reason, timestamp)
+	message := newInteractionResultMessageWithCode(action, success, amount, reason, reasonCode, timestamp)
 	if err := hub.writeJSON(client, message); err != nil {
 		log.Printf("websocket write failed for %s: %v", client.id, err)
+	}
+}
+
+func (hub *gameHub) sendSkillEffectsToStageLocked(stageID string, effects []skillEffectMessage) {
+	if len(effects) == 0 {
+		return
+	}
+
+	message := skillEffectsMessage{
+		Type:    "skill_effects",
+		Effects: effects,
+	}
+
+	for _, client := range hub.clients {
+		viewer := hub.players[client.id]
+		if viewer == nil || viewer.StageID != stageID {
+			continue
+		}
+
+		if err := hub.writeJSON(client, message); err != nil {
+			log.Printf("websocket write failed for %s: %v", client.id, err)
+		}
 	}
 }
 

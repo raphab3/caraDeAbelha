@@ -66,6 +66,13 @@ export const GameHUD = ({
   const [selectedSkillId, setSelectedSkillId] = useState<string | undefined>(undefined);
   const [slotHotkeys, setSlotHotkeys] = useState<string[]>(readStoredSlotHotkeys);
 
+  const handleCloseShop = () => {
+    setIsShopOpen(false);
+    setIsEditingSkills(false);
+    setSelectedSkillId(undefined);
+    setRecordingHotkeySlot(undefined);
+  };
+
   const handleUseSkill = (slot: number) => {
     gameSessionController?.sendAction({
       type: "use_skill",
@@ -74,15 +81,12 @@ export const GameHUD = ({
   };
 
   const handleToggleShop = () => {
-    setIsShopOpen((current) => {
-      const next = !current;
-      if (!next) {
-        setIsEditingSkills(false);
-        setSelectedSkillId(undefined);
-        setRecordingHotkeySlot(undefined);
-      }
-      return next;
-    });
+    if (isShopOpen) {
+      handleCloseShop();
+      return;
+    }
+
+    setIsShopOpen(true);
   };
 
   const handleToggleEditingSkills = () => {
@@ -184,6 +188,7 @@ export const GameHUD = ({
           isEditingSkills={isEditingSkills}
           isRecordingHotkeyForSlot={recordingHotkeySlot}
           isShopOpen={isShopOpen}
+          onCloseShop={handleCloseShop}
           onRequestHotkeyCapture={setRecordingHotkeySlot}
           onSelectSkill={setSelectedSkillId}
           onToggleEditingSkills={handleToggleEditingSkills}

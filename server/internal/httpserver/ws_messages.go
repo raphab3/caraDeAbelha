@@ -56,6 +56,8 @@ type playerState struct {
 	DestinationX *float64           `json:"destinationX,omitempty"`
 	DestinationY *float64           `json:"destinationY,omitempty"`
 	Speed        float64            `json:"speed"`
+	FacingX      float64            `json:"-"`
+	FacingY      float64            `json:"-"`
 	Route        []movementWaypoint `json:"-"`
 	UpdatedAt    time.Time          `json:"-"`
 	LastSeenAt   time.Time          `json:"-"`
@@ -168,6 +170,30 @@ type skillRuntimeMessage struct {
 	CooldownEndsAt int64  `json:"cooldownEndsAt"`
 }
 
+type skillEffectMessage struct {
+	ID            string  `json:"id"`
+	OwnerPlayerID string  `json:"ownerPlayerId"`
+	SkillID       string  `json:"skillId"`
+	Slot          int     `json:"slot"`
+	StageID       string  `json:"stageId"`
+	Kind          string  `json:"kind"`
+	State         string  `json:"state"`
+	FromX         float64 `json:"fromX"`
+	FromY         float64 `json:"fromY"`
+	ToX           float64 `json:"toX"`
+	ToY           float64 `json:"toY"`
+	DirectionX    float64 `json:"directionX"`
+	DirectionY    float64 `json:"directionY"`
+	DurationMs    int     `json:"durationMs"`
+	StartedAt     int64   `json:"startedAt"`
+	ExpiresAt     int64   `json:"expiresAt"`
+}
+
+type skillEffectsMessage struct {
+	Type    string               `json:"type"`
+	Effects []skillEffectMessage `json:"effects"`
+}
+
 // playerStatusMessage contains the player's progression state: pollen, capacity, honey, level, XP, skill points,
 // current zone and unlocked zones. Sent to the player whenever their progress changes.
 // This is the server-authoritative source of truth for player economy stats on the client.
@@ -192,12 +218,13 @@ type playerStatusMessage struct {
 // Used to communicate immediate results and errors to the client without inflating the main state snapshot.
 // Actions include "collect_flower", "deposit_pollen" and other interaction types.
 type interactionResultMessage struct {
-	Type      string `json:"type"`
-	Action    string `json:"action"`
-	Success   bool   `json:"success"`
-	Amount    int    `json:"amount"`
-	Reason    string `json:"reason"`
-	Timestamp int64  `json:"timestamp"`
+	Type       string `json:"type"`
+	Action     string `json:"action"`
+	Success    bool   `json:"success"`
+	Amount     int    `json:"amount"`
+	Reason     string `json:"reason"`
+	ReasonCode string `json:"reasonCode,omitempty"`
+	Timestamp  int64  `json:"timestamp"`
 }
 
 // zoneInfoMessage represents metadata and unlock status for a single zone.
@@ -313,13 +340,18 @@ func buildSkillCatalogMessage() []skillCatalogEntryMessage {
 // reason: error message if !success, empty if success
 // timestamp: Unix milliseconds
 func newInteractionResultMessage(action string, success bool, amount int, reason string, timestamp int64) interactionResultMessage {
+	return newInteractionResultMessageWithCode(action, success, amount, reason, "", timestamp)
+}
+
+func newInteractionResultMessageWithCode(action string, success bool, amount int, reason string, reasonCode string, timestamp int64) interactionResultMessage {
 	return interactionResultMessage{
-		Type:      "interaction_result",
-		Action:    action,
-		Success:   success,
-		Amount:    amount,
-		Reason:    reason,
-		Timestamp: timestamp,
+		Type:       "interaction_result",
+		Action:     action,
+		Success:    success,
+		Amount:     amount,
+		Reason:     reason,
+		ReasonCode: reasonCode,
+		Timestamp:  timestamp,
 	}
 }
 

@@ -1409,6 +1409,9 @@ func TestWebSocketUseSkillSendsInteractionResult(t *testing.T) {
 	progress := hub.ensurePlayerProgressLocked(session.PlayerID)
 	progress.OwnedSkillIDs = []string{"skill:impulso"}
 	progress.EquippedSkills = []string{"skill:impulso", "", "", ""}
+	player := hub.players[session.PlayerID]
+	player.FacingX = 1
+	player.FacingY = 0
 	hub.mu.Unlock()
 
 	if err := connection.WriteJSON(useSkillAction{Type: "use_skill", Slot: 0}); err != nil {
@@ -1428,6 +1431,9 @@ func TestWebSocketUseSkillSendsInteractionResult(t *testing.T) {
 	if interaction.Reason != "Impulso" {
 		t.Fatalf("expected use_skill reason Impulso, got %q", interaction.Reason)
 	}
+	if interaction.ReasonCode != "" {
+		t.Fatalf("expected empty use_skill reasonCode on success, got %q", interaction.ReasonCode)
+	}
 
 	status := readTypedSocketMessage[playerStatusMessage](t, connection)
 	if len(status.SkillRuntime) != skillSlotCount {
@@ -1438,5 +1444,87 @@ func TestWebSocketUseSkillSendsInteractionResult(t *testing.T) {
 	}
 	if status.SkillRuntime[0].CooldownEndsAt == 0 {
 		t.Fatalf("expected slot 0 cooldown end timestamp")
+	}
+
+	effects := readTypedSocketMessage[skillEffectsMessage](t, connection)
+	if effects.Type != "skill_effects" {
+		t.Fatalf("expected skill_effects, got %q", effects.Type)
+	}
+	if len(effects.Effects) != 1 {
+		t.Fatalf("expected 1 skill effect, got %d", len(effects.Effects))
+	}
+	if effects.Effects[0].Kind != skillEffectKindDash {
+		t.Fatalf("expected dash effect kind, got %q", effects.Effects[0].Kind)
+	}
+	if effects.Effects[0].ToX <= effects.Effects[0].FromX {
+		t.Fatalf("expected impulso dash to advance forward, got from=%f to=%f", effects.Effects[0].FromX, effects.Effects[0].ToX)
+	}
+
+	world := readTypedSocketMessage[worldStateMessage](t, connection)
+	var movedPlayer *playerState
+	for index := range world.Players {
+		if world.Players[index].ID == session.PlayerID {
+			movedPlayer = &world.Players[index]
+			break
+		}
+	}
+	if movedPlayer == nil {
+		t.Fatalf("expected moved player in world snapshot")
+	}
+	if movedPlayer.X != effects.Effects[0].ToX || movedPlayer.Y != effects.Effects[0].ToY {
+		t.Fatalf("expected world snapshot to match impulso destination, got (%f,%f) want (%f,%f)", movedPlayer.X, movedPlayer.Y, effects.Effects[0].ToX, effects.Effects[0].ToY)
+	}
+}
+
+func TestWebSocketUseSkillCooldownReturnsStableReasonCode(t *testing.T) {
+	hub := newGameHub()
+	hub.world = buildTraversableTestWorld()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", hub.handleWebSocket)
+	testServer := httptest.NewServer(mux)
+	defer testServer.Close()
+
+	websocketURL := "ws" + strings.TrimPrefix(testServer.URL, "http") + "/ws"
+	connection := openGameSocket(t, websocketURL, "cooldown-bee")
+	defer connection.Close()
+
+	session := readTypedSocketMessage[sessionMessage](t, connection)
+	_ = readTypedSocketMessage[worldStateMessage](t, connection)
+
+	hub.mu.Lock()
+	progress := hub.ensurePlayerProgressLocked(session.PlayerID)
+	progress.OwnedSkillIDs = []string{"skill:impulso"}
+	progress.EquippedSkills = []string{"skill:impulso", "", "", ""}
+	player := hub.players[session.PlayerID]
+	player.FacingX = 1
+	player.FacingY = 0
+	hub.mu.Unlock()
+
+	if err := connection.WriteJSON(useSkillAction{Type: "use_skill", Slot: 0}); err != nil {
+		t.Fatalf("send first use_skill action: %v", err)
+	}
+	_ = readTypedSocketMessage[interactionResultMessage](t, connection)
+	_ = readTypedSocketMessage[playerStatusMessage](t, connection)
+	_ = readTypedSocketMessage[skillEffectsMessage](t, connection)
+	_ = readTypedSocketMessage[worldStateMessage](t, connection)
+
+	if err := connection.WriteJSON(useSkillAction{Type: "use_skill", Slot: 0}); err != nil {
+		t.Fatalf("send second use_skill action: %v", err)
+	}
+
+	interaction := readTypedSocketMessage[interactionResultMessage](t, connection)
+	if interaction.Success {
+		t.Fatalf("expected second use_skill to fail during cooldown")
+	}
+	if interaction.ReasonCode != useSkillReasonCooldown {
+		t.Fatalf("expected cooldown reason code %q, got %q", useSkillReasonCooldown, interaction.ReasonCode)
+	}
+	if interaction.Reason == "" {
+		t.Fatalf("expected human-readable cooldown reason")
+	}
+
+	status := readTypedSocketMessage[playerStatusMessage](t, connection)
+	if status.SkillRuntime[0].State != skillStateCooldown {
+		t.Fatalf("expected slot 0 to remain in cooldown, got %q", status.SkillRuntime[0].State)
 	}
 }

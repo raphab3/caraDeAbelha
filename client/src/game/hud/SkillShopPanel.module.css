@@ -28,6 +28,11 @@
   gap: 1rem;
 }
 
+.headerCopy {
+  min-width: 0;
+  flex: 1;
+}
+
 .headerActions {
   display: flex;
   align-items: flex-start;
@@ -88,6 +93,28 @@
 
 .dragHandle:active {
   cursor: grabbing;
+}
+
+.closeButton {
+  min-height: 3.55rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid rgba(248, 113, 113, 0.24);
+  border-radius: 1rem;
+  background: rgba(127, 29, 29, 0.22);
+  color: #fee2e2;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: border-color 180ms ease, transform 180ms ease, background 180ms ease;
+}
+
+.closeButton:hover,
+.closeButton:focus-visible {
+  border-color: rgba(252, 165, 165, 0.6);
+  background: rgba(127, 29, 29, 0.36);
+  transform: translateY(-1px);
+  outline: none;
 }
 
 .honeyLabel {
@@ -391,14 +418,27 @@
 
 @media (max-width: 767px) {
   .root {
-    inset: auto 0.75rem 5.75rem 0.75rem;
-    width: auto;
-    left: 0.75rem !important;
-    top: auto !important;
+    inset: 0;
+    z-index: 58;
+    display: flex;
+    align-items: stretch;
+    justify-content: stretch;
+    width: 100%;
+    padding: max(0.75rem, env(safe-area-inset-top)) 0.75rem max(0.75rem, env(safe-area-inset-bottom)) 0.75rem;
+    background: rgba(2, 6, 23, 0.58);
+    left: 0 !important;
+    top: 0 !important;
   }
 
   .panelChrome {
-    max-height: min(68vh, 34rem);
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    padding: 1rem;
+    border-radius: 1.35rem;
+    background:
+      radial-gradient(circle at top right, rgba(245, 158, 11, 0.14), transparent 24%),
+      linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(15, 23, 42, 0.94) 100%);
   }
 
   .header,
@@ -411,10 +451,65 @@
   }
 
   .layout {
-    display: flex;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    flex: 1;
   }
 
   .dragHandle {
     display: none;
+  }
+
+  .headerActions {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .honey,
+  .closeButton {
+    flex: 1;
+  }
+
+  .toolbar {
+    align-items: stretch;
+  }
+
+  .shortcutHint {
+    display: none;
+  }
+
+  .list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 0.65rem;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .skillRow {
+    min-height: 7rem;
+    justify-content: space-between;
+  }
+
+  .skillRowMain,
+  .skillRowMeta,
+  .detailHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .detailCard {
+    min-height: 0;
+    padding: 1rem;
+  }
+
+  .bindings {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .list {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -8,6 +8,7 @@ export interface SkillShopPanelProps {
   isEditingSkills: boolean;
   isOpen: boolean;
   isRecordingHotkeyForSlot: number | undefined;
+  onClose: () => void;
   onSelectSkill: (skillId: string | undefined) => void;
   onRequestHotkeyCapture: (slot: number | undefined) => void;
   onToggleEditingSkills: () => void;
@@ -25,6 +26,32 @@ const INITIAL_PANEL_POSITION: FloatingPanelPosition = {
   x: 16,
   y: 320,
 };
+
+let activeScrollLocks = 0;
+let previousBodyOverflow = "";
+let previousHtmlOverflow = "";
+
+function lockDocumentScroll(): () => void {
+  if (typeof document === "undefined") {
+    return () => undefined;
+  }
+
+  activeScrollLocks += 1;
+  if (activeScrollLocks === 1) {
+    previousBodyOverflow = document.body.style.overflow;
+    previousHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+  }
+
+  return () => {
+    activeScrollLocks = Math.max(0, activeScrollLocks - 1);
+    if (activeScrollLocks === 0) {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    }
+  };
+}
 
 function clampPanelPosition(position: FloatingPanelPosition, panel: HTMLElement | null): FloatingPanelPosition {
   if (typeof window === "undefined") {
@@ -92,6 +119,7 @@ export const SkillShopPanel = ({
   isEditingSkills,
   isOpen,
   isRecordingHotkeyForSlot,
+  onClose,
   onSelectSkill,
   onRequestHotkeyCapture,
   onToggleEditingSkills,
@@ -130,6 +158,14 @@ export const SkillShopPanel = ({
       window.removeEventListener("resize", handleResize);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+
+    return lockDocumentScroll();
+  }, [isOpen]);
 
   const activeSkill = normalizedProgress.skillCatalog.find((entry) => entry.id === activeSkillId) ?? normalizedProgress.skillCatalog[0];
 
@@ -215,12 +251,14 @@ export const SkillShopPanel = ({
     <section
       ref={panelRef}
       className={styles.root}
+      aria-modal="true"
       aria-label="Loja de skills"
+      role="dialog"
       style={{ left: `${panelPosition.x}px`, top: `${panelPosition.y}px` }}
     >
       <div className={styles.panelChrome}>
         <div className={styles.header}>
-          <div>
+          <div className={styles.headerCopy}>
             <p className={styles.eyebrow}>Loja</p>
             <h2 className={styles.title}>Skills da colmeia</h2>
             <p className={styles.subtitle}>Clique em uma skill para ver detalhes e editar sem abrir uma lista longa.</p>
@@ -231,6 +269,9 @@ export const SkillShopPanel = ({
               <span className={styles.honeyLabel}>Mel</span>
               <span className={styles.honeyValue}>{normalizedProgress.honey}</span>
             </div>
+            <button aria-label="Fechar loja" className={styles.closeButton} onClick={onClose} type="button">
+              Fechar
+            </button>
             <button aria-label="Mover loja" className={styles.dragHandle} onPointerDown={handlePointerDown} type="button">
               <span />
               <span />
