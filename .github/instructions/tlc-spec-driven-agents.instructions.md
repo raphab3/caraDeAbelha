@@ -33,6 +33,8 @@ Os únicos agentes de workflow deste workspace são, nesta ordem:
 8. Sempre que uma fase fizer perguntas ao usuário (incluindo Start Here e Specify), usar obrigatoriamente a tool `vscode/askQuestions`.
 9. Quando as fases Design ou Tasks forem solicitadas/aprovadas, persistir os artefatos em arquivos `.md` em `.specs/features/<feature>/` (não apenas responder no chat).
 10. O agente 01 Start Here - Spec Driver é apenas um roteador: não implementa, não executa tasks, não cria artefatos e sempre termina perguntando qual é o próximo passo do fluxo após entender e classificar o pedido.
+11. Para frontend deste repositório, seguir a diretriz CSS atual: CSS Modules por componente para código novo ou refatorado, `client/src/styles.css` apenas para reset/tokens/globais inevitáveis, e evitar novas strings longas de Tailwind ou blocos globais específicos de componente.
+12. Não introduzir CSS-in-JS com runtime, como `styled-components` ou `emotion`, sem decisão técnica registrada em spec/design, porque a aplicação já possui custo relevante de renderização 3D.
 
 ## Fases preferenciais
 

@@ -83,8 +83,21 @@ client/src/
 - Three.js com renderização instanced
 - React Router para navegação
 - React Query para estado do servidor
-- Tailwind CSS + shadcn/ui para UI
+- CSS Modules por componente + tokens globais para UI nova e refactors
+- Tailwind CSS apenas como apoio pontual em protótipos ou utilitários pequenos
 - Vite para build
+
+### Diretriz de CSS
+
+Daqui para frente, componentes novos ou refatorados devem usar CSS componentizado:
+
+- Cada componente visual com estilo relevante deve ter um arquivo local `*.module.css` ao lado do `index.tsx` ou do arquivo do componente.
+- `client/src/styles.css` deve ficar restrito a `@import "tailwindcss"`, reset/base global, tokens CSS, cursores globais e regras realmente transversais.
+- Evitar strings longas de classes em `className`. Quando a composição passar de utilitários simples, mover para CSS Module.
+- Não adicionar novos blocos BEM grandes em CSS global para componentes específicos.
+- Estados visuais devem ser expressos por props ou estado interno do componente, mapeando para classes locais do módulo.
+- Tokens como cores, sombras, raios, z-index, espaçamento e motion devem ser centralizados antes de serem reutilizados por vários componentes.
+- Bibliotecas CSS-in-JS com runtime, como `styled-components` ou `emotion`, não devem ser adotadas sem nova decisão técnica, porque o jogo já tem carga pesada de Three.js e deve evitar custo de runtime desnecessário.
 
 ## 🚀 Rodando o Projeto
 

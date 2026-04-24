@@ -14,6 +14,10 @@ Use this repository's React + TypeScript frontend architecture as the default fo
 - For net-new or materially redesigned frontend surfaces, consult the `ui-ux-pro-max` skill for layout, typography, color, and interaction guidance before implementation.
 - If styled-components is used, theme values are the single source of truth for colors, spacing, typography, shadows, radii, and breakpoints.
 - If the project uses `Tailwind CSS + shadcn/ui + Radix`, prefer shadcn primitives first, extend them in `shared/components/`, and keep tokens centralized through the Tailwind theme and CSS variables.
+- In this repository, the forward CSS direction is CSS Modules per component plus minimal global tokens. For new or refactored components, create local `*.module.css` files beside the component and avoid adding component-specific styles to `client/src/styles.css`.
+- Keep `client/src/styles.css` limited to Tailwind import, reset/base rules, CSS tokens, cursor globals, and unavoidable cross-cutting rules. Do not grow it with large component blocks.
+- Avoid long aggregated Tailwind strings in JSX. If a `className` carries structural, visual, responsive, and state styling together, extract it into a CSS Module class and expose variants through component props.
+- Do not introduce runtime CSS-in-JS libraries such as `styled-components` or `emotion` unless a new approved design decision explicitly accepts their bundle/runtime cost.
 - Use React Hook Form with Zod for forms, TanStack React Query for server state, Zustand for global state with actions, and Jotai for simple shared atomic UI state.
 - Reevaluate every `useEffect`. Prefer React Query, derived state, event handlers, atoms, or local initial state when possible.
 - Avoid hardcoded design tokens, large monolithic components, and unnecessary state duplication.
