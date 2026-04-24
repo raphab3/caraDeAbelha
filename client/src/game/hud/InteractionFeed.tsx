@@ -52,8 +52,10 @@ export const InteractionFeed = ({ lastInteraction }: InteractionFeedProps) => {
     }
 
     const labels: Record<string, string> = {
+      buy_skill: interaction.success ? "Skill comprada" : "Compra falhou",
       collect_flower: "Colheu flor",
       deposit_pollen: "Depositou polen",
+      equip_skill: interaction.success ? "Skill equipada" : "Nao equipou",
       collect_pollen: "Coletou polen",
       interact_hive: "Visitou colmeia",
       failed_collection: "Falha na coleta",
@@ -69,9 +71,31 @@ export const InteractionFeed = ({ lastInteraction }: InteractionFeedProps) => {
 
   const isSuccess = lastInteraction.success;
   const isCollectingState = lastInteraction.action === "collect_flower" && lastInteraction.reason.startsWith("Coletando flor");
-  const showReason = Boolean(lastInteraction.reason) && (!isSuccess || lastInteraction.amount === 0 || lastInteraction.reason.includes("XP ganho"));
+  const showReason = Boolean(lastInteraction.reason) && (
+    !isSuccess ||
+    lastInteraction.amount === 0 ||
+    lastInteraction.reason.includes("XP ganho") ||
+    lastInteraction.action === "buy_skill" ||
+    lastInteraction.action === "equip_skill"
+  );
   const toneClass = isCollectingState ? styles.collecting : isSuccess ? styles.success : styles.error;
   const visibilityClass = isExiting ? styles.exiting : styles.visible;
+
+  const amountLabel = (() => {
+    if (lastInteraction.amount <= 0) {
+      return null;
+    }
+
+    if (lastInteraction.action === "buy_skill") {
+      return `-${lastInteraction.amount} mel`;
+    }
+
+    if (lastInteraction.action === "equip_skill") {
+      return `Slot ${lastInteraction.amount}`;
+    }
+
+    return `${isSuccess ? "+" : ""}${lastInteraction.amount}`;
+  })();
 
   return (
     <div className={[styles.feed, visibilityClass].join(" ")}>
@@ -100,10 +124,9 @@ export const InteractionFeed = ({ lastInteraction }: InteractionFeedProps) => {
 
         {/* Amount and Status */}
         <div className="text-center">
-          {lastInteraction.amount > 0 && (
+          {amountLabel && (
             <p className={styles.amount}>
-              {isSuccess ? "+" : ""}
-              {lastInteraction.amount}
+              {amountLabel}
             </p>
           )}
           {showReason && (

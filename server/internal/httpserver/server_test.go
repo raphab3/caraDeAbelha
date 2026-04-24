@@ -16,6 +16,17 @@ import (
 	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/zones"
 )
 
+func readTypedSocketMessage[T any](t *testing.T, connection *websocket.Conn) T {
+	t.Helper()
+
+	var message T
+	if err := connection.ReadJSON(&message); err != nil {
+		t.Fatalf("read socket message: %v", err)
+	}
+
+	return message
+}
+
 func openGameSocket(t *testing.T, websocketURL string, username string) *websocket.Conn {
 	t.Helper()
 
@@ -1274,5 +1285,107 @@ func TestWebSocketReconnectLoadsPlayerStateByUsername(t *testing.T) {
 
 	if restoredPlayer.Username != "beekeeper" {
 		t.Fatalf("expected restored username beekeeper, got %q", restoredPlayer.Username)
+	}
+}
+
+func TestWebSocketBuySkillSendsInteractionAndUpdatedStatus(t *testing.T) {
+	hub := newGameHub()
+	hub.world = buildTraversableTestWorld()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", hub.handleWebSocket)
+	testServer := httptest.NewServer(mux)
+	defer testServer.Close()
+
+	websocketURL := "ws" + strings.TrimPrefix(testServer.URL, "http") + "/ws"
+	connection := openGameSocket(t, websocketURL, "forager")
+	defer connection.Close()
+
+	session := readTypedSocketMessage[sessionMessage](t, connection)
+	_ = readTypedSocketMessage[worldStateMessage](t, connection)
+
+	hub.mu.Lock()
+	progress := hub.ensurePlayerProgressLocked(session.PlayerID)
+	progress.Honey = 200
+	hub.mu.Unlock()
+
+	if err := connection.WriteJSON(buySkillAction{Type: "buy_skill", SkillID: "skill:impulso"}); err != nil {
+		t.Fatalf("send buy_skill action: %v", err)
+	}
+
+	interaction := readTypedSocketMessage[interactionResultMessage](t, connection)
+	if interaction.Type != "interaction_result" {
+		t.Fatalf("expected interaction_result, got %q", interaction.Type)
+	}
+	if interaction.Action != "buy_skill" || !interaction.Success {
+		t.Fatalf("expected successful buy_skill interaction, got action=%q success=%v", interaction.Action, interaction.Success)
+	}
+	if interaction.Amount != 40 {
+		t.Fatalf("expected buy_skill amount 40, got %d", interaction.Amount)
+	}
+
+	status := readTypedSocketMessage[playerStatusMessage](t, connection)
+	if status.Type != "player_status" {
+		t.Fatalf("expected player_status, got %q", status.Type)
+	}
+	if status.Honey != 160 {
+		t.Fatalf("expected honey 160 after purchase, got %d", status.Honey)
+	}
+	if len(status.OwnedSkillIDs) != 1 || status.OwnedSkillIDs[0] != "skill:impulso" {
+		t.Fatalf("expected owned skills to contain impulso, got %v", status.OwnedSkillIDs)
+	}
+	if len(status.EquippedSkills) != skillSlotCount {
+		t.Fatalf("expected %d equipped skill slots, got %d", skillSlotCount, len(status.EquippedSkills))
+	}
+}
+
+func TestWebSocketEquipSkillSendsInteractionAndUpdatedStatus(t *testing.T) {
+	hub := newGameHub()
+	hub.world = buildTraversableTestWorld()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", hub.handleWebSocket)
+	testServer := httptest.NewServer(mux)
+	defer testServer.Close()
+
+	websocketURL := "ws" + strings.TrimPrefix(testServer.URL, "http") + "/ws"
+	connection := openGameSocket(t, websocketURL, "builder")
+	defer connection.Close()
+
+	session := readTypedSocketMessage[sessionMessage](t, connection)
+	_ = readTypedSocketMessage[worldStateMessage](t, connection)
+
+	hub.mu.Lock()
+	progress := hub.ensurePlayerProgressLocked(session.PlayerID)
+	progress.Honey = 200
+	progress.OwnedSkillIDs = []string{"skill:impulso", "skill:flor-de-nectar"}
+	progress.EquippedSkills = []string{"", "", "", ""}
+	hub.mu.Unlock()
+
+	if err := connection.WriteJSON(equipSkillAction{Type: "equip_skill", SkillID: "skill:flor-de-nectar", Slot: 2}); err != nil {
+		t.Fatalf("send equip_skill action: %v", err)
+	}
+
+	interaction := readTypedSocketMessage[interactionResultMessage](t, connection)
+	if interaction.Type != "interaction_result" {
+		t.Fatalf("expected interaction_result, got %q", interaction.Type)
+	}
+	if interaction.Action != "equip_skill" || !interaction.Success {
+		t.Fatalf("expected successful equip_skill interaction, got action=%q success=%v", interaction.Action, interaction.Success)
+	}
+	if interaction.Amount != 3 {
+		t.Fatalf("expected equip_skill amount 3 for slot index 2, got %d", interaction.Amount)
+	}
+
+	status := readTypedSocketMessage[playerStatusMessage](t, connection)
+	if status.Type != "player_status" {
+		t.Fatalf("expected player_status, got %q", status.Type)
+	}
+	if len(status.EquippedSkills) != skillSlotCount {
+		t.Fatalf("expected %d equipped skill slots, got %d", skillSlotCount, len(status.EquippedSkills))
+	}
+	if status.EquippedSkills[2] != "skill:flor-de-nectar" {
+		t.Fatalf("expected flor de nectar in slot 2, got %v", status.EquippedSkills)
+	}
+	if status.Honey != 200 {
+		t.Fatalf("expected equip to not change honey, got %d", status.Honey)
 	}
 }
