@@ -1,8 +1,9 @@
 import { OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DoubleSide, MOUSE, type Mesh } from "three";
 
+import { getMapBuilderCatalogItem } from "./catalog";
 import { useMapBuilderStore } from "./useMapBuilderStore";
 import { BaseTerrainRenderer } from "./BaseTerrainRenderer";
 import { PlacedItemsRenderer } from "./PlacedItemsRenderer";
@@ -80,6 +81,7 @@ function HoverMarker({ cell }: { cell: { x: number; y: number; z: number } }) {
 function SceneContent({
   cameraDistance,
   hoveredCell,
+  isPanning,
   interactionPlaneSize,
   mapSize,
   onHoverCell,
@@ -94,6 +96,7 @@ function SceneContent({
 }: {
   cameraDistance: number;
   hoveredCell: { x: number; y: number; z: number } | null;
+  isPanning: boolean;
   interactionPlaneSize: number;
   mapSize: number;
   onHoverCell: (pointX: number, pointZ: number) => void;
@@ -177,9 +180,9 @@ function SceneContent({
         minDistance={CAMERA_MIN_DISTANCE}
         minPolarAngle={0.32}
         mouseButtons={{
-          LEFT: MOUSE.PAN,
+          LEFT: isPanning ? MOUSE.PAN : MOUSE.ROTATE,
           MIDDLE: MOUSE.DOLLY,
-          RIGHT: MOUSE.ROTATE,
+          RIGHT: isPanning ? MOUSE.ROTATE : MOUSE.PAN,
         }}
         rotateSpeed={CAMERA_ROTATE_SPEED}
         target={[0, toTerrainSurfaceY(0), 0]}
@@ -195,6 +198,7 @@ export function BuilderCanvas() {
   const placedItems = useMapBuilderStore((state) => state.placedItems);
   const editorState = useMapBuilderStore((state) => state.editorState);
   const placeItem = useMapBuilderStore((state) => state.placeItem);
+  const paintTerrainAt = useMapBuilderStore((state) => state.paintTerrainAt);
   const removeItem = useMapBuilderStore((state) => state.removeItem);
   const updateItem = useMapBuilderStore((state) => state.updateItem);
   const setHoveredCell = useMapBuilderStore((state) => state.setHoveredCell);
@@ -214,6 +218,7 @@ export function BuilderCanvas() {
   const paintStrokeRef = useRef<PaintStrokeState>({ active: false, lastCellKey: null, visitedCellKeys: new Set() });
   const dragStateRef = useRef<DragState>({ active: false, itemId: null, pointerId: null });
   const clipboardRef = useRef<ClipboardItem | null>(null);
+  const [isSpacePanning, setIsSpacePanning] = useState(false);
 
   const updateHoveredCell = (sceneX: number, sceneZ: number) => {
     if (!Number.isFinite(sceneX) || !Number.isFinite(sceneZ)) {
@@ -229,6 +234,9 @@ export function BuilderCanvas() {
   };
 
   const tryPaintCell = (sceneX: number, sceneZ: number) => {
+    if (isSpacePanning) {
+      return;
+    }
     if (dragStateRef.current.active) {
       return;
     }
@@ -248,17 +256,21 @@ export function BuilderCanvas() {
     paintStrokeRef.current.lastCellKey = cellKey;
     paintStrokeRef.current.visitedCellKeys.add(cellKey);
 
-    if (occupiedKeys.has(cellKey)) {
+    const selectedAsset = getMapBuilderCatalogItem(editorState.selectedAssetType);
+    if (selectedAsset?.category === "terrain") {
+      paintTerrainAt({ x, z, prefabId: selectedAsset.prefabId, mode: "paint" });
       return;
     }
 
-    placeItem({
-      prefabId: editorState.selectedAssetType,
-      x,
-      y,
-      z,
-      meta: {},
-    });
+    if (!occupiedKeys.has(cellKey)) {
+      placeItem({
+        prefabId: editorState.selectedAssetType,
+        x,
+        y,
+        z,
+        meta: {},
+      });
+    }
   };
 
   const moveDraggedItem = (sceneX: number, sceneZ: number) => {
@@ -284,8 +296,35 @@ export function BuilderCanvas() {
     updateItem(draggedItem.id, { x, z });
   };
 
+  const tryDeleteCell = (sceneX: number, sceneZ: number) => {
+    if (isSpacePanning || editorState.currentTool !== "delete" || !editorState.selectedAssetType) {
+      return;
+    }
+
+    const selectedAsset = getMapBuilderCatalogItem(editorState.selectedAssetType);
+    if (selectedAsset?.category !== "terrain") {
+      return;
+    }
+
+    const x = Math.round(toWorldAxis(sceneX));
+    const z = Math.round(toWorldAxis(sceneZ));
+    const cellKey = `${x}:${z}:delete`;
+    if (paintStrokeRef.current.lastCellKey === cellKey || paintStrokeRef.current.visitedCellKeys.has(cellKey)) {
+      return;
+    }
+
+    paintStrokeRef.current.lastCellKey = cellKey;
+    paintStrokeRef.current.visitedCellKeys.add(cellKey);
+    paintTerrainAt({ x, z, prefabId: selectedAsset.prefabId, mode: "delete" });
+  };
+
+  const handleStrokeCell = (sceneX: number, sceneZ: number) => {
+    tryPaintCell(sceneX, sceneZ);
+    tryDeleteCell(sceneX, sceneZ);
+  };
+
   const handlePointerStart = (eventTarget: EventTarget | null, pointerId: number, sceneX: number, sceneZ: number) => {
-    const isPaintTool = editorState.currentTool === "paint";
+    const isPaintTool = editorState.currentTool === "paint" || editorState.currentTool === "delete";
 
     paintStrokeRef.current.active = isPaintTool;
     paintStrokeRef.current.lastCellKey = null;
@@ -303,7 +342,9 @@ export function BuilderCanvas() {
     if (editorState.currentTool === "select") {
       setSelectedItemId(null);
     }
-    tryPaintCell(sceneX, sceneZ);
+    if (!isSpacePanning) {
+      handleStrokeCell(sceneX, sceneZ);
+    }
     moveDraggedItem(sceneX, sceneZ);
   };
 
@@ -328,7 +369,15 @@ export function BuilderCanvas() {
     }
 
     if (editorState.currentTool === "delete") {
-      removeItem(itemId);
+      const selectedAsset = editorState.selectedAssetType ? getMapBuilderCatalogItem(editorState.selectedAssetType) : null;
+      if (selectedAsset?.category === "terrain") {
+        const targetItem = placedItems.find((item) => item.id === itemId);
+        if (targetItem) {
+          paintTerrainAt({ x: targetItem.x, z: targetItem.z, prefabId: selectedAsset.prefabId, mode: "delete" });
+        }
+      } else {
+        removeItem(itemId);
+      }
       return;
     }
 
@@ -349,6 +398,10 @@ export function BuilderCanvas() {
 
   useEffect(() => {
     const handleKeyboard = (event: KeyboardEvent) => {
+      if (event.code === "Space") {
+        event.preventDefault();
+        setIsSpacePanning(true);
+      }
       if (!(event.ctrlKey || event.metaKey)) {
         return;
       }
@@ -390,10 +443,25 @@ export function BuilderCanvas() {
         });
       }
     };
+    const handleKeyboardUp = (event: KeyboardEvent) => {
+      if (event.code === "Space") {
+        event.preventDefault();
+        setIsSpacePanning(false);
+      }
+    };
+    const handleWindowBlur = () => {
+      setIsSpacePanning(false);
+    };
 
     window.addEventListener("keydown", handleKeyboard);
-    return () => window.removeEventListener("keydown", handleKeyboard);
-  }, [editorState.hoveredCell, editorState.selectedItemId, mapInfo.defaultY, placeItem, placedItems]);
+    window.addEventListener("keyup", handleKeyboardUp);
+    window.addEventListener("blur", handleWindowBlur);
+    return () => {
+      window.removeEventListener("keydown", handleKeyboard);
+      window.removeEventListener("keyup", handleKeyboardUp);
+      window.removeEventListener("blur", handleWindowBlur);
+    };
+  }, [editorState.hoveredCell, editorState.selectedAssetType, editorState.selectedItemId, mapInfo.defaultY, paintTerrainAt, placeItem, placedItems]);
 
   useEffect(() => {
     const handleContextMenu = (event: MouseEvent) => event.preventDefault();
@@ -402,7 +470,7 @@ export function BuilderCanvas() {
   }, []);
 
   return (
-    <div className="relative h-full min-h-[72vh] overflow-hidden lg:min-h-[calc(100vh-3.5rem)]">
+    <div className={`relative h-full min-h-[72vh] overflow-hidden lg:min-h-[calc(100vh-3.5rem)] ${isSpacePanning ? "cursor-grab" : "cursor-default"}`}>
       <Canvas
         camera={{ position: [cameraDistance, cameraDistance * 0.52, cameraDistance], fov: 52 }}
         dpr={[1, 1.8]}
@@ -412,11 +480,12 @@ export function BuilderCanvas() {
         <SceneContent
           cameraDistance={cameraDistance}
           hoveredCell={editorState.hoveredCell}
+          isPanning={isSpacePanning}
           interactionPlaneSize={interactionPlaneSize}
           mapSize={mapInfo.size}
           onHoverCell={updateHoveredCell}
           onItemPointerDown={handleItemPointerDown}
-          onPaintCell={tryPaintCell}
+          onPaintCell={handleStrokeCell}
           onPointerEnd={handlePointerEnd}
           onPointerStart={handlePointerStart}
           placedItems={placedItems}

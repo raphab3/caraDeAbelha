@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { MAP_BUILDER_CATALOG, getMapBuilderCatalogItem } from "./catalog";
 import { AssetShelf } from "./AssetShelf";
@@ -13,6 +13,7 @@ import { useFullscreenTarget } from "../../hooks/useFullscreenTarget";
 
 export default function MapBuilder() {
   const { isFullscreen, isSupported: isFullscreenSupported, targetRef, toggleFullscreen } = useFullscreenTarget<HTMLDivElement>();
+  const [isUiHidden, setIsUiHidden] = useState(false);
   const mapInfo = useMapBuilderStore((state) => state.mapInfo);
   const proceduralBase = useMapBuilderStore((state) => state.proceduralBase);
   const placedItems = useMapBuilderStore((state) => state.placedItems);
@@ -104,6 +105,20 @@ export default function MapBuilder() {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "v", ctrlKey: true }));
   };
 
+  useEffect(() => {
+    const handleKeyboard = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key !== "/") {
+        return;
+      }
+
+      event.preventDefault();
+      setIsUiHidden((currentValue) => !currentValue);
+    };
+
+    window.addEventListener("keydown", handleKeyboard);
+    return () => window.removeEventListener("keydown", handleKeyboard);
+  }, []);
+
   const handleNewItem = () => {
     const firstItem = MAP_BUILDER_CATALOG[0];
     if (!firstItem) {
@@ -124,6 +139,7 @@ export default function MapBuilder() {
   return (
     <div ref={targetRef} className="min-h-0 min-w-0 h-full">
       <MapBuilderLayout
+        isUiHidden={isUiHidden}
         header={
           <HeaderControls
             defaultY={mapInfo.defaultY}
@@ -174,7 +190,6 @@ export default function MapBuilder() {
             currentTool={editorState.currentTool}
             hasSelection={Boolean(selectedItem)}
             onCopySelected={handleCopySelected}
-            onDeleteSelected={handleDeleteSelectedItem}
             onNewItem={handleNewItem}
             onPaste={handlePasteSelected}
             onToolChange={setCurrentTool}

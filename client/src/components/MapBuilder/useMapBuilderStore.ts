@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { getMapBuilderCatalogItem } from "./catalog";
 import {
   buildProceduralBase,
+  countMapStats,
   DEFAULT_MAP_BUILDER_LAYOUT_STYLE,
   DEFAULT_MAP_BUILDER_SEED,
   DEFAULT_MAP_BUILDER_SIZE,
@@ -12,6 +13,7 @@ import {
 import type {
   HoveredGridCell,
   MapBuilderState,
+  MapTile,
   MapBuilderTool,
   PlaceItemInput,
   PlacedItem,
@@ -104,6 +106,22 @@ function normalizeOptionalText(value: string | undefined): string | undefined {
 
   const trimmedValue = value.trim();
   return trimmedValue.length > 0 ? trimmedValue : undefined;
+}
+
+function clampTerrainHeight(height: number): number {
+  return Math.max(-0.5, Math.min(6, Math.round(height * 2) / 2));
+}
+
+function resolveTerrainTileType(y: number): "water" | "grass" | "stone" {
+  if (y <= -0.5) {
+    return "water";
+  }
+
+  if (y >= 1) {
+    return "stone";
+  }
+
+  return "grass";
 }
 
 const initialProceduralBase = buildProceduralBase({
@@ -216,6 +234,70 @@ export const useMapBuilderStore = create<MapBuilderState>()((set, get) => ({
         selectedItemId: itemId,
       },
     }));
+  },
+  paintTerrainAt: ({ x, z, prefabId, mode = "paint" }) => {
+    set((state) => {
+      if (!isWithinMapBounds(x, z, state.mapInfo.size)) {
+        return state;
+      }
+
+      const normalizedX = normalizeCoordinate(x);
+      const normalizedZ = normalizeCoordinate(z);
+      const nextTiles: MapTile[] = state.proceduralBase.tiles.map((tile) => {
+        if (tile.x !== normalizedX || tile.z !== normalizedZ) {
+          return tile;
+        }
+
+        if (mode === "delete") {
+          const loweredY = clampTerrainHeight(tile.y - 1);
+          return {
+            ...tile,
+            y: loweredY,
+            type: resolveTerrainTileType(loweredY),
+            prop: null,
+          };
+        }
+
+        if (prefabId === "terrain/slope-wide") {
+          const flattenedY = clampTerrainHeight(Math.max(0, tile.y));
+          return {
+            ...tile,
+            y: flattenedY,
+            type: "grass" as const,
+            prop: null,
+          };
+        }
+
+        if (prefabId === "terrain/overhang-edge") {
+          const raisedY = clampTerrainHeight(Math.max(1, tile.y));
+          return {
+            ...tile,
+            y: raisedY,
+            type: "stone" as const,
+            prop: null,
+          };
+        }
+
+        const raisedY = clampTerrainHeight(Math.max(0, tile.y) + 1);
+        return {
+          ...tile,
+          y: raisedY,
+          type: "stone" as const,
+          prop: null,
+        };
+      });
+
+      return {
+        proceduralBase: {
+          ...state.proceduralBase,
+          tiles: nextTiles,
+          stats: countMapStats(nextTiles),
+        },
+        placedItems: state.placedItems.filter(
+          (item) => !(item.tag === "terrain" && item.x === normalizedX && item.z === normalizedZ),
+        ),
+      };
+    });
   },
   placeItem: (item) => {
     const normalizedItem = normalizePlacedItemInput(item);
