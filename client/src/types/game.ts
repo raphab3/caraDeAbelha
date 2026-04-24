@@ -273,6 +273,11 @@ export interface EquipSkillAction {
   slot: number;
 }
 
+export interface UseSkillAction {
+  type: "use_skill";
+  slot: number;
+}
+
 export type ClientMessage =
   | MoveAction
   | MoveToAction
@@ -281,7 +286,8 @@ export type ClientMessage =
   | DepositAction
   | UnlockZoneAction
   | BuySkillAction
-  | EquipSkillAction;
+  | EquipSkillAction
+  | UseSkillAction;
 
 export interface SkillCatalogEntry {
   id: string;

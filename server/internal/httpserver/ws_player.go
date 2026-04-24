@@ -669,3 +669,37 @@ func (hub *gameHub) equipSkill(clientID string, skillID string, slot int) bool {
 	hub.sendPlayerStatus(client, progress)
 	return false
 }
+
+func (hub *gameHub) useSkill(clientID string, slot int) bool {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	client, ok := hub.clients[clientID]
+	if !ok || client == nil {
+		return false
+	}
+
+	if slot < 0 || slot >= skillSlotCount {
+		hub.sendInteractionResult(client, "use_skill", false, 0, "Slot invalido")
+		return false
+	}
+
+	progress := hub.ensurePlayerProgressLocked(clientID)
+	progress.OwnedSkillIDs = normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
+	progress.EquippedSkills = normalizeEquippedSkills(progress.EquippedSkills, progress.OwnedSkillIDs)
+
+	skillID := progress.EquippedSkills[slot]
+	if strings.TrimSpace(skillID) == "" {
+		hub.sendInteractionResult(client, "use_skill", false, 0, "Nenhuma skill equipada neste slot")
+		return false
+	}
+
+	skill, ok := findBeeSkillDefinition(skillID)
+	if !ok {
+		hub.sendInteractionResult(client, "use_skill", false, 0, "Skill invalida")
+		return false
+	}
+
+	hub.sendInteractionResult(client, "use_skill", true, slot+1, skill.Name)
+	return false
+}

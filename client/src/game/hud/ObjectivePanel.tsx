@@ -5,9 +5,16 @@ import { SkillShopPanel } from "./SkillShopPanel";
 
 export interface ObjectivePanelProps {
   gameSessionController: GameSessionController | undefined;
+  isEditingSkills: boolean;
+  isRecordingHotkeyForSlot: number | undefined;
+  isShopOpen: boolean;
   onSelectSkill: (skillId: string | undefined) => void;
+  onRequestHotkeyCapture: (slot: number | undefined) => void;
+  onToggleEditingSkills: () => void;
+  onToggleShop: () => void;
   playerProgress: PlayerProgressState | undefined;
   selectedSkillId: string | undefined;
+  slotHotkeys: string[];
 }
 
 /**
@@ -16,7 +23,19 @@ export interface ObjectivePanelProps {
  * - Available Skill Points (SP) when relevant
  * - Completely dropped redundant level/xp bars (now in ribbon) and bulky unlocked lists
  */
-export const ObjectivePanel = ({ gameSessionController, onSelectSkill, playerProgress, selectedSkillId }: ObjectivePanelProps) => {
+export const ObjectivePanel = ({
+  gameSessionController,
+  isEditingSkills,
+  isRecordingHotkeyForSlot,
+  isShopOpen,
+  onRequestHotkeyCapture,
+  onSelectSkill,
+  onToggleEditingSkills,
+  onToggleShop,
+  playerProgress,
+  selectedSkillId,
+  slotHotkeys,
+}: ObjectivePanelProps) => {
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(() => window.matchMedia("(max-width: 767px)").matches);
 
@@ -140,6 +159,36 @@ export const ObjectivePanel = ({ gameSessionController, onSelectSkill, playerPro
         </span>
       </button>
 
+      <button
+        aria-expanded={isShopOpen}
+        aria-keyshortcuts="L"
+        className="min-h-11 self-start rounded-full border border-slate-700/60 bg-slate-900/72 px-4 py-2.5 text-left shadow-lg backdrop-blur-md transition hover:border-amber-300/60 hover:bg-slate-900/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/70 pointer-events-auto"
+        onClick={onToggleShop}
+        type="button"
+      >
+        <span className="flex items-center gap-3">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-orange-600 text-white shadow-inner">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 5h16v14H4z" />
+              <path d="M6 8h12" />
+              <path d="M7 12h10" />
+              <path d="M8 16h8" />
+            </svg>
+          </span>
+          <span className="flex flex-col">
+            <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-amber-200/75">
+              Loja
+            </span>
+            <span className="text-sm font-black text-white">
+              {isShopOpen ? "Fechar skills" : "Abrir skills"}
+            </span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+              tecla L
+            </span>
+          </span>
+        </span>
+      </button>
+
       <div id="player-status-panel" className="pointer-events-auto self-start">
         <PlayerStatusPanel
           currentZoneName={currentZoneName}
@@ -152,14 +201,22 @@ export const ObjectivePanel = ({ gameSessionController, onSelectSkill, playerPro
         />
       </div>
 
-      <div className="pointer-events-auto self-start">
-        <SkillShopPanel
-          gameSessionController={gameSessionController}
-          onSelectSkill={onSelectSkill}
-          playerProgress={playerProgress}
-          selectedSkillId={selectedSkillId}
-        />
-      </div>
+      {isShopOpen ? (
+        <div className="pointer-events-auto self-start">
+          <SkillShopPanel
+            gameSessionController={gameSessionController}
+            isEditingSkills={isEditingSkills}
+            isOpen={isShopOpen}
+            isRecordingHotkeyForSlot={isRecordingHotkeyForSlot}
+            onRequestHotkeyCapture={onRequestHotkeyCapture}
+            onSelectSkill={onSelectSkill}
+            onToggleEditingSkills={onToggleEditingSkills}
+            playerProgress={playerProgress}
+            selectedSkillId={selectedSkillId}
+            slotHotkeys={slotHotkeys}
+          />
+        </div>
+      ) : null}
     </div>
   );
 };

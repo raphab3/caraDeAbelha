@@ -4,13 +4,15 @@ import styles from "./SkillShopPanel.module.css";
 
 export interface SkillShopPanelProps {
   gameSessionController: GameSessionController | undefined;
+  isEditingSkills: boolean;
+  isOpen: boolean;
+  isRecordingHotkeyForSlot: number | undefined;
   onSelectSkill: (skillId: string | undefined) => void;
+  onRequestHotkeyCapture: (slot: number | undefined) => void;
+  onToggleEditingSkills: () => void;
   playerProgress: PlayerProgressState;
   selectedSkillId: string | undefined;
-}
-
-function findFirstEmptySlot(equippedSkills: string[]): number {
-  return equippedSkills.findIndex((skillId) => skillId === "");
+  slotHotkeys: string[];
 }
 
 function isSkillEquipped(equippedSkills: string[], skillId: string): boolean {
@@ -19,9 +21,10 @@ function isSkillEquipped(equippedSkills: string[], skillId: string): boolean {
 
 function resolveActionLabel(
   entry: SkillCatalogEntry,
+  isEditingSkills: boolean,
   playerProgress: PlayerProgressState,
   selectedSkillId: string | undefined,
-): { disabled: boolean; label: string; mode: "buy" | "select" | "selected" | "blocked" } {
+): { disabled: boolean; label: string; mode: "buy" | "edit" | "select" | "selected" | "blocked" } {
   const owned = playerProgress.ownedSkillIds.includes(entry.id);
   const equipped = isSkillEquipped(playerProgress.equippedSkills, entry.id);
 
@@ -42,6 +45,14 @@ function resolveActionLabel(
     };
   }
 
+  if (!isEditingSkills) {
+    return {
+      disabled: false,
+      label: equipped ? "Editar slot" : "Abrir edicao",
+      mode: "edit",
+    };
+  }
+
   return {
     disabled: false,
     label: equipped ? "Mover" : "Selecionar",
@@ -51,12 +62,17 @@ function resolveActionLabel(
 
 export const SkillShopPanel = ({
   gameSessionController,
+  isEditingSkills,
+  isOpen,
+  isRecordingHotkeyForSlot,
   onSelectSkill,
+  onRequestHotkeyCapture,
+  onToggleEditingSkills,
   playerProgress,
   selectedSkillId,
+  slotHotkeys,
 }: SkillShopPanelProps) => {
   const normalizedProgress = normalizePlayerProgressState(playerProgress);
-  const firstEmptySlot = findFirstEmptySlot(normalizedProgress.equippedSkills);
 
   const handleAction = (entry: SkillCatalogEntry) => {
     const owned = normalizedProgress.ownedSkillIds.includes(entry.id);
@@ -73,13 +89,9 @@ export const SkillShopPanel = ({
       return;
     }
 
-    if (firstEmptySlot >= 0) {
-      gameSessionController?.sendAction({
-        type: "equip_skill",
-        skillId: entry.id,
-        slot: firstEmptySlot,
-      });
-      onSelectSkill(undefined);
+    if (!isEditingSkills) {
+      onToggleEditingSkills();
+      onSelectSkill(entry.id);
       return;
     }
 
@@ -92,7 +104,11 @@ export const SkillShopPanel = ({
         <div>
           <p className={styles.eyebrow}>Loja</p>
           <h2 className={styles.title}>Skills da colmeia</h2>
-          <p className={styles.subtitle}>Compre com mel e equipe nos 4 slots ativos do rodapé.</p>
+          <p className={styles.subtitle}>
+            {isEditingSkills
+              ? "Modo edicao ativo. Escolha uma skill e ajuste os atalhos dos slots."
+              : "Abra a edicao para trocar skills e configurar atalhos."}
+          </p>
         </div>
 
         <div className={styles.honey}>
@@ -101,11 +117,47 @@ export const SkillShopPanel = ({
         </div>
       </div>
 
+      <div className={styles.toolbar}>
+        <button
+          className={[styles.button, isEditingSkills ? styles.buttonSelected : ""].join(" ")}
+          onClick={onToggleEditingSkills}
+          type="button"
+        >
+          {isEditingSkills ? "Fechar edicao" : "Editar skills"}
+        </button>
+        <span className={styles.shortcutHint}>{isOpen ? "Tecla L fecha a loja" : "Tecla L abre a loja"}</span>
+      </div>
+
+      {isEditingSkills ? (
+        <div className={styles.bindings}>
+          {normalizedProgress.equippedSkills.map((equippedSkillId, slotIndex) => (
+            <div key={`binding-${slotIndex}`} className={styles.bindingRow}>
+              <div>
+                <p className={styles.bindingTitle}>{`Slot ${slotIndex + 1}`}</p>
+                <p className={styles.bindingMeta}>{equippedSkillId ? equippedSkillId.replace("skill:", "") : "Sem skill equipada"}</p>
+              </div>
+              <button
+                className={[
+                  styles.bindingButton,
+                  isRecordingHotkeyForSlot === slotIndex ? styles.bindingButtonRecording : "",
+                ].join(" ")}
+                onClick={() => {
+                  onRequestHotkeyCapture(isRecordingHotkeyForSlot === slotIndex ? undefined : slotIndex);
+                }}
+                type="button"
+              >
+                {isRecordingHotkeyForSlot === slotIndex ? "Pressione uma tecla" : `Atalho ${slotHotkeys[slotIndex] ?? "-"}`}
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <div className={styles.list}>
         {normalizedProgress.skillCatalog.map((entry) => {
           const owned = normalizedProgress.ownedSkillIds.includes(entry.id);
           const equipped = isSkillEquipped(normalizedProgress.equippedSkills, entry.id);
-          const action = resolveActionLabel(entry, normalizedProgress, selectedSkillId);
+          const action = resolveActionLabel(entry, isEditingSkills, normalizedProgress, selectedSkillId);
 
           return (
             <article

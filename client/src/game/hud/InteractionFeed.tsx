@@ -56,6 +56,7 @@ export const InteractionFeed = ({ lastInteraction }: InteractionFeedProps) => {
       collect_flower: "Colheu flor",
       deposit_pollen: "Depositou polen",
       equip_skill: interaction.success ? "Skill equipada" : "Nao equipou",
+      use_skill: interaction.success ? "Skill acionada" : "Skill indisponivel",
       collect_pollen: "Coletou polen",
       interact_hive: "Visitou colmeia",
       failed_collection: "Falha na coleta",
@@ -76,7 +77,8 @@ export const InteractionFeed = ({ lastInteraction }: InteractionFeedProps) => {
     lastInteraction.amount === 0 ||
     lastInteraction.reason.includes("XP ganho") ||
     lastInteraction.action === "buy_skill" ||
-    lastInteraction.action === "equip_skill"
+    lastInteraction.action === "equip_skill" ||
+    lastInteraction.action === "use_skill"
   );
   const toneClass = isCollectingState ? styles.collecting : isSuccess ? styles.success : styles.error;
   const visibilityClass = isExiting ? styles.exiting : styles.visible;
@@ -91,6 +93,10 @@ export const InteractionFeed = ({ lastInteraction }: InteractionFeedProps) => {
     }
 
     if (lastInteraction.action === "equip_skill") {
+      return `Slot ${lastInteraction.amount}`;
+    }
+
+    if (lastInteraction.action === "use_skill") {
       return `Slot ${lastInteraction.amount}`;
     }
 

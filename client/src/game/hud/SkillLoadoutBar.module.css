@@ -124,6 +124,30 @@
   color: rgba(226, 232, 240, 0.86);
 }
 
+.footerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+}
+
+.hotkey {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  min-height: 1.7rem;
+  padding: 0 0.45rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  background: rgba(2, 132, 199, 0.15);
+  color: #cffafe;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 @media (max-width: 767px) {
   .slots {
     gap: 0.55rem;

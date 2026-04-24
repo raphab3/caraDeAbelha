@@ -40,6 +40,11 @@ type equipSkillAction struct {
 	Slot    int    `json:"slot"`
 }
 
+type useSkillAction struct {
+	Type string `json:"type"`
+	Slot int    `json:"slot"`
+}
+
 type playerState struct {
 	ID           string             `json:"id"`
 	Username     string             `json:"username"`

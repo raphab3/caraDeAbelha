@@ -4,8 +4,11 @@ import styles from "./SkillLoadoutBar.module.css";
 
 export interface SkillLoadoutBarProps {
   gameSessionController: GameSessionController | undefined;
+  isEditingSkills: boolean;
+  onUseSkill: (slot: number) => void;
   playerProgress: PlayerProgressState | undefined;
   selectedSkillId: string | undefined;
+  slotHotkeys: string[];
   onSelectSkill: (skillId: string | undefined) => void;
 }
 
@@ -25,8 +28,11 @@ function getBadgeLabel(skillName: string): string {
 
 export const SkillLoadoutBar = ({
   gameSessionController,
+  isEditingSkills,
+  onUseSkill,
   playerProgress,
   selectedSkillId,
+  slotHotkeys,
   onSelectSkill,
 }: SkillLoadoutBarProps) => {
   if (!playerProgress) {
@@ -38,13 +44,20 @@ export const SkillLoadoutBar = ({
   const selectedSkill = selectedSkillId ? skillMap.get(selectedSkillId) : undefined;
 
   const handleSlotClick = (slotIndex: number, equippedSkillId: string) => {
-    if (selectedSkillId) {
-      gameSessionController?.sendAction({
-        type: "equip_skill",
-        skillId: selectedSkillId,
-        slot: slotIndex,
-      });
-      onSelectSkill(undefined);
+    if (isEditingSkills) {
+      if (selectedSkillId) {
+        gameSessionController?.sendAction({
+          type: "equip_skill",
+          skillId: selectedSkillId,
+          slot: slotIndex,
+        });
+        onSelectSkill(undefined);
+        return;
+      }
+
+      if (equippedSkillId) {
+        onSelectSkill(equippedSkillId);
+      }
       return;
     }
 
@@ -52,21 +65,24 @@ export const SkillLoadoutBar = ({
       return;
     }
 
-    onSelectSkill(equippedSkillId);
+    onUseSkill(slotIndex);
   };
 
   return (
     <div className={styles.root}>
       <div className={[styles.hint, selectedSkill ? styles.selected : ""].join(" ")}>
-        {selectedSkill
-          ? `Skill selecionada: ${selectedSkill.name}. Clique em um slot para equipar.`
-          : "Slots de skills. Clique em uma skill comprada na loja ou em uma skill equipada para mover."}
+        {isEditingSkills
+          ? selectedSkill
+            ? `Editando loadout: ${selectedSkill.name} pronta para equipar.`
+            : "Modo edicao ativo. Escolha uma skill na loja e clique em um slot para equipar."
+          : "Clique no slot ou use o atalho configurado para acionar a skill equipada."}
       </div>
 
       <div className={styles.slots}>
         {normalizedProgress.equippedSkills.map((equippedSkillId, slotIndex) => {
           const skill = equippedSkillId ? skillMap.get(equippedSkillId) : undefined;
-          const isArmedSlot = Boolean(selectedSkillId);
+          const isArmedSlot = Boolean(selectedSkillId) && isEditingSkills;
+          const hotkey = slotHotkeys[slotIndex] ?? "-";
 
           return (
             <button
@@ -92,12 +108,18 @@ export const SkillLoadoutBar = ({
                     <p className={styles.title}>{skill.name}</p>
                     <p className={styles.meta}>{skill.role}</p>
                   </div>
-                  <p className={styles.action}>{selectedSkillId ? "Equipar aqui" : "Clique para mover"}</p>
+                  <div className={styles.footerRow}>
+                    <span className={styles.hotkey}>{hotkey}</span>
+                    <p className={styles.action}>{isEditingSkills ? (selectedSkillId ? "Equipar aqui" : "Selecionar para mover") : "Acionar"}</p>
+                  </div>
                 </>
               ) : (
                 <>
                   <p className={styles.empty}>Nenhuma skill equipada</p>
-                  <p className={styles.action}>{selectedSkillId ? "Equipar aqui" : "Slot vazio"}</p>
+                  <div className={styles.footerRow}>
+                    <span className={styles.hotkey}>{hotkey}</span>
+                    <p className={styles.action}>{isEditingSkills ? "Slot de destino" : "Slot vazio"}</p>
+                  </div>
                 </>
               )}
             </button>

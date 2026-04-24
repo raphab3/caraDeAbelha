@@ -176,6 +176,70 @@
   background: linear-gradient(180deg, rgba(217, 119, 6, 0.3) 0%, rgba(120, 53, 15, 0.5) 100%);
 }
 
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.shortcutHint {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.bindings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.85rem;
+  border: 1px solid rgba(71, 85, 105, 0.72);
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.56);
+}
+
+.bindingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.bindingTitle {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.bindingMeta {
+  margin: 0.2rem 0 0;
+  font-size: 0.66rem;
+  color: rgba(148, 163, 184, 0.9);
+  text-transform: uppercase;
+}
+
+.bindingButton {
+  min-height: 2.4rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 0.8rem;
+  background: rgba(8, 145, 178, 0.16);
+  color: #ecfeff;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.bindingButtonRecording {
+  border-color: rgba(250, 204, 21, 0.72);
+  background: rgba(217, 119, 6, 0.26);
+}
+
 @media (max-width: 767px) {
   .root {
     width: calc(100vw - 2rem);
@@ -186,6 +250,12 @@
   }
 
   .actions {
+    align-items: stretch;
+  }
+
+  .toolbar,
+  .bindingRow {
+    flex-direction: column;
     align-items: stretch;
   }
 }

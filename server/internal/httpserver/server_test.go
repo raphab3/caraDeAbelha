@@ -1389,3 +1389,43 @@ func TestWebSocketEquipSkillSendsInteractionAndUpdatedStatus(t *testing.T) {
 		t.Fatalf("expected equip to not change honey, got %d", status.Honey)
 	}
 }
+
+func TestWebSocketUseSkillSendsInteractionResult(t *testing.T) {
+	hub := newGameHub()
+	hub.world = buildTraversableTestWorld()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", hub.handleWebSocket)
+	testServer := httptest.NewServer(mux)
+	defer testServer.Close()
+
+	websocketURL := "ws" + strings.TrimPrefix(testServer.URL, "http") + "/ws"
+	connection := openGameSocket(t, websocketURL, "caster")
+	defer connection.Close()
+
+	session := readTypedSocketMessage[sessionMessage](t, connection)
+	_ = readTypedSocketMessage[worldStateMessage](t, connection)
+
+	hub.mu.Lock()
+	progress := hub.ensurePlayerProgressLocked(session.PlayerID)
+	progress.OwnedSkillIDs = []string{"skill:impulso"}
+	progress.EquippedSkills = []string{"skill:impulso", "", "", ""}
+	hub.mu.Unlock()
+
+	if err := connection.WriteJSON(useSkillAction{Type: "use_skill", Slot: 0}); err != nil {
+		t.Fatalf("send use_skill action: %v", err)
+	}
+
+	interaction := readTypedSocketMessage[interactionResultMessage](t, connection)
+	if interaction.Type != "interaction_result" {
+		t.Fatalf("expected interaction_result, got %q", interaction.Type)
+	}
+	if interaction.Action != "use_skill" || !interaction.Success {
+		t.Fatalf("expected successful use_skill interaction, got action=%q success=%v", interaction.Action, interaction.Success)
+	}
+	if interaction.Amount != 1 {
+		t.Fatalf("expected use_skill amount 1, got %d", interaction.Amount)
+	}
+	if interaction.Reason != "Impulso" {
+		t.Fatalf("expected use_skill reason Impulso, got %q", interaction.Reason)
+	}
+}
