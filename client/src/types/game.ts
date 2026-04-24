@@ -33,7 +33,15 @@ export interface AdminPlayerSummaryDTO {
   id: string;
   username: string;
   online: boolean;
+  honey: number;
   lastSeenAt?: string;
+}
+
+export interface AdminPlayerHoneyUpdateResponse {
+  status: string;
+  service: string;
+  timestamp: string;
+  player: AdminPlayerSummaryDTO;
 }
 
 export interface AdminPlayersResponse {

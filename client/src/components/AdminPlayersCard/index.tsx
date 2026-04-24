@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
+import { API_URL } from "../../game/env";
 import { useAdminPlayers } from "../../hooks/useAdminPlayers";
+import type { AdminPlayerHoneyUpdateResponse, AdminPlayerSummaryDTO } from "../../types/game";
 
 const LAST_SEEN_FORMATTER = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "short",
@@ -28,6 +30,9 @@ function resolveStatusClasses(online: boolean): string {
 
 export function AdminPlayersCard() {
   const [page, setPage] = useState(1);
+  const [savingPlayerId, setSavingPlayerId] = useState<string | null>(null);
+  const [saveErrorByPlayer, setSaveErrorByPlayer] = useState<Record<string, string>>({});
+  const [localHoneyByPlayer, setLocalHoneyByPlayer] = useState<Record<string, number>>({});
   const adminPlayers = useAdminPlayers(page, PLAYERS_PAGE_SIZE);
 
   useEffect(() => {
@@ -36,8 +41,80 @@ export function AdminPlayersCard() {
     }
   }, [adminPlayers.page, page]);
 
+  useEffect(() => {
+    setLocalHoneyByPlayer((current) => {
+      let changed = false;
+      const next = { ...current };
+
+      for (const player of adminPlayers.players) {
+        if (next[player.id] === player.honey) {
+          delete next[player.id];
+          changed = true;
+        }
+      }
+
+      return changed ? next : current;
+    });
+  }, [adminPlayers.players]);
+
   const hasPreviousPage = page > 1;
   const hasNextPage = adminPlayers.totalPages > 0 && page < adminPlayers.totalPages;
+
+  const resolveDisplayedHoney = (player: AdminPlayerSummaryDTO): number => localHoneyByPlayer[player.id] ?? player.honey;
+
+  const handleHoneySubmit = async (event: FormEvent<HTMLFormElement>, player: AdminPlayerSummaryDTO) => {
+    event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+    const nextHoney = Number(formData.get("honey"));
+    if (!Number.isInteger(nextHoney) || nextHoney < 0) {
+      setSaveErrorByPlayer((current) => ({
+        ...current,
+        [player.id]: "Informe um valor inteiro maior ou igual a zero.",
+      }));
+      return;
+    }
+
+    setSavingPlayerId(player.id);
+    setSaveErrorByPlayer((current) => {
+      if (!(player.id in current)) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[player.id];
+      return next;
+    });
+
+    try {
+      const response = await fetch(`${API_URL}/admin/players/${player.id}/honey`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ honey: nextHoney }),
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || `admin player honey returned ${response.status}`);
+      }
+
+      const data = (await response.json()) as AdminPlayerHoneyUpdateResponse;
+      setLocalHoneyByPlayer((current) => ({
+        ...current,
+        [player.id]: data.player.honey,
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "erro desconhecido";
+      setSaveErrorByPlayer((current) => ({
+        ...current,
+        [player.id]: message,
+      }));
+    } finally {
+      setSavingPlayerId((current) => (current === player.id ? null : current));
+    }
+  };
 
   return (
     <article className="rounded-[28px] border border-white/10 bg-slate-950/45 p-5 shadow-[0_20px_44px_rgba(2,6,23,0.26)] backdrop-blur md:p-6">
@@ -46,7 +123,7 @@ export function AdminPlayersCard() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Players</p>
           <h3 className="mt-3 text-2xl font-semibold text-white">Presenca e ultima atividade</h3>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-            Ordenacao fixa: online primeiro, depois quem teve atividade mais recente.
+            Ordenacao fixa: online primeiro. O saldo de mel pode ser ajustado na hora para quem estiver conectado.
           </p>
         </div>
 
@@ -80,16 +157,22 @@ export function AdminPlayersCard() {
 
       {adminPlayers.players.length > 0 ? (
         <div className="mt-5 overflow-hidden rounded-[24px] border border-white/10 bg-black/10">
-          <div className="hidden grid-cols-[minmax(0,1.2fr)_180px_220px] gap-3 border-b border-white/10 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400 md:grid">
+          <div className="hidden grid-cols-[minmax(0,1.1fr)_160px_minmax(220px,0.9fr)_220px] gap-3 border-b border-white/10 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400 md:grid">
             <span>Username</span>
             <span>Status</span>
+            <span>Mel realtime</span>
             <span>Ultima atividade</span>
           </div>
 
           <div className="divide-y divide-white/10">
-            {adminPlayers.players.map((player) => (
-              <div key={player.id} className="grid gap-3 px-4 py-4 md:grid-cols-[minmax(0,1.2fr)_180px_220px] md:items-center">
-                <div>
+            {adminPlayers.players.map((player) => {
+              const displayedHoney = resolveDisplayedHoney(player);
+              const isSaving = savingPlayerId === player.id;
+              const saveError = saveErrorByPlayer[player.id];
+
+              return (
+              <div key={player.id} className="grid gap-4 px-4 py-4 md:grid-cols-[minmax(0,1.1fr)_160px_minmax(220px,0.9fr)_220px] md:items-center">
+                <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 md:hidden">Username</p>
                   <p className="text-sm font-semibold text-white">{player.username}</p>
                 </div>
@@ -103,11 +186,49 @@ export function AdminPlayersCard() {
                 </div>
 
                 <div>
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 md:hidden">Mel realtime</p>
+                      <p className="text-sm font-semibold text-amber-100">{displayedHoney} mel</p>
+                    </div>
+
+                    <form className="flex flex-wrap items-center gap-2" onSubmit={(event) => void handleHoneySubmit(event, player)}>
+                      <label className="sr-only" htmlFor={`player-honey-${player.id}`}>
+                        Editar mel de {player.username}
+                      </label>
+                      <input
+                        key={`${player.id}:${displayedHoney}`}
+                        className="min-h-11 w-28 rounded-2xl border border-white/10 bg-slate-950/70 px-3 text-sm font-semibold text-white outline-none transition-colors focus:border-amber-300/45"
+                        defaultValue={displayedHoney}
+                        disabled={isSaving}
+                        id={`player-honey-${player.id}`}
+                        inputMode="numeric"
+                        min={0}
+                        name="honey"
+                        step={1}
+                        type="number"
+                      />
+                      <button
+                        className="inline-flex min-h-11 items-center rounded-full border border-amber-300/35 bg-amber-300/14 px-4 text-sm font-semibold text-amber-100 transition-colors hover:bg-amber-300/20 disabled:cursor-not-allowed disabled:opacity-40"
+                        disabled={isSaving}
+                        type="submit"
+                      >
+                        {isSaving ? "Salvando..." : "Aplicar"}
+                      </button>
+                    </form>
+
+                    <p className={`text-xs ${saveError ? "text-rose-200" : "text-slate-400"}`}>
+                      {saveError ?? "Atualiza o saldo do jogador conectado sem esperar o proximo poll."}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 md:hidden">Ultima atividade</p>
                   <p className="text-sm text-slate-200">{formatLastSeenAt(player.lastSeenAt)}</p>
                 </div>
               </div>
-            ))}
+            );})}
           </div>
         </div>
       ) : null}

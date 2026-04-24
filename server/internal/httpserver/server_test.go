@@ -572,6 +572,7 @@ func TestAdminPlayersEndpointReturnsPaginatedOnlineFirst(t *testing.T) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/admin/players", hub.handleAdminPlayers)
+	mux.HandleFunc("/admin/players/", hub.handleAdminPlayers)
 	testServer := httptest.NewServer(mux)
 	defer testServer.Close()
 
@@ -605,6 +606,9 @@ func TestAdminPlayersEndpointReturnsPaginatedOnlineFirst(t *testing.T) {
 	if payload.Players[0].Username != "Alpha" || !payload.Players[0].Online {
 		t.Fatalf("expected Alpha online first, got %+v", payload.Players[0])
 	}
+	if payload.Players[0].Honey != 0 {
+		t.Fatalf("expected Alpha honey 0, got %d", payload.Players[0].Honey)
+	}
 
 	if payload.Players[1].Username != "Beta" || !payload.Players[1].Online {
 		t.Fatalf("expected Beta online second, got %+v", payload.Players[1])
@@ -627,6 +631,77 @@ func TestAdminPlayersEndpointReturnsPaginatedOnlineFirst(t *testing.T) {
 
 	if payloadPageTwo.Players[0].Username != "Zeta" || payloadPageTwo.Players[0].Online {
 		t.Fatalf("expected offline Zeta on second page, got %+v", payloadPageTwo.Players[0])
+	}
+}
+
+func TestAdminPlayerHoneyUpdateSendsRealtimeStatus(t *testing.T) {
+	handler := NewHandler()
+	testServer := httptest.NewServer(handler)
+	defer testServer.Close()
+
+	websocketURL := "ws" + strings.TrimPrefix(testServer.URL, "http") + "/ws"
+	connection := openGameSocket(t, websocketURL, "beekeeper")
+	defer connection.Close()
+
+	session := readTypedSocketMessage[sessionMessage](t, connection)
+	_ = readTypedSocketMessage[worldStateMessage](t, connection)
+
+	body := strings.NewReader(`{"honey":275}`)
+	request, err := http.NewRequest(http.MethodPost, testServer.URL+"/admin/players/"+session.PlayerID+"/honey", body)
+	if err != nil {
+		t.Fatalf("build honey update request: %v", err)
+	}
+	request.Header.Set("Content-Type", "application/json")
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("send honey update request: %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, response.StatusCode)
+	}
+
+	var payload adminPlayerHoneyUpdateResponse
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode honey update response: %v", err)
+	}
+
+	if payload.Player.ID != session.PlayerID {
+		t.Fatalf("expected updated player %q, got %q", session.PlayerID, payload.Player.ID)
+	}
+	if payload.Player.Honey != 275 {
+		t.Fatalf("expected response honey 275, got %d", payload.Player.Honey)
+	}
+
+	status := readTypedSocketMessage[playerStatusMessage](t, connection)
+	if status.Type != "player_status" {
+		t.Fatalf("expected player_status, got %q", status.Type)
+	}
+	if status.Honey != 275 {
+		t.Fatalf("expected realtime honey 275, got %d", status.Honey)
+	}
+	if status.PlayerID != session.PlayerID {
+		t.Fatalf("expected player status for %q, got %q", session.PlayerID, status.PlayerID)
+	}
+
+	playersResponse, err := http.Get(testServer.URL + "/admin/players?page=1&pageSize=8")
+	if err != nil {
+		t.Fatalf("request admin players after update: %v", err)
+	}
+	defer playersResponse.Body.Close()
+
+	var playersPayload adminPlayersResponse
+	if err := json.NewDecoder(playersResponse.Body).Decode(&playersPayload); err != nil {
+		t.Fatalf("decode players payload after update: %v", err)
+	}
+
+	if len(playersPayload.Players) != 1 {
+		t.Fatalf("expected 1 player in admin list, got %d", len(playersPayload.Players))
+	}
+	if playersPayload.Players[0].Honey != 275 {
+		t.Fatalf("expected admin list honey 275, got %d", playersPayload.Players[0].Honey)
 	}
 }
 
