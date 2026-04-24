@@ -70,6 +70,12 @@
   cursor: var(--cursor-bee-default);
 }
 
+.viewportGameplay,
+.viewportGameplay * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .viewportGameplay button,
 .viewportGameplay [role="button"],
 .viewportGameplay a {

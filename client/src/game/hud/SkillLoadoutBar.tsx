@@ -16,16 +16,6 @@ function getSkillMap(skillCatalog: SkillCatalogEntry[]): Map<string, SkillCatalo
   return new Map(skillCatalog.map((entry) => [entry.id, entry]));
 }
 
-function getBadgeLabel(skillName: string): string {
-  const letters = skillName
-    .split(" ")
-    .map((segment) => segment.charAt(0).toUpperCase())
-    .join("")
-    .slice(0, 2);
-
-  return letters || "SK";
-}
-
 function renderSkillIcon(skill: SkillCatalogEntry | undefined) {
   if (!skill) {
     return (
@@ -152,26 +142,9 @@ export const SkillLoadoutBar = ({
                 <span className={styles.iconGlyph}>{renderSkillIcon(skill)}</span>
               </div>
 
-              {skill ? (
-                <>
-                  <div className={styles.content}>
-                    <p className={styles.title}>{skill.name}</p>
-                    <p className={styles.meta}>{skill.role}</p>
-                  </div>
-                  <div className={styles.footerRow}>
-                    <span className={styles.badge}>{skill ? getBadgeLabel(skill.name) : `${slotIndex + 1}`}</span>
-                    <p className={styles.action}>{isEditingSkills ? (selectedSkillId ? "Equipar" : "Mover") : "Usar"}</p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p className={styles.empty}>Slot vazio</p>
-                  <div className={styles.footerRow}>
-                    <span className={styles.badge}>{`${slotIndex + 1}`}</span>
-                    <p className={styles.action}>{isEditingSkills ? "Destino" : "Livre"}</p>
-                  </div>
-                </>
-              )}
+              <div className={styles.slotFooter}>
+                <span className={[styles.stateDot, skill ? styles.stateDotFilled : styles.stateDotEmpty].join(" ")} />
+              </div>
             </button>
           );
         })}
