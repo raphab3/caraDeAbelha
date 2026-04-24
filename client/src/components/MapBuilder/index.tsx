@@ -126,7 +126,6 @@ export default function MapBuilder() {
       <MapBuilderLayout
         header={
           <HeaderControls
-            currentTool={editorState.currentTool}
             defaultY={mapInfo.defaultY}
             isFullscreen={isFullscreen}
             isFullscreenSupported={isFullscreenSupported}
@@ -141,7 +140,6 @@ export default function MapBuilder() {
             onToggleFullscreen={() => {
               void toggleFullscreen();
             }}
-            onToolChange={setCurrentTool}
             proceduralSeed={proceduralBase.seed}
           />
         }
