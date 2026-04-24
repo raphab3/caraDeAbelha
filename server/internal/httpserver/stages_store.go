@@ -82,6 +82,14 @@ func newMemoryStageStore() *memoryStageStore {
 	}
 }
 
+func normalizeStageValidationErrors(errors []string) []string {
+	if errors == nil {
+		return []string{}
+	}
+
+	return errors
+}
+
 func (store *sqlStageStore) ListStages(ctx context.Context) ([]adminStageSummary, error) {
 	rows, err := store.db.QueryContext(ctx, `
 		SELECT s.id, s.slug, s.display_name, s.status, COALESCE(s.active_version_id, ''),
@@ -167,6 +175,7 @@ func (store *sqlStageStore) ImportVersion(ctx context.Context, input stageImport
 	if input.Valid {
 		validationStatus = stageValidationValid
 	}
+	validationErrors := normalizeStageValidationErrors(input.Errors)
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO stages (id, slug, display_name, status, created_at, updated_at)
@@ -191,7 +200,7 @@ func (store *sqlStageStore) ImportVersion(ctx context.Context, input stageImport
 		    id, stage_id, version, source_json, checksum, validation_status, validation_errors, created_at
 		) VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8)
 		ON CONFLICT (stage_id, checksum) DO NOTHING`,
-		versionID, input.StageID, nextVersion, string(input.SourceJSON), input.Checksum, validationStatus, pq.Array(input.Errors), now)
+		versionID, input.StageID, nextVersion, string(input.SourceJSON), input.Checksum, validationStatus, pq.Array(validationErrors), now)
 	if err != nil {
 		return adminStageSummary{}, adminStageVersion{}, err
 	}
@@ -415,6 +424,7 @@ func (store *memoryStageStore) ImportVersion(_ context.Context, input stageImpor
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	now := time.Now().UTC()
+	validationErrors := normalizeStageValidationErrors(input.Errors)
 	stage := store.stages[input.StageID]
 	if stage == nil {
 		stage = &memoryStage{summary: adminStageSummary{
@@ -439,7 +449,7 @@ func (store *memoryStageStore) ImportVersion(_ context.Context, input stageImpor
 		Version:          nextVersion,
 		Checksum:         input.Checksum,
 		ValidationStatus: stageValidationInvalid,
-		ValidationErrors: append([]string{}, input.Errors...),
+		ValidationErrors: append([]string{}, validationErrors...),
 		CreatedAt:        now,
 		SourceJSON:       string(input.SourceJSON),
 	}
