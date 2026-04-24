@@ -324,7 +324,7 @@ export function BuilderCanvas() {
   };
 
   const handlePointerStart = (eventTarget: EventTarget | null, pointerId: number, sceneX: number, sceneZ: number) => {
-    const isPaintTool = editorState.currentTool === "paint" || editorState.currentTool === "delete";
+    const isPaintTool = (editorState.currentTool === "paint" || editorState.currentTool === "delete") && !isSpacePanning;
 
     paintStrokeRef.current.active = isPaintTool;
     paintStrokeRef.current.lastCellKey = null;
