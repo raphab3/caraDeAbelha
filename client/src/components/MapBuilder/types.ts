@@ -155,6 +155,7 @@ export interface MapBuilderState {
   setIsPainting: (isPainting: boolean) => void;
   setHoveredCell: (cell: HoveredGridCell | null) => void;
   setSelectedItemId: (itemId: string | null) => void;
+  paintTerrainAt: (input: { x: number; z: number; prefabId: string; mode?: "paint" | "delete" }) => void;
   placeItem: (item: PlaceItemInput) => void;
   removeItem: (id: string) => void;
   updateItem: (id: string, data: UpdatePlacedItemInput) => void;
