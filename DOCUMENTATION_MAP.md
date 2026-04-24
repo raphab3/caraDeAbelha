@@ -36,6 +36,8 @@ Guia para encontrar informação no projeto.
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | Diagrama sistema, data flow, design patterns | Arquitetos, Leads |
 | [TASK_CDAM_01_06_IMPLEMENTATION.md](./TASK_CDAM_01_06_IMPLEMENTATION.md) | Especificação task CDAM-01-06 | Devs frontend |
 | [.specs/features/](./.specs/features/) | Especificações de features em TLC | Todos |
+| [.specs/features/skill-runtime-effects/spec.md](./.specs/features/skill-runtime-effects/spec.md) | Próxima fase das skills: cooldown, feedback visual e projeções runtime | Gameplay, Frontend, Backend |
+| [.specs/features/skill-runtime-effects/tasks.md](./.specs/features/skill-runtime-effects/tasks.md) | Quebra de execução da próxima fase das skills | Implementadores |
 
 ## 🗂️ Por Tópico
 
@@ -86,6 +88,7 @@ cd client && npm run build
 - [PROJECT_STATUS.md](./PROJECT_STATUS.md) - Game mechanics section
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - Configuration section
 - [EPIC1_ACTION_ITEMS.md](./EPIC1_ACTION_ITEMS.md) - Design decisions
+- [.specs/features/skill-runtime-effects/spec.md](./.specs/features/skill-runtime-effects/spec.md) - Runtime jogável das 4 skills atuais
 
 **Balancing constants:**
 ```go
