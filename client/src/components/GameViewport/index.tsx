@@ -89,6 +89,10 @@ const flowerTargetCoreGeometry = new CircleGeometry(0.12, 24);
 const disconnectedBeaconGeometry = new IcosahedronGeometry(0.38, 0);
 const impulseTrailOrbGeometry = new SphereGeometry(0.12, 14, 14);
 const impulseTrailRingGeometry = new RingGeometry(0.18, 0.3, 24);
+const projectileBodyGeometry = new SphereGeometry(0.1, 12, 12);
+const projectileTipGeometry = new ConeGeometry(0.08, 0.28, 16);
+
+projectileTipGeometry.rotateZ(-Math.PI / 2);
 
 beeStingerGeometry.rotateZ(-Math.PI / 2);
 
@@ -850,12 +854,58 @@ function SkillEffectsLayer({ skillEffects, surfaceIndex }: { skillEffects: Skill
   return (
     <group>
       {skillEffects.map((effect) => {
-        if (effect.kind !== "dash") {
-          return null;
+        if (effect.kind === "dash") {
+          return <DashTrailEffect key={effect.id} effect={effect} surfaceIndex={surfaceIndex} />;
         }
 
-        return <DashTrailEffect key={effect.id} effect={effect} surfaceIndex={surfaceIndex} />;
+        if (effect.kind === "projectile") {
+          return <ProjectileSkillEffect key={effect.id} effect={effect} surfaceIndex={surfaceIndex} />;
+        }
+
+        return null;
       })}
+    </group>
+  );
+}
+
+function ProjectileSkillEffect({ effect, surfaceIndex }: { effect: SkillEffectState; surfaceIndex: WorldSurfaceIndex }) {
+  const groupRef = useRef<Group>(null);
+  const directionYaw = useMemo(
+    () => Math.atan2(effect.directionX, effect.directionY) + BEE_MOVEMENT_YAW_OFFSET,
+    [effect.directionX, effect.directionY],
+  );
+
+  useFrame((state) => {
+    if (!groupRef.current) {
+      return;
+    }
+
+    const progress = MathUtils.clamp((Date.now() - effect.startedAt) / Math.max(effect.durationMs, 1), 0, 1);
+    const worldX = MathUtils.lerp(effect.fromX, effect.toX, progress);
+    const worldY = MathUtils.lerp(effect.fromY, effect.toY, progress);
+    const sceneY = resolveBeeSceneHeight(surfaceIndex, worldX, worldY, state.clock.elapsedTime, 0) + 0.28;
+
+    groupRef.current.position.set(toSceneAxis(worldX), sceneY, toSceneAxis(worldY));
+    groupRef.current.rotation.set(0, directionYaw, 0);
+    groupRef.current.scale.setScalar(1 - progress * 0.06);
+  });
+
+  return (
+    <group ref={groupRef} renderOrder={36}>
+      <mesh renderOrder={36}>
+        <primitive attach="geometry" object={projectileBodyGeometry} />
+        <meshBasicMaterial color="#fef08a" transparent opacity={0.92} depthWrite={false} />
+      </mesh>
+
+      <mesh position={[0.18, 0, 0]} renderOrder={37}>
+        <primitive attach="geometry" object={projectileTipGeometry} />
+        <meshBasicMaterial color="#f59e0b" transparent opacity={0.95} depthWrite={false} />
+      </mesh>
+
+      <mesh scale={1.8} renderOrder={35} rotation={[-Math.PI / 2, 0, 0]}>
+        <primitive attach="geometry" object={impulseTrailRingGeometry} />
+        <meshBasicMaterial color="#fde68a" transparent opacity={0.18} depthWrite={false} side={DoubleSide} />
+      </mesh>
     </group>
   );
 }

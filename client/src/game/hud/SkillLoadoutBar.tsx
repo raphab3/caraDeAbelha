@@ -4,6 +4,7 @@ import type { GameSessionController, PlayerProgressState, SkillCatalogEntry } fr
 import styles from "./SkillLoadoutBar.module.css";
 
 export interface SkillLoadoutBarProps {
+  blockedSkillFeedback: { slot: number; reasonCode: string } | undefined;
   gameSessionController: GameSessionController | undefined;
   isEditingSkills: boolean;
   onUseSkill: (slot: number) => void;
@@ -72,6 +73,7 @@ function renderSkillIcon(skill: SkillCatalogEntry | undefined) {
 }
 
 export const SkillLoadoutBar = ({
+  blockedSkillFeedback,
   gameSessionController,
   isEditingSkills,
   onUseSkill,
@@ -142,6 +144,7 @@ export const SkillLoadoutBar = ({
           const runtime = normalizedProgress.skillRuntime[slotIndex];
           const remainingCooldownMs = Math.max(0, runtime.cooldownEndsAt - now);
           const isCooldown = runtime.state === "cooldown" && remainingCooldownMs > 0;
+          const isBlocked = blockedSkillFeedback?.slot === slotIndex;
           const cooldownProgress = isCooldown && skill
             ? Math.min(1, remainingCooldownMs / ({
                 "skill:impulso": 1800,
@@ -157,6 +160,7 @@ export const SkillLoadoutBar = ({
               className={[
                 styles.slot,
                 skill ? styles.slotFilled : "",
+                isBlocked ? styles.slotBlocked : "",
                 isCooldown ? styles.slotCooldown : "",
                 isArmedSlot ? styles.slotArmed : "",
                 !skill ? styles.slotEmpty : "",
@@ -173,6 +177,8 @@ export const SkillLoadoutBar = ({
                 </>
               ) : null}
 
+              {isBlocked ? <span className={styles.blockedFlash} aria-hidden="true" /> : null}
+
               <div className={styles.slotHeader}>
                 <span className={styles.slotIndex}>{`Slot ${slotIndex + 1}`}</span>
                 <span className={styles.hotkeyBadge}>{hotkey}</span>
@@ -186,7 +192,13 @@ export const SkillLoadoutBar = ({
                 <span
                   className={[
                     styles.stateDot,
-                    isCooldown ? styles.stateDotCooldown : skill ? styles.stateDotFilled : styles.stateDotEmpty,
+                    isBlocked
+                      ? styles.stateDotBlocked
+                      : isCooldown
+                        ? styles.stateDotCooldown
+                        : skill
+                          ? styles.stateDotFilled
+                          : styles.stateDotEmpty,
                   ].join(" ")}
                 />
               </div>

@@ -1528,3 +1528,63 @@ func TestWebSocketUseSkillCooldownReturnsStableReasonCode(t *testing.T) {
 		t.Fatalf("expected slot 0 to remain in cooldown, got %q", status.SkillRuntime[0].State)
 	}
 }
+
+func TestWebSocketUseAtirarFerraoEmitsProjectileEffect(t *testing.T) {
+	hub := newGameHub()
+	hub.world = buildTraversableTestWorld()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", hub.handleWebSocket)
+	testServer := httptest.NewServer(mux)
+	defer testServer.Close()
+
+	websocketURL := "ws" + strings.TrimPrefix(testServer.URL, "http") + "/ws"
+	connection := openGameSocket(t, websocketURL, "stinger")
+	defer connection.Close()
+
+	session := readTypedSocketMessage[sessionMessage](t, connection)
+	_ = readTypedSocketMessage[worldStateMessage](t, connection)
+
+	hub.mu.Lock()
+	progress := hub.ensurePlayerProgressLocked(session.PlayerID)
+	progress.OwnedSkillIDs = []string{"skill:atirar-ferrao"}
+	progress.EquippedSkills = []string{"skill:atirar-ferrao", "", "", ""}
+	player := hub.players[session.PlayerID]
+	player.FacingX = 1
+	player.FacingY = 0
+	hub.mu.Unlock()
+
+	if err := connection.WriteJSON(useSkillAction{Type: "use_skill", Slot: 0}); err != nil {
+		t.Fatalf("send use_skill action: %v", err)
+	}
+
+	interaction := readTypedSocketMessage[interactionResultMessage](t, connection)
+	if interaction.Action != "use_skill" || !interaction.Success {
+		t.Fatalf("expected successful use_skill interaction, got action=%q success=%v", interaction.Action, interaction.Success)
+	}
+	if interaction.Reason != "Atirar Ferrão" {
+		t.Fatalf("expected use_skill reason Atirar Ferrão, got %q", interaction.Reason)
+	}
+
+	status := readTypedSocketMessage[playerStatusMessage](t, connection)
+	if status.SkillRuntime[0].State != skillStateCooldown {
+		t.Fatalf("expected slot 0 to enter cooldown, got %q", status.SkillRuntime[0].State)
+	}
+
+	effects := readTypedSocketMessage[skillEffectsMessage](t, connection)
+	if len(effects.Effects) != 1 {
+		t.Fatalf("expected 1 skill effect, got %d", len(effects.Effects))
+	}
+	effect := effects.Effects[0]
+	if effect.Kind != skillEffectKindProjectile {
+		t.Fatalf("expected projectile effect kind, got %q", effect.Kind)
+	}
+	if effect.SkillID != "skill:atirar-ferrao" {
+		t.Fatalf("expected Atirar Ferrão effect, got %q", effect.SkillID)
+	}
+	if effect.ToX <= effect.FromX {
+		t.Fatalf("expected projectile to travel forward, got from=%f to=%f", effect.FromX, effect.ToX)
+	}
+	if effect.DurationMs <= 0 {
+		t.Fatalf("expected projectile duration, got %d", effect.DurationMs)
+	}
+}

@@ -18,11 +18,14 @@ const (
 	useSkillReasonCooldown     = "cooldown_active"
 	useSkillReasonBlockedPath  = "blocked_path"
 	skillEffectKindDash        = "dash"
+	skillEffectKindProjectile  = "projectile"
 	skillEffectStateActive     = "active"
 	impulsoDashDistance        = 1.8
 	impulsoDashMinDistance     = 0.18
 	impulsoDashSampleDistance  = 0.14
 	impulsoDashDuration        = 320 * time.Millisecond
+	ferraoProjectileDistance   = 4.2
+	ferraoProjectileDuration   = 560 * time.Millisecond
 )
 
 func (hub *gameHub) ensurePlayerProgressLocked(playerID string) *loopbase.PlayerProgress {
@@ -606,6 +609,43 @@ func (hub *gameHub) triggerImpulsoLocked(player *playerState, slot int, now time
 	}, true
 }
 
+func (hub *gameHub) triggerAtirarFerraoLocked(player *playerState, slot int, now time.Time) (skillEffectMessage, bool) {
+	if player == nil {
+		return skillEffectMessage{}, false
+	}
+
+	directionX, directionY := hub.resolveSkillDirectionLocked(player)
+	if math.Hypot(directionX, directionY) <= movementStopDistance {
+		return skillEffectMessage{}, false
+	}
+
+	fromX := player.X
+	fromY := player.Y
+	toX, toY := hub.clampWorldPosition(fromX+directionX*ferraoProjectileDistance, fromY+directionY*ferraoProjectileDistance)
+	startedAt := now.UnixMilli()
+	expiresAt := now.Add(ferraoProjectileDuration).UnixMilli()
+	effectID := "skillfx:" + player.ID + ":" + strconv.Itoa(slot) + ":" + strconv.FormatInt(startedAt, 10) + ":ferrao"
+
+	return skillEffectMessage{
+		ID:            effectID,
+		OwnerPlayerID: player.ID,
+		SkillID:       "skill:atirar-ferrao",
+		Slot:          slot,
+		StageID:       player.StageID,
+		Kind:          skillEffectKindProjectile,
+		State:         skillEffectStateActive,
+		FromX:         fromX,
+		FromY:         fromY,
+		ToX:           toX,
+		ToY:           toY,
+		DirectionX:    directionX,
+		DirectionY:    directionY,
+		DurationMs:    int(ferraoProjectileDuration / time.Millisecond),
+		StartedAt:     startedAt,
+		ExpiresAt:     expiresAt,
+	}, true
+}
+
 func (hub *gameHub) clearPlayerRouteLocked(player *playerState) {
 	if player == nil {
 		return
@@ -860,7 +900,8 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 
 	shouldBroadcast := false
 	var skillEffects []skillEffectMessage
-	if skillID == "skill:impulso" {
+	switch skillID {
+	case "skill:impulso":
 		effect, ok := hub.triggerImpulsoLocked(player, slot, now)
 		if !ok {
 			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Sem espaco livre para usar Impulso agora")
@@ -868,6 +909,13 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 		}
 		skillEffects = []skillEffectMessage{effect}
 		shouldBroadcast = true
+	case "skill:atirar-ferrao":
+		effect, ok := hub.triggerAtirarFerraoLocked(player, slot, now)
+		if !ok {
+			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Sem direcao valida para disparar o Ferrão")
+			return false
+		}
+		skillEffects = []skillEffectMessage{effect}
 	}
 
 	progress.SkillRuntime[slot] = loopbase.PlayerSkillRuntime{

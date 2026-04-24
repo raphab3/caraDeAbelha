@@ -7,6 +7,8 @@ import { SkillLoadoutBar } from "./SkillLoadoutBar";
 import { ZoneUnlockPanel } from "./ZoneUnlockPanel";
 import styles from "./GameHUD.module.css";
 
+const BLOCKED_SKILL_REASON_CODES = new Set(["blocked_path", "empty_slot", "invalid_skill", "invalid_slot"]);
+
 export interface GameHUDProps {
   playerProgress: PlayerProgressState | undefined;
   lastInteraction: InteractionResult | undefined;
@@ -65,6 +67,8 @@ export const GameHUD = ({
   const [recordingHotkeySlot, setRecordingHotkeySlot] = useState<number | undefined>(undefined);
   const [selectedSkillId, setSelectedSkillId] = useState<string | undefined>(undefined);
   const [slotHotkeys, setSlotHotkeys] = useState<string[]>(readStoredSlotHotkeys);
+  const [lastRequestedSkillSlot, setLastRequestedSkillSlot] = useState<number | undefined>(undefined);
+  const [blockedSkillFeedback, setBlockedSkillFeedback] = useState<{ slot: number; reasonCode: string } | undefined>(undefined);
 
   const handleCloseShop = () => {
     setIsShopOpen(false);
@@ -74,6 +78,8 @@ export const GameHUD = ({
   };
 
   const handleUseSkill = (slot: number) => {
+    setLastRequestedSkillSlot(slot);
+    setBlockedSkillFeedback(undefined);
     gameSessionController?.sendAction({
       type: "use_skill",
       slot,
@@ -104,6 +110,25 @@ export const GameHUD = ({
   useEffect(() => {
     window.localStorage.setItem(SLOT_HOTKEYS_STORAGE_KEY, JSON.stringify(slotHotkeys));
   }, [slotHotkeys]);
+
+  useEffect(() => {
+    if (lastInteraction?.action !== "use_skill" || lastInteraction.success || lastRequestedSkillSlot === undefined) {
+      return;
+    }
+
+    if (!lastInteraction.reasonCode || !BLOCKED_SKILL_REASON_CODES.has(lastInteraction.reasonCode)) {
+      return;
+    }
+
+    setBlockedSkillFeedback({ slot: lastRequestedSkillSlot, reasonCode: lastInteraction.reasonCode });
+    const timeoutId = window.setTimeout(() => {
+      setBlockedSkillFeedback(undefined);
+    }, 520);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [lastInteraction, lastRequestedSkillSlot]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -201,6 +226,7 @@ export const GameHUD = ({
 
       <div className={styles.bottomLoadout}>
         <SkillLoadoutBar
+          blockedSkillFeedback={blockedSkillFeedback}
           gameSessionController={gameSessionController}
           isEditingSkills={isEditingSkills && isShopOpen}
           onSelectSkill={setSelectedSkillId}
