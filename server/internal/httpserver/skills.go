@@ -14,76 +14,86 @@ const (
 )
 
 type beeSkillDefinition struct {
-	ID        string
-	Name      string
-	Role      string
-	Summary   string
-	CostHoney int
-	BaseCooldownMs     int
-	BasePower          float64
-	MaxUpgradeLevel    int
-	UpgradeCostBase    int
-	UpgradeCostStep    int
+	ID                  string
+	Name                string
+	Role                string
+	Summary             string
+	CostHoney           int
+	BaseCooldownMs      int
+	BasePower           float64
+	BaseDistance        float64
+	MaxUpgradeLevel     int
+	UpgradeCostBase     int
+	UpgradeCostStep     int
 	CooldownStepPercent float64
-	PowerStep          float64
+	PowerStep           float64
+	DistanceStep        float64
 }
 
 var beeSkillCatalog = []beeSkillDefinition{
 	{
-		ID:        "skill:impulso",
-		Name:      "Impulso",
-		Role:      "mobilidade",
-		Summary:   "Arrancada curta para reposicionar a abelha.",
-		CostHoney: 40,
-		BaseCooldownMs:     1800,
-		BasePower:          1,
-		MaxUpgradeLevel:    3,
-		UpgradeCostBase:    35,
-		UpgradeCostStep:    25,
+		ID:                  "skill:impulso",
+		Name:                "Impulso",
+		Role:                "mobilidade",
+		Summary:             "Arrancada curta para reposicionar a abelha.",
+		CostHoney:           40,
+		BaseCooldownMs:      1800,
+		BasePower:           0,
+		BaseDistance:        impulsoDashDistance,
+		MaxUpgradeLevel:     3,
+		UpgradeCostBase:     35,
+		UpgradeCostStep:     25,
 		CooldownStepPercent: 0.12,
-		PowerStep:          0.18,
+		PowerStep:           0,
+		DistanceStep:        0.35,
 	},
 	{
-		ID:        "skill:atirar-ferrao",
-		Name:      "Atirar Ferrão",
-		Role:      "dano",
-		Summary:   "Disparo ofensivo para a futura camada de combate.",
-		CostHoney: 60,
-		BaseCooldownMs:     2500,
-		BasePower:          1,
-		MaxUpgradeLevel:    3,
-		UpgradeCostBase:    45,
-		UpgradeCostStep:    30,
+		ID:                  "skill:atirar-ferrao",
+		Name:                "Atirar Ferrão",
+		Role:                "dano",
+		Summary:             "Disparo ofensivo para a futura camada de combate.",
+		CostHoney:           60,
+		BaseCooldownMs:      2500,
+		BasePower:           1,
+		BaseDistance:        ferraoProjectileDistance,
+		MaxUpgradeLevel:     3,
+		UpgradeCostBase:     45,
+		UpgradeCostStep:     30,
 		CooldownStepPercent: 0.10,
-		PowerStep:          0.22,
+		PowerStep:           0.22,
+		DistanceStep:        0.75,
 	},
 	{
-		ID:        "skill:slime-de-mel",
-		Name:      "Slime de Mel",
-		Role:      "controle",
-		Summary:   "Poça viscosa que prepara lentidão em inimigos.",
-		CostHoney: 80,
-		BaseCooldownMs:     6000,
-		BasePower:          1,
-		MaxUpgradeLevel:    3,
-		UpgradeCostBase:    60,
-		UpgradeCostStep:    40,
+		ID:                  "skill:slime-de-mel",
+		Name:                "Slime de Mel",
+		Role:                "controle",
+		Summary:             "Poça viscosa que prepara lentidão em inimigos.",
+		CostHoney:           80,
+		BaseCooldownMs:      6000,
+		BasePower:           1,
+		BaseDistance:        0,
+		MaxUpgradeLevel:     3,
+		UpgradeCostBase:     60,
+		UpgradeCostStep:     40,
 		CooldownStepPercent: 0.08,
-		PowerStep:          0.20,
+		PowerStep:           0.20,
+		DistanceStep:        0,
 	},
 	{
-		ID:        "skill:flor-de-nectar",
-		Name:      "Flor de Néctar",
-		Role:      "suporte",
-		Summary:   "Broto de néctar para futura cura ou regeneração em área.",
-		CostHoney: 100,
-		BaseCooldownMs:     8000,
-		BasePower:          1,
-		MaxUpgradeLevel:    3,
-		UpgradeCostBase:    75,
-		UpgradeCostStep:    50,
+		ID:                  "skill:flor-de-nectar",
+		Name:                "Flor de Néctar",
+		Role:                "suporte",
+		Summary:             "Broto de néctar para futura cura ou regeneração em área.",
+		CostHoney:           100,
+		BaseCooldownMs:      8000,
+		BasePower:           1,
+		BaseDistance:        0,
+		MaxUpgradeLevel:     3,
+		UpgradeCostBase:     75,
+		UpgradeCostStep:     50,
 		CooldownStepPercent: 0.08,
-		PowerStep:          0.24,
+		PowerStep:           0.24,
+		DistanceStep:        0,
 	},
 }
 
@@ -215,7 +225,7 @@ func skillCooldownForSkillLevel(skillID string, level int) time.Duration {
 func skillPowerForLevel(skillID string, level int) float64 {
 	definition, ok := findBeeSkillDefinition(skillID)
 	if !ok {
-		return 1
+		return 0
 	}
 	if level < 0 {
 		level = 0
@@ -224,6 +234,20 @@ func skillPowerForLevel(skillID string, level int) float64 {
 		level = definition.MaxUpgradeLevel
 	}
 	return definition.BasePower + float64(level)*definition.PowerStep
+}
+
+func skillDistanceForLevel(skillID string, level int) float64 {
+	definition, ok := findBeeSkillDefinition(skillID)
+	if !ok {
+		return 0
+	}
+	if level < 0 {
+		level = 0
+	}
+	if level > definition.MaxUpgradeLevel {
+		level = definition.MaxUpgradeLevel
+	}
+	return definition.BaseDistance + float64(level)*definition.DistanceStep
 }
 
 func nextSkillUpgradeCost(skillID string, level int) (int, bool) {

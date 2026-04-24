@@ -303,6 +303,7 @@ export interface SkillCatalogEntry {
   costHoney: number;
   baseCooldownMs: number;
   basePower: number;
+  baseDistance: number;
   maxUpgradeLevel: number;
 }
 
@@ -312,6 +313,10 @@ export interface SkillUpgradeState {
   maxLevel: number;
   currentCooldownMs: number;
   currentPower: number;
+  currentDistance: number;
+  nextCooldownMs: number;
+  nextPower: number;
+  nextDistance: number;
   nextUpgradeCost: number;
   canUpgrade: boolean;
 }
@@ -337,6 +342,8 @@ export interface SkillEffectState {
   toY: number;
   directionX: number;
   directionY: number;
+  radius: number;
+  power: number;
   durationMs: number;
   startedAt: number;
   expiresAt: number;

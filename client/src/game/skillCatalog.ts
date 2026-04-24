@@ -8,7 +8,8 @@ export const DEFAULT_SKILL_CATALOG: SkillCatalogEntry[] = [
     summary: "Arrancada curta para reposicionar a abelha.",
     costHoney: 40,
     baseCooldownMs: 1800,
-    basePower: 1,
+    basePower: 0,
+    baseDistance: 1.8,
     maxUpgradeLevel: 3,
   },
   {
@@ -19,6 +20,7 @@ export const DEFAULT_SKILL_CATALOG: SkillCatalogEntry[] = [
     costHoney: 60,
     baseCooldownMs: 2500,
     basePower: 1,
+    baseDistance: 4.2,
     maxUpgradeLevel: 3,
   },
   {
@@ -29,6 +31,7 @@ export const DEFAULT_SKILL_CATALOG: SkillCatalogEntry[] = [
     costHoney: 80,
     baseCooldownMs: 6000,
     basePower: 1,
+    baseDistance: 0,
     maxUpgradeLevel: 3,
   },
   {
@@ -39,6 +42,7 @@ export const DEFAULT_SKILL_CATALOG: SkillCatalogEntry[] = [
     costHoney: 100,
     baseCooldownMs: 8000,
     basePower: 1,
+    baseDistance: 0,
     maxUpgradeLevel: 3,
   },
 ];

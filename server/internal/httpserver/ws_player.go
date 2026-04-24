@@ -26,6 +26,10 @@ const (
 	impulsoDashDuration        = 320 * time.Millisecond
 	ferraoProjectileDistance   = 4.2
 	ferraoProjectileDuration   = 560 * time.Millisecond
+	slimeAreaBaseRadius        = 1.15
+	slimeAreaBaseDuration      = 4200 * time.Millisecond
+	florAreaBaseRadius         = 1.3
+	florAreaBaseDuration       = 5200 * time.Millisecond
 )
 
 func (hub *gameHub) ensurePlayerProgressLocked(playerID string) *loopbase.PlayerProgress {
@@ -34,16 +38,16 @@ func (hub *gameHub) ensurePlayerProgressLocked(playerID string) *loopbase.Player
 	}
 
 	progress := &loopbase.PlayerProgress{
-		PlayerID:        playerID,
-		PollenCapacity:  40,
-		Level:           1,
-		SkillPoints:     1,
-		CurrentZoneID:   zones.DefaultCurrentZoneID(),
-		UnlockedZoneIDs: zones.DefaultUnlockedZoneIDs(),
-		OwnedSkillIDs:   []string{},
-		EquippedSkills:  make([]string, skillSlotCount),
+		PlayerID:           playerID,
+		PollenCapacity:     40,
+		Level:              1,
+		SkillPoints:        1,
+		CurrentZoneID:      zones.DefaultCurrentZoneID(),
+		UnlockedZoneIDs:    zones.DefaultUnlockedZoneIDs(),
+		OwnedSkillIDs:      []string{},
+		EquippedSkills:     make([]string, skillSlotCount),
 		SkillUpgradeLevels: map[string]int{},
-		SkillRuntime:    normalizeSkillRuntime(nil, make([]string, skillSlotCount), hub.now()),
+		SkillRuntime:       normalizeSkillRuntime(nil, make([]string, skillSlotCount), hub.now()),
 	}
 
 	hub.playerProgress[playerID] = progress
@@ -531,22 +535,23 @@ func (hub *gameHub) resolveSkillDirectionLocked(player *playerState) (float64, f
 	return 1, 0
 }
 
-func (hub *gameHub) resolveImpulsoDestinationLocked(player *playerState, directionX float64, directionY float64) (float64, float64, bool) {
+func (hub *gameHub) resolveImpulsoDestinationLocked(player *playerState, directionX float64, directionY float64, dashDistance float64) (float64, float64, bool) {
 	if player == nil {
 		return 0, 0, false
 	}
 
-	distanceScale := math.Hypot(directionX, directionY)
-	if distanceScale <= movementStopDistance {
-		distanceScale = 1
+	if dashDistance <= movementStopDistance {
+		dashDistance = impulsoDashDistance
+	}
+
+	directionMagnitude := math.Hypot(directionX, directionY)
+	if directionMagnitude <= movementStopDistance {
 		directionX = 1
 		directionY = 0
 	} else {
-		directionX /= distanceScale
-		directionY /= distanceScale
+		directionX /= directionMagnitude
+		directionY /= directionMagnitude
 	}
-
-	dashDistance := impulsoDashDistance * distanceScale
 
 	lastValidX := player.X
 	lastValidY := player.Y
@@ -585,10 +590,10 @@ func (hub *gameHub) triggerImpulsoLocked(player *playerState, slot int, now time
 	}
 
 	directionX, directionY := hub.resolveSkillDirectionLocked(player)
-	power := skillPowerForLevel("skill:impulso", level)
+	dashDistance := skillDistanceForLevel("skill:impulso", level)
 	fromX := player.X
 	fromY := player.Y
-	toX, toY, ok := hub.resolveImpulsoDestinationLocked(player, directionX*power, directionY*power)
+	toX, toY, ok := hub.resolveImpulsoDestinationLocked(player, directionX, directionY, dashDistance)
 	if !ok {
 		return skillEffectMessage{}, false
 	}
@@ -617,6 +622,8 @@ func (hub *gameHub) triggerImpulsoLocked(player *playerState, slot int, now time
 		ToY:           toY,
 		DirectionX:    directionX,
 		DirectionY:    directionY,
+		Radius:        0,
+		Power:         0,
 		DurationMs:    int(impulsoDashDuration / time.Millisecond),
 		StartedAt:     startedAt,
 		ExpiresAt:     expiresAt,
@@ -636,7 +643,7 @@ func (hub *gameHub) triggerAtirarFerraoLocked(player *playerState, slot int, now
 	fromX := player.X
 	fromY := player.Y
 	power := skillPowerForLevel("skill:atirar-ferrao", level)
-	travelDistance := ferraoProjectileDistance * power
+	travelDistance := skillDistanceForLevel("skill:atirar-ferrao", level)
 	toX, toY := hub.clampWorldPosition(fromX+directionX*travelDistance, fromY+directionY*travelDistance)
 	startedAt := now.UnixMilli()
 	projectileDuration := time.Duration(float64(ferraoProjectileDuration) * (1 + (power-1)*0.3))
@@ -657,7 +664,77 @@ func (hub *gameHub) triggerAtirarFerraoLocked(player *playerState, slot int, now
 		ToY:           toY,
 		DirectionX:    directionX,
 		DirectionY:    directionY,
+		Radius:        0,
+		Power:         power,
 		DurationMs:    int(projectileDuration / time.Millisecond),
+		StartedAt:     startedAt,
+		ExpiresAt:     expiresAt,
+	}, true
+}
+
+func (hub *gameHub) triggerSlimeDeMelLocked(player *playerState, slot int, now time.Time, level int) (skillEffectMessage, bool) {
+	if player == nil {
+		return skillEffectMessage{}, false
+	}
+
+	power := skillPowerForLevel("skill:slime-de-mel", level)
+	radius := slimeAreaBaseRadius * (0.92 + power*0.28)
+	duration := time.Duration(float64(slimeAreaBaseDuration) * (1 + (power-1)*0.4))
+	startedAt := now.UnixMilli()
+	expiresAt := now.Add(duration).UnixMilli()
+	effectID := "skillfx:" + player.ID + ":" + strconv.Itoa(slot) + ":" + strconv.FormatInt(startedAt, 10) + ":slime"
+
+	return skillEffectMessage{
+		ID:            effectID,
+		OwnerPlayerID: player.ID,
+		SkillID:       "skill:slime-de-mel",
+		Slot:          slot,
+		StageID:       player.StageID,
+		Kind:          "ground-area",
+		State:         skillEffectStateActive,
+		FromX:         player.X,
+		FromY:         player.Y,
+		ToX:           player.X,
+		ToY:           player.Y,
+		DirectionX:    0,
+		DirectionY:    0,
+		Radius:        radius,
+		Power:         power,
+		DurationMs:    int(duration / time.Millisecond),
+		StartedAt:     startedAt,
+		ExpiresAt:     expiresAt,
+	}, true
+}
+
+func (hub *gameHub) triggerFlorDeNectarLocked(player *playerState, slot int, now time.Time, level int) (skillEffectMessage, bool) {
+	if player == nil {
+		return skillEffectMessage{}, false
+	}
+
+	power := skillPowerForLevel("skill:flor-de-nectar", level)
+	radius := florAreaBaseRadius * (0.94 + power*0.24)
+	duration := time.Duration(float64(florAreaBaseDuration) * (1 + (power-1)*0.35))
+	startedAt := now.UnixMilli()
+	expiresAt := now.Add(duration).UnixMilli()
+	effectID := "skillfx:" + player.ID + ":" + strconv.Itoa(slot) + ":" + strconv.FormatInt(startedAt, 10) + ":flor"
+
+	return skillEffectMessage{
+		ID:            effectID,
+		OwnerPlayerID: player.ID,
+		SkillID:       "skill:flor-de-nectar",
+		Slot:          slot,
+		StageID:       player.StageID,
+		Kind:          "support-area",
+		State:         skillEffectStateActive,
+		FromX:         player.X,
+		FromY:         player.Y,
+		ToX:           player.X,
+		ToY:           player.Y,
+		DirectionX:    0,
+		DirectionY:    0,
+		Radius:        radius,
+		Power:         power,
+		DurationMs:    int(duration / time.Millisecond),
 		StartedAt:     startedAt,
 		ExpiresAt:     expiresAt,
 	}, true
@@ -986,6 +1063,20 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 		effect, ok := hub.triggerAtirarFerraoLocked(player, slot, now, currentLevel)
 		if !ok {
 			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Sem direcao valida para disparar o Ferrão")
+			return false
+		}
+		skillEffects = []skillEffectMessage{effect}
+	case "skill:slime-de-mel":
+		effect, ok := hub.triggerSlimeDeMelLocked(player, slot, now, currentLevel)
+		if !ok {
+			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Nao foi possivel posicionar o Slime de Mel")
+			return false
+		}
+		skillEffects = []skillEffectMessage{effect}
+	case "skill:flor-de-nectar":
+		effect, ok := hub.triggerFlorDeNectarLocked(player, slot, now, currentLevel)
+		if !ok {
+			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Nao foi possivel florescer Nectar agora")
 			return false
 		}
 		skillEffects = []skillEffectMessage{effect}

@@ -77,6 +77,14 @@ function formatCooldownLabel(cooldownMs: number): string {
   return `${(cooldownMs / 1000).toFixed(cooldownMs >= 10000 ? 0 : 1)}s`;
 }
 
+function formatPowerLabel(power: number): string {
+  return `${power.toFixed(2)}x`;
+}
+
+function formatDistanceLabel(distance: number): string {
+  return `${distance.toFixed(distance >= 10 ? 0 : 1)}m`;
+}
+
 function resolveActionLabel(
   entry: SkillCatalogEntry,
   isEditingSkills: boolean,
@@ -252,6 +260,16 @@ export const SkillShopPanel = ({
   const activeSkillAction = resolveActionLabel(activeSkill, isEditingSkills, normalizedProgress, selectedSkillId);
   const activeSkillUpgrade = normalizedProgress.skillUpgrades.find((entry) => entry.skillId === activeSkill.id);
   const canUpgradeActiveSkill = Boolean(activeSkillOwned && activeSkillUpgrade?.canUpgrade && normalizedProgress.honey >= activeSkillUpgrade.nextUpgradeCost);
+  const currentStats = [
+    { key: "cooldown", label: "Cooldown", value: formatCooldownLabel(activeSkillUpgrade?.currentCooldownMs ?? activeSkill.baseCooldownMs), visible: true },
+    { key: "distance", label: "Distancia", value: formatDistanceLabel(activeSkillUpgrade?.currentDistance ?? activeSkill.baseDistance), visible: (activeSkillUpgrade?.currentDistance ?? activeSkill.baseDistance) > 0 },
+    { key: "power", label: "Power", value: formatPowerLabel(activeSkillUpgrade?.currentPower ?? activeSkill.basePower), visible: (activeSkillUpgrade?.currentPower ?? activeSkill.basePower) > 0 },
+  ].filter((entry) => entry.visible);
+  const nextStats = [
+    { key: "cooldown", label: "Cooldown", value: formatCooldownLabel(activeSkillUpgrade?.nextCooldownMs ?? activeSkill.baseCooldownMs), visible: Boolean(activeSkillUpgrade?.canUpgrade) },
+    { key: "distance", label: "Distancia", value: formatDistanceLabel(activeSkillUpgrade?.nextDistance ?? activeSkill.baseDistance), visible: Boolean(activeSkillUpgrade?.canUpgrade) && (activeSkillUpgrade?.nextDistance ?? activeSkill.baseDistance) > 0 },
+    { key: "power", label: "Power", value: formatPowerLabel(activeSkillUpgrade?.nextPower ?? activeSkill.basePower), visible: Boolean(activeSkillUpgrade?.canUpgrade) && (activeSkillUpgrade?.nextPower ?? activeSkill.basePower) > 0 },
+  ].filter((entry) => entry.visible);
 
   return (
     <section
@@ -357,14 +375,27 @@ export const SkillShopPanel = ({
                 </div>
 
                 <div className={styles.statGrid}>
-                  <div className={styles.statCard}>
-                    <span className={styles.statLabel}>Cooldown</span>
-                    <strong className={styles.statValue}>{formatCooldownLabel(activeSkillUpgrade?.currentCooldownMs ?? activeSkill.baseCooldownMs)}</strong>
-                  </div>
-                  <div className={styles.statCard}>
-                    <span className={styles.statLabel}>Power</span>
-                    <strong className={styles.statValue}>{(activeSkillUpgrade?.currentPower ?? activeSkill.basePower).toFixed(2)}x</strong>
-                  </div>
+                  {currentStats.map((stat) => (
+                    <div key={stat.key} className={styles.statCard}>
+                      <span className={styles.statLabel}>{stat.label}</span>
+                      <strong className={styles.statValue}>{stat.value}</strong>
+                    </div>
+                  ))}
+                </div>
+
+                <div className={styles.previewRow}>
+                  <span className={styles.previewLabel}>Proximo nivel</span>
+                  {activeSkillUpgrade?.canUpgrade ? (
+                    <div className={styles.previewValues}>
+                      {nextStats.map((stat) => (
+                        <span key={stat.key} className={styles.previewValue}>
+                          {`${stat.label} ${stat.value}`}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className={styles.previewLocked}>Sem novos upgrades</span>
+                  )}
                 </div>
               </div>
             ) : null}

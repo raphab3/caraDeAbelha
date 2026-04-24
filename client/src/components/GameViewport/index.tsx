@@ -862,8 +862,61 @@ function SkillEffectsLayer({ skillEffects, surfaceIndex }: { skillEffects: Skill
           return <ProjectileSkillEffect key={effect.id} effect={effect} surfaceIndex={surfaceIndex} />;
         }
 
+        if (effect.kind === "ground-area" || effect.kind === "support-area") {
+          return <AreaSkillEffect key={effect.id} effect={effect} surfaceIndex={surfaceIndex} />;
+        }
+
         return null;
       })}
+    </group>
+  );
+}
+
+function AreaSkillEffect({ effect, surfaceIndex }: { effect: SkillEffectState; surfaceIndex: WorldSurfaceIndex }) {
+  const groupRef = useRef<Group>(null);
+  const isSupport = effect.kind === "support-area";
+  const radiusScene = Math.max(toSceneAxis(effect.radius), 0.55);
+  const position = useMemo(
+    () => [
+      toSceneAxis(effect.toX),
+      resolveTargetMarkerSceneY(surfaceIndex, effect.toX, effect.toY) + 0.03,
+      toSceneAxis(effect.toY),
+    ] as const,
+    [effect.toX, effect.toY, surfaceIndex],
+  );
+  const ringScale = radiusScene * 2.15;
+  const coreScale = radiusScene * 7.8;
+  const pulseScale = radiusScene * 2.65;
+  const ringColor = isSupport ? "#7df9cf" : "#f59e0b";
+  const fillColor = isSupport ? "#86efac" : "#fcd34d";
+
+  useFrame((state) => {
+    if (!groupRef.current) {
+      return;
+    }
+
+    const progress = MathUtils.clamp((Date.now() - effect.startedAt) / Math.max(effect.durationMs, 1), 0, 1);
+    const pulse = 1 + Math.sin(state.clock.elapsedTime * (isSupport ? 2 : 3.2)) * 0.06;
+    groupRef.current.rotation.y = state.clock.elapsedTime * (isSupport ? 0.8 : -1.1);
+    groupRef.current.scale.setScalar(1 - progress * 0.04 + (pulse - 1));
+  });
+
+  return (
+    <group ref={groupRef} position={position} renderOrder={33}>
+      <mesh renderOrder={33} rotation={[-Math.PI / 2, 0, 0]} scale={coreScale}>
+        <primitive attach="geometry" object={moveTargetCoreGeometry} />
+        <meshBasicMaterial color={fillColor} transparent opacity={isSupport ? 0.16 : 0.14} depthWrite={false} />
+      </mesh>
+
+      <mesh renderOrder={34} rotation={[-Math.PI / 2, 0, 0]} scale={ringScale}>
+        <primitive attach="geometry" object={flowerTargetRingGeometry} />
+        <meshBasicMaterial color={ringColor} transparent opacity={0.82} depthWrite={false} side={DoubleSide} />
+      </mesh>
+
+      <mesh renderOrder={32} rotation={[-Math.PI / 2, 0, 0]} scale={pulseScale}>
+        <primitive attach="geometry" object={impulseTrailRingGeometry} />
+        <meshBasicMaterial color={ringColor} transparent opacity={0.18} depthWrite={false} side={DoubleSide} />
+      </mesh>
     </group>
   );
 }

@@ -1436,8 +1436,11 @@ func TestWebSocketUpgradeSkillSendsInteractionAndUpdatedStatus(t *testing.T) {
 	if status.SkillUpgrades[0].CurrentCooldownMs >= 1800 {
 		t.Fatalf("expected reduced cooldown after upgrade, got %d", status.SkillUpgrades[0].CurrentCooldownMs)
 	}
-	if status.SkillUpgrades[0].CurrentPower <= 1 {
-		t.Fatalf("expected improved power after upgrade, got %f", status.SkillUpgrades[0].CurrentPower)
+	if status.SkillUpgrades[0].CurrentPower != 0 {
+		t.Fatalf("expected impulso power to stay hidden at 0, got %f", status.SkillUpgrades[0].CurrentPower)
+	}
+	if status.SkillUpgrades[0].CurrentDistance <= impulsoDashDistance {
+		t.Fatalf("expected improved impulso distance after upgrade, got %f", status.SkillUpgrades[0].CurrentDistance)
 	}
 }
 
@@ -1637,5 +1640,104 @@ func TestWebSocketUseAtirarFerraoEmitsProjectileEffect(t *testing.T) {
 	}
 	if effect.DurationMs <= 0 {
 		t.Fatalf("expected projectile duration, got %d", effect.DurationMs)
+	}
+}
+
+func TestWebSocketUseSlimeDeMelEmitsGroundAreaEffect(t *testing.T) {
+	hub := newGameHub()
+	hub.world = buildTraversableTestWorld()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", hub.handleWebSocket)
+	testServer := httptest.NewServer(mux)
+	defer testServer.Close()
+
+	websocketURL := "ws" + strings.TrimPrefix(testServer.URL, "http") + "/ws"
+	connection := openGameSocket(t, websocketURL, "slime-bee")
+	defer connection.Close()
+
+	session := readTypedSocketMessage[sessionMessage](t, connection)
+	_ = readTypedSocketMessage[worldStateMessage](t, connection)
+
+	hub.mu.Lock()
+	progress := hub.ensurePlayerProgressLocked(session.PlayerID)
+	progress.OwnedSkillIDs = []string{"skill:slime-de-mel"}
+	progress.EquippedSkills = []string{"skill:slime-de-mel", "", "", ""}
+	hub.mu.Unlock()
+
+	if err := connection.WriteJSON(useSkillAction{Type: "use_skill", Slot: 0}); err != nil {
+		t.Fatalf("send use_skill action: %v", err)
+	}
+
+	_ = readTypedSocketMessage[interactionResultMessage](t, connection)
+	_ = readTypedSocketMessage[playerStatusMessage](t, connection)
+	effects := readTypedSocketMessage[skillEffectsMessage](t, connection)
+	if len(effects.Effects) != 1 {
+		t.Fatalf("expected 1 skill effect, got %d", len(effects.Effects))
+	}
+	effect := effects.Effects[0]
+	if effect.Kind != "ground-area" {
+		t.Fatalf("expected ground-area effect kind, got %q", effect.Kind)
+	}
+	if effect.SkillID != "skill:slime-de-mel" {
+		t.Fatalf("expected slime skill id, got %q", effect.SkillID)
+	}
+	if effect.Radius <= 1 {
+		t.Fatalf("expected slime radius above 1 tile, got %f", effect.Radius)
+	}
+	if effect.Power != 1 {
+		t.Fatalf("expected base slime power 1, got %f", effect.Power)
+	}
+	if effect.DurationMs < 4000 {
+		t.Fatalf("expected slime duration near base duration, got %d", effect.DurationMs)
+	}
+	if effect.ToX != effect.FromX || effect.ToY != effect.FromY {
+		t.Fatalf("expected anchored area, got from=(%f,%f) to=(%f,%f)", effect.FromX, effect.FromY, effect.ToX, effect.ToY)
+	}
+}
+
+func TestWebSocketUseFlorDeNectarEmitsSupportAreaEffectWithUpgrade(t *testing.T) {
+	hub := newGameHub()
+	hub.world = buildTraversableTestWorld()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", hub.handleWebSocket)
+	testServer := httptest.NewServer(mux)
+	defer testServer.Close()
+
+	websocketURL := "ws" + strings.TrimPrefix(testServer.URL, "http") + "/ws"
+	connection := openGameSocket(t, websocketURL, "nectar-bee")
+	defer connection.Close()
+
+	session := readTypedSocketMessage[sessionMessage](t, connection)
+	_ = readTypedSocketMessage[worldStateMessage](t, connection)
+
+	hub.mu.Lock()
+	progress := hub.ensurePlayerProgressLocked(session.PlayerID)
+	progress.OwnedSkillIDs = []string{"skill:flor-de-nectar"}
+	progress.SkillUpgradeLevels = map[string]int{"skill:flor-de-nectar": 2}
+	progress.EquippedSkills = []string{"skill:flor-de-nectar", "", "", ""}
+	hub.mu.Unlock()
+
+	if err := connection.WriteJSON(useSkillAction{Type: "use_skill", Slot: 0}); err != nil {
+		t.Fatalf("send use_skill action: %v", err)
+	}
+
+	_ = readTypedSocketMessage[interactionResultMessage](t, connection)
+	_ = readTypedSocketMessage[playerStatusMessage](t, connection)
+	effects := readTypedSocketMessage[skillEffectsMessage](t, connection)
+	if len(effects.Effects) != 1 {
+		t.Fatalf("expected 1 skill effect, got %d", len(effects.Effects))
+	}
+	effect := effects.Effects[0]
+	if effect.Kind != "support-area" {
+		t.Fatalf("expected support-area effect kind, got %q", effect.Kind)
+	}
+	if effect.Power <= 1.2 {
+		t.Fatalf("expected upgraded support power, got %f", effect.Power)
+	}
+	if effect.Radius <= 1.5 {
+		t.Fatalf("expected larger upgraded support radius, got %f", effect.Radius)
+	}
+	if effect.DurationMs <= 5200 {
+		t.Fatalf("expected upgraded support duration above base, got %d", effect.DurationMs)
 	}
 }

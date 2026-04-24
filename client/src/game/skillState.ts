@@ -57,6 +57,10 @@ function normalizeSkillUpgrades(
       maxLevel: typeof entry?.maxLevel === "number" ? entry.maxLevel : (catalogEntry?.maxUpgradeLevel ?? 0),
       currentCooldownMs: typeof entry?.currentCooldownMs === "number" ? entry.currentCooldownMs : (catalogEntry?.baseCooldownMs ?? 0),
       currentPower: typeof entry?.currentPower === "number" ? entry.currentPower : (catalogEntry?.basePower ?? 1),
+      currentDistance: typeof entry?.currentDistance === "number" ? entry.currentDistance : (catalogEntry?.baseDistance ?? 0),
+      nextCooldownMs: typeof entry?.nextCooldownMs === "number" ? entry.nextCooldownMs : (catalogEntry?.baseCooldownMs ?? 0),
+      nextPower: typeof entry?.nextPower === "number" ? entry.nextPower : (catalogEntry?.basePower ?? 1),
+      nextDistance: typeof entry?.nextDistance === "number" ? entry.nextDistance : (catalogEntry?.baseDistance ?? 0),
       nextUpgradeCost: typeof entry?.nextUpgradeCost === "number" ? entry.nextUpgradeCost : 0,
       canUpgrade: typeof entry?.canUpgrade === "boolean" ? entry.canUpgrade : false,
     };

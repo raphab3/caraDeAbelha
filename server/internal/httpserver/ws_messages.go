@@ -168,6 +168,7 @@ type skillCatalogEntryMessage struct {
 	CostHoney       int     `json:"costHoney"`
 	BaseCooldownMs  int     `json:"baseCooldownMs"`
 	BasePower       float64 `json:"basePower"`
+	BaseDistance    float64 `json:"baseDistance"`
 	MaxUpgradeLevel int     `json:"maxUpgradeLevel"`
 }
 
@@ -177,6 +178,10 @@ type skillUpgradeMessage struct {
 	MaxLevel          int     `json:"maxLevel"`
 	CurrentCooldownMs int     `json:"currentCooldownMs"`
 	CurrentPower      float64 `json:"currentPower"`
+	CurrentDistance   float64 `json:"currentDistance"`
+	NextCooldownMs    int     `json:"nextCooldownMs"`
+	NextPower         float64 `json:"nextPower"`
+	NextDistance      float64 `json:"nextDistance"`
 	NextUpgradeCost   int     `json:"nextUpgradeCost"`
 	CanUpgrade        bool    `json:"canUpgrade"`
 }
@@ -202,6 +207,8 @@ type skillEffectMessage struct {
 	ToY           float64 `json:"toY"`
 	DirectionX    float64 `json:"directionX"`
 	DirectionY    float64 `json:"directionY"`
+	Radius        float64 `json:"radius"`
+	Power         float64 `json:"power"`
 	DurationMs    int     `json:"durationMs"`
 	StartedAt     int64   `json:"startedAt"`
 	ExpiresAt     int64   `json:"expiresAt"`
@@ -321,12 +328,20 @@ func buildSkillUpgradeMessage(skillUpgradeLevels map[string]int, ownedSkillIDs [
 		}
 		level := skillUpgradeLevel(skillUpgradeLevels, skillID)
 		nextCost, canUpgrade := nextSkillUpgradeCost(skillID, level)
+		nextLevel := level
+		if canUpgrade {
+			nextLevel = level + 1
+		}
 		message = append(message, skillUpgradeMessage{
 			SkillID:           skillID,
 			Level:             level,
 			MaxLevel:          definition.MaxUpgradeLevel,
 			CurrentCooldownMs: int(skillCooldownForSkillLevel(skillID, level) / time.Millisecond),
 			CurrentPower:      skillPowerForLevel(skillID, level),
+			CurrentDistance:   skillDistanceForLevel(skillID, level),
+			NextCooldownMs:    int(skillCooldownForSkillLevel(skillID, nextLevel) / time.Millisecond),
+			NextPower:         skillPowerForLevel(skillID, nextLevel),
+			NextDistance:      skillDistanceForLevel(skillID, nextLevel),
 			NextUpgradeCost:   nextCost,
 			CanUpgrade:        canUpgrade,
 		})
@@ -372,6 +387,7 @@ func buildSkillCatalogMessage() []skillCatalogEntryMessage {
 			CostHoney:       entry.CostHoney,
 			BaseCooldownMs:  entry.BaseCooldownMs,
 			BasePower:       entry.BasePower,
+			BaseDistance:    entry.BaseDistance,
 			MaxUpgradeLevel: entry.MaxUpgradeLevel,
 		})
 	}
