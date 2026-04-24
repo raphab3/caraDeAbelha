@@ -1,4 +1,5 @@
 import { Clone, useGLTF } from "@react-three/drei";
+import type { ThreeEvent } from "@react-three/fiber";
 
 import { MAP_BUILDER_CATALOG, getMapBuilderCatalogItem } from "./catalog";
 import {
@@ -10,7 +11,7 @@ import type { PlacedItem } from "./types";
 interface PlacedItemsRendererProps {
   currentTool: "paint" | "delete" | "select";
   items: PlacedItem[];
-  onItemPointerDown: (itemId: string) => void;
+  onItemPointerDown: (event: ThreeEvent<PointerEvent>, itemId: string) => void;
   selectedItemId: string | null;
   tileElevationByCell: Map<string, number>;
 }
@@ -50,7 +51,7 @@ function PlacedItemInstance({
   currentTool: "paint" | "delete" | "select";
   isSelected: boolean;
   item: PlacedItem;
-  onItemPointerDown: (itemId: string) => void;
+  onItemPointerDown: (event: ThreeEvent<PointerEvent>, itemId: string) => void;
   tileElevationByCell: Map<string, number>;
 }) {
   const catalogItem = getMapBuilderCatalogItem(item.prefabId);
@@ -64,7 +65,7 @@ function PlacedItemInstance({
     <group
       onPointerDown={(event) => {
         event.stopPropagation();
-        onItemPointerDown(item.id);
+        onItemPointerDown(event, item.id);
       }}
       position={[toSceneAxis(item.x), resolvePlacedItemSceneY(item, tileElevationByCell), toSceneAxis(item.z)]}
       rotation={[0, (item.rotationY * Math.PI) / 180, 0]}

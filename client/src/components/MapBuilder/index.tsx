@@ -4,6 +4,7 @@ import { MAP_BUILDER_CATALOG, getMapBuilderCatalogItem } from "./catalog";
 import { AssetShelf } from "./AssetShelf";
 import { BuilderCanvas } from "./BuilderCanvas";
 import { buildStageExport, buildStageExportFileName, downloadStageExport } from "./exportStage";
+import { FooterToolbar } from "./FooterToolbar";
 import { HeaderControls } from "./HeaderControls";
 import { MapBuilderLayout } from "./MapBuilderLayout";
 import { SelectionInspector } from "./SelectionInspector";
@@ -26,6 +27,7 @@ export default function MapBuilder() {
   const removeItem = useMapBuilderStore((state) => state.removeItem);
   const updateItem = useMapBuilderStore((state) => state.updateItem);
   const generateProceduralBase = useMapBuilderStore((state) => state.generateProceduralBase);
+  const placeItem = useMapBuilderStore((state) => state.placeItem);
 
   const selectedItem = useMemo(
     () => placedItems.find((item) => item.id === editorState.selectedItemId) ?? null,
@@ -91,12 +93,39 @@ export default function MapBuilder() {
     removeItem(selectedItem.id);
   };
 
+  const handleCopySelected = () => {
+    if (!selectedItem) {
+      return;
+    }
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "c", ctrlKey: true }));
+  };
+
+  const handlePasteSelected = () => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "v", ctrlKey: true }));
+  };
+
+  const handleNewItem = () => {
+    const firstItem = MAP_BUILDER_CATALOG[0];
+    if (!firstItem) {
+      return;
+    }
+
+    setCurrentTool("paint");
+    setSelectedAssetType(firstItem.prefabId);
+    placeItem({
+      prefabId: firstItem.prefabId,
+      x: 0,
+      y: mapInfo.defaultY,
+      z: 0,
+      meta: {},
+    });
+  };
+
   return (
     <div ref={targetRef} className="min-h-0 min-w-0 h-full">
       <MapBuilderLayout
         header={
           <HeaderControls
-            currentTool={editorState.currentTool}
             defaultY={mapInfo.defaultY}
             isFullscreen={isFullscreen}
             isFullscreenSupported={isFullscreenSupported}
@@ -111,7 +140,6 @@ export default function MapBuilder() {
             onToggleFullscreen={() => {
               void toggleFullscreen();
             }}
-            onToolChange={setCurrentTool}
             proceduralSeed={proceduralBase.seed}
           />
         }
@@ -139,6 +167,17 @@ export default function MapBuilder() {
             items={MAP_BUILDER_CATALOG}
             onSelect={setSelectedAssetType}
             selectedPrefabId={editorState.selectedAssetType}
+          />
+        }
+        toolbar={
+          <FooterToolbar
+            currentTool={editorState.currentTool}
+            hasSelection={Boolean(selectedItem)}
+            onCopySelected={handleCopySelected}
+            onDeleteSelected={handleDeleteSelectedItem}
+            onNewItem={handleNewItem}
+            onPaste={handlePasteSelected}
+            onToolChange={setCurrentTool}
           />
         }
       />
