@@ -30,6 +30,12 @@ export const validateGameTypes = () => {
     unlockedZoneIds: ["zone_1", "zone_2"],
     ownedSkillIds: ["skill:impulso"],
     equippedSkills: ["skill:impulso", "", "", ""],
+    skillRuntime: [
+      { slot: 0, skillId: "skill:impulso", state: "ready", cooldownEndsAt: 0 },
+      { slot: 1, skillId: "", state: "ready", cooldownEndsAt: 0 },
+      { slot: 2, skillId: "", state: "ready", cooldownEndsAt: 0 },
+      { slot: 3, skillId: "", state: "ready", cooldownEndsAt: 0 },
+    ],
     skillCatalog: DEFAULT_SKILL_CATALOG,
   };
 
@@ -65,6 +71,12 @@ export const validateGameTypes = () => {
     unlockedZoneIds: ["zone_1", "zone_2", "zone_3"],
     ownedSkillIds: ["skill:impulso", "skill:flor-de-nectar"],
     equippedSkills: ["skill:impulso", "", "skill:flor-de-nectar", ""],
+    skillRuntime: [
+      { slot: 0, skillId: "skill:impulso", state: "cooldown", cooldownEndsAt: Date.now() + 1200 },
+      { slot: 1, skillId: "", state: "ready", cooldownEndsAt: 0 },
+      { slot: 2, skillId: "skill:flor-de-nectar", state: "ready", cooldownEndsAt: 0 },
+      { slot: 3, skillId: "", state: "ready", cooldownEndsAt: 0 },
+    ],
     skillCatalog: DEFAULT_SKILL_CATALOG,
   };
 

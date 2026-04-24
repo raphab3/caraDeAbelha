@@ -42,6 +42,12 @@ function createDefaultPlayerProgress() {
     unlockedZoneIds: ["zone:starter_meadow"],
     ownedSkillIds: [],
     equippedSkills: Array.from({ length: SKILL_SLOT_COUNT }, () => ""),
+    skillRuntime: Array.from({ length: SKILL_SLOT_COUNT }, (_, slot) => ({
+      slot,
+      skillId: "",
+      state: "ready" as const,
+      cooldownEndsAt: 0,
+    })),
     skillCatalog: DEFAULT_SKILL_CATALOG,
   });
 }

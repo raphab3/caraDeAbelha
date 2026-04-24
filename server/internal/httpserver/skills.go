@@ -1,6 +1,17 @@
 package httpserver
 
+import (
+	"time"
+
+	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/loopbase"
+)
+
 const skillSlotCount = 4
+
+const (
+	skillStateReady    = "ready"
+	skillStateCooldown = "cooldown"
+)
 
 type beeSkillDefinition struct {
 	ID        string
@@ -101,6 +112,49 @@ func normalizeEquippedSkills(skillSlots []string, ownedSkillIDs []string) []stri
 		}
 
 		normalized[index] = skillID
+	}
+
+	return normalized
+}
+
+func skillCooldownForSkill(skillID string) time.Duration {
+	switch skillID {
+	case "skill:impulso":
+		return 1800 * time.Millisecond
+	case "skill:atirar-ferrao":
+		return 2500 * time.Millisecond
+	case "skill:slime-de-mel":
+		return 6000 * time.Millisecond
+	case "skill:flor-de-nectar":
+		return 8000 * time.Millisecond
+	default:
+		return 2500 * time.Millisecond
+	}
+}
+
+func normalizeSkillRuntime(skillRuntime []loopbase.PlayerSkillRuntime, equippedSkills []string, now time.Time) []loopbase.PlayerSkillRuntime {
+	normalized := make([]loopbase.PlayerSkillRuntime, 0, skillSlotCount)
+	for slot := 0; slot < skillSlotCount; slot++ {
+		skillID := ""
+		if slot < len(equippedSkills) {
+			skillID = equippedSkills[slot]
+		}
+
+		entry := loopbase.PlayerSkillRuntime{
+			Slot:    slot,
+			SkillID: skillID,
+			State:   skillStateReady,
+		}
+
+		if slot < len(skillRuntime) {
+			current := skillRuntime[slot]
+			if current.SkillID == skillID && !current.CooldownEndsAt.IsZero() && current.CooldownEndsAt.After(now) {
+				entry.State = skillStateCooldown
+				entry.CooldownEndsAt = current.CooldownEndsAt
+			}
+		}
+
+		normalized = append(normalized, entry)
 	}
 
 	return normalized

@@ -161,6 +161,13 @@ type skillCatalogEntryMessage struct {
 	CostHoney int    `json:"costHoney"`
 }
 
+type skillRuntimeMessage struct {
+	Slot           int    `json:"slot"`
+	SkillID        string `json:"skillId"`
+	State          string `json:"state"`
+	CooldownEndsAt int64  `json:"cooldownEndsAt"`
+}
+
 // playerStatusMessage contains the player's progression state: pollen, capacity, honey, level, XP, skill points,
 // current zone and unlocked zones. Sent to the player whenever their progress changes.
 // This is the server-authoritative source of truth for player economy stats on the client.
@@ -177,6 +184,7 @@ type playerStatusMessage struct {
 	UnlockedZoneIDs []string                   `json:"unlockedZoneIds"`
 	OwnedSkillIDs   []string                   `json:"ownedSkillIds"`
 	EquippedSkills  []string                   `json:"equippedSkills"`
+	SkillRuntime    []skillRuntimeMessage      `json:"skillRuntime"`
 	SkillCatalog    []skillCatalogEntryMessage `json:"skillCatalog"`
 }
 
@@ -228,12 +236,14 @@ func newPlayerStatusMessage(progress *loopbase.PlayerProgress) playerStatusMessa
 			Type:           "player_status",
 			OwnedSkillIDs:  []string{},
 			EquippedSkills: make([]string, skillSlotCount),
+			SkillRuntime:   buildSkillRuntimeMessage(nil),
 			SkillCatalog:   buildSkillCatalogMessage(),
 		}
 	}
 
 	ownedSkillIDs := normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
 	equippedSkills := normalizeEquippedSkills(progress.EquippedSkills, ownedSkillIDs)
+	progress.SkillRuntime = normalizeSkillRuntime(progress.SkillRuntime, equippedSkills, time.Now())
 
 	return playerStatusMessage{
 		Type:            "player_status",
@@ -248,8 +258,35 @@ func newPlayerStatusMessage(progress *loopbase.PlayerProgress) playerStatusMessa
 		UnlockedZoneIDs: progress.UnlockedZoneIDs,
 		OwnedSkillIDs:   ownedSkillIDs,
 		EquippedSkills:  equippedSkills,
+		SkillRuntime:    buildSkillRuntimeMessage(progress.SkillRuntime),
 		SkillCatalog:    buildSkillCatalogMessage(),
 	}
+}
+
+func buildSkillRuntimeMessage(skillRuntime []loopbase.PlayerSkillRuntime) []skillRuntimeMessage {
+	if len(skillRuntime) == 0 {
+		message := make([]skillRuntimeMessage, 0, skillSlotCount)
+		for slot := 0; slot < skillSlotCount; slot++ {
+			message = append(message, skillRuntimeMessage{Slot: slot, State: skillStateReady})
+		}
+		return message
+	}
+
+	message := make([]skillRuntimeMessage, 0, len(skillRuntime))
+	for _, entry := range skillRuntime {
+		cooldownEndsAt := int64(0)
+		if !entry.CooldownEndsAt.IsZero() {
+			cooldownEndsAt = entry.CooldownEndsAt.UnixMilli()
+		}
+		message = append(message, skillRuntimeMessage{
+			Slot:           entry.Slot,
+			SkillID:        entry.SkillID,
+			State:          entry.State,
+			CooldownEndsAt: cooldownEndsAt,
+		})
+	}
+
+	return message
 }
 
 func buildSkillCatalogMessage() []skillCatalogEntryMessage {

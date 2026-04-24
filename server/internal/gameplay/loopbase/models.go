@@ -2,6 +2,13 @@ package loopbase
 
 import "time"
 
+type PlayerSkillRuntime struct {
+	Slot           int       `json:"slot"`
+	SkillID        string    `json:"skillId"`
+	State          string    `json:"state"`
+	CooldownEndsAt time.Time `json:"cooldownEndsAt"`
+}
+
 // PlayerProgress tracks the player's economy state: pollen carried, capacity, honey accumulated,
 // level, XP, skill points, and zone access.
 // This model is authoritative on the server and sent to the client as player_status.
@@ -17,6 +24,7 @@ type PlayerProgress struct {
 	UnlockedZoneIDs []string  `json:"unlockedZoneIds"`
 	OwnedSkillIDs   []string  `json:"ownedSkillIds"`
 	EquippedSkills  []string  `json:"equippedSkills"`
+	SkillRuntime    []PlayerSkillRuntime `json:"skillRuntime"`
 	UpdatedAt       time.Time `json:"-"`
 }
 

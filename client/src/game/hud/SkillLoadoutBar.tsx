@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { normalizePlayerProgressState } from "../../game/skillState";
 import type { GameSessionController, PlayerProgressState, SkillCatalogEntry } from "../../types/game";
 import styles from "./SkillLoadoutBar.module.css";
@@ -83,8 +84,28 @@ export const SkillLoadoutBar = ({
     return null;
   }
 
+  const [now, setNow] = useState(() => Date.now());
+
   const normalizedProgress = normalizePlayerProgressState(playerProgress);
   const skillMap = getSkillMap(normalizedProgress.skillCatalog);
+
+  useEffect(() => {
+    const hasCooldown = normalizedProgress.skillRuntime.some(
+      (runtime) => runtime.state === "cooldown" && runtime.cooldownEndsAt > now,
+    );
+
+    if (!hasCooldown) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setNow(Date.now());
+    }, 100);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [normalizedProgress.skillRuntime, now]);
 
   const handleSlotClick = (slotIndex: number, equippedSkillId: string) => {
     if (isEditingSkills) {
@@ -118,6 +139,17 @@ export const SkillLoadoutBar = ({
           const skill = equippedSkillId ? skillMap.get(equippedSkillId) : undefined;
           const isArmedSlot = Boolean(selectedSkillId) && isEditingSkills;
           const hotkey = slotHotkeys[slotIndex] ?? `${slotIndex + 1}`;
+          const runtime = normalizedProgress.skillRuntime[slotIndex];
+          const remainingCooldownMs = Math.max(0, runtime.cooldownEndsAt - now);
+          const isCooldown = runtime.state === "cooldown" && remainingCooldownMs > 0;
+          const cooldownProgress = isCooldown && skill
+            ? Math.min(1, remainingCooldownMs / ({
+                "skill:impulso": 1800,
+                "skill:atirar-ferrao": 2500,
+                "skill:slime-de-mel": 6000,
+                "skill:flor-de-nectar": 8000,
+              }[runtime.skillId] ?? 2500))
+            : 0;
 
           return (
             <button
@@ -125,6 +157,7 @@ export const SkillLoadoutBar = ({
               className={[
                 styles.slot,
                 skill ? styles.slotFilled : "",
+                isCooldown ? styles.slotCooldown : "",
                 isArmedSlot ? styles.slotArmed : "",
                 !skill ? styles.slotEmpty : "",
               ].join(" ")}
@@ -133,6 +166,13 @@ export const SkillLoadoutBar = ({
               }}
               type="button"
             >
+              {isCooldown ? (
+                <>
+                  <span className={styles.cooldownOverlay} style={{ transform: `scaleY(${cooldownProgress})` }} />
+                  <span className={styles.cooldownLabel}>{(remainingCooldownMs / 1000).toFixed(1)}</span>
+                </>
+              ) : null}
+
               <div className={styles.slotHeader}>
                 <span className={styles.slotIndex}>{`Slot ${slotIndex + 1}`}</span>
                 <span className={styles.hotkeyBadge}>{hotkey}</span>
@@ -143,7 +183,12 @@ export const SkillLoadoutBar = ({
               </div>
 
               <div className={styles.slotFooter}>
-                <span className={[styles.stateDot, skill ? styles.stateDotFilled : styles.stateDotEmpty].join(" ")} />
+                <span
+                  className={[
+                    styles.stateDot,
+                    isCooldown ? styles.stateDotCooldown : skill ? styles.stateDotFilled : styles.stateDotEmpty,
+                  ].join(" ")}
+                />
               </div>
             </button>
           );

@@ -24,6 +24,7 @@ func (hub *gameHub) ensurePlayerProgressLocked(playerID string) *loopbase.Player
 		UnlockedZoneIDs: zones.DefaultUnlockedZoneIDs(),
 		OwnedSkillIDs:   []string{},
 		EquippedSkills:  make([]string, skillSlotCount),
+		SkillRuntime:    normalizeSkillRuntime(nil, make([]string, skillSlotCount), hub.now()),
 	}
 
 	hub.playerProgress[playerID] = progress
@@ -657,12 +658,14 @@ func (hub *gameHub) equipSkill(clientID string, skillID string, slot int) bool {
 	}
 
 	progress.EquippedSkills = normalizeEquippedSkills(progress.EquippedSkills, progress.OwnedSkillIDs)
+	progress.SkillRuntime = normalizeSkillRuntime(progress.SkillRuntime, progress.EquippedSkills, hub.now())
 	for index, equippedSkillID := range progress.EquippedSkills {
 		if equippedSkillID == skillID {
 			progress.EquippedSkills[index] = ""
 		}
 	}
 	progress.EquippedSkills[slot] = skillID
+	progress.SkillRuntime = normalizeSkillRuntime(progress.SkillRuntime, progress.EquippedSkills, hub.now())
 	progress.UpdatedAt = hub.now()
 
 	hub.sendInteractionResult(client, "equip_skill", true, slot+1, "Skill equipada")
@@ -687,6 +690,7 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 	progress := hub.ensurePlayerProgressLocked(clientID)
 	progress.OwnedSkillIDs = normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
 	progress.EquippedSkills = normalizeEquippedSkills(progress.EquippedSkills, progress.OwnedSkillIDs)
+	progress.SkillRuntime = normalizeSkillRuntime(progress.SkillRuntime, progress.EquippedSkills, hub.now())
 
 	skillID := progress.EquippedSkills[slot]
 	if strings.TrimSpace(skillID) == "" {
@@ -700,6 +704,22 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 		return false
 	}
 
+	runtime := progress.SkillRuntime[slot]
+	if runtime.State == skillStateCooldown && runtime.CooldownEndsAt.After(hub.now()) {
+		hub.sendInteractionResult(client, "use_skill", false, 0, "Skill em cooldown")
+		hub.sendPlayerStatus(client, progress)
+		return false
+	}
+
+	progress.SkillRuntime[slot] = loopbase.PlayerSkillRuntime{
+		Slot:           slot,
+		SkillID:        skillID,
+		State:          skillStateCooldown,
+		CooldownEndsAt: hub.now().Add(skillCooldownForSkill(skillID)),
+	}
+	progress.UpdatedAt = hub.now()
+
 	hub.sendInteractionResult(client, "use_skill", true, slot+1, skill.Name)
+	hub.sendPlayerStatus(client, progress)
 	return false
 }

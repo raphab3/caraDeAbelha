@@ -51,6 +51,10 @@
   border-color: rgba(45, 212, 191, 0.46);
 }
 
+.slotCooldown {
+  border-color: rgba(251, 191, 36, 0.62);
+}
+
 .slotEmpty {
   background:
     radial-gradient(circle at top, rgba(148, 163, 184, 0.12), transparent 42%),
@@ -83,6 +87,38 @@
   border: 2px solid rgba(15, 23, 42, 0.92);
   box-shadow: 0 12px 24px rgba(245, 158, 11, 0.28);
   z-index: 2;
+}
+
+.cooldownOverlay {
+  position: absolute;
+  inset: 0;
+  transform-origin: bottom center;
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.42) 0%, rgba(120, 53, 15, 0.6) 100%);
+  border-radius: inherit;
+  opacity: 0.62;
+  pointer-events: none;
+}
+
+.cooldownLabel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.2rem;
+  min-height: 2.2rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  color: #fef3c7;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .slotIndex {
@@ -148,6 +184,11 @@
 .stateDotFilled {
   background: #22d3ee;
   box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
+}
+
+.stateDotCooldown {
+  background: #fbbf24;
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.12);
 }
 
 .stateDotEmpty {

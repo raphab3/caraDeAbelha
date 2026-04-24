@@ -1428,4 +1428,15 @@ func TestWebSocketUseSkillSendsInteractionResult(t *testing.T) {
 	if interaction.Reason != "Impulso" {
 		t.Fatalf("expected use_skill reason Impulso, got %q", interaction.Reason)
 	}
+
+	status := readTypedSocketMessage[playerStatusMessage](t, connection)
+	if len(status.SkillRuntime) != skillSlotCount {
+		t.Fatalf("expected %d skill runtime entries, got %d", skillSlotCount, len(status.SkillRuntime))
+	}
+	if status.SkillRuntime[0].State != skillStateCooldown {
+		t.Fatalf("expected slot 0 cooldown state, got %q", status.SkillRuntime[0].State)
+	}
+	if status.SkillRuntime[0].CooldownEndsAt == 0 {
+		t.Fatalf("expected slot 0 cooldown end timestamp")
+	}
 }

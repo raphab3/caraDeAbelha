@@ -297,6 +297,13 @@ export interface SkillCatalogEntry {
   costHoney: number;
 }
 
+export interface PlayerSkillRuntimeState {
+  slot: number;
+  skillId: string;
+  state: "ready" | "cooldown";
+  cooldownEndsAt: number;
+}
+
 // Player progression state: economy, levels, zones
 export interface PlayerProgressState {
   pollenCarried: number;
@@ -309,6 +316,7 @@ export interface PlayerProgressState {
   unlockedZoneIds: string[];
   ownedSkillIds: string[];
   equippedSkills: string[];
+  skillRuntime: PlayerSkillRuntimeState[];
   skillCatalog: SkillCatalogEntry[];
 }
 
@@ -351,6 +359,7 @@ export interface PlayerStatusMessage {
   unlockedZoneIds: string[];
   ownedSkillIds: string[];
   equippedSkills: string[];
+  skillRuntime: PlayerSkillRuntimeState[];
   skillCatalog: SkillCatalogEntry[];
 }
 
