@@ -273,6 +273,11 @@ export interface EquipSkillAction {
   slot: number;
 }
 
+export interface UpgradeSkillAction {
+  type: "upgrade_skill";
+  skillId: string;
+}
+
 export interface UseSkillAction {
   type: "use_skill";
   slot: number;
@@ -287,6 +292,7 @@ export type ClientMessage =
   | UnlockZoneAction
   | BuySkillAction
   | EquipSkillAction
+  | UpgradeSkillAction
   | UseSkillAction;
 
 export interface SkillCatalogEntry {
@@ -295,6 +301,19 @@ export interface SkillCatalogEntry {
   role: string;
   summary: string;
   costHoney: number;
+  baseCooldownMs: number;
+  basePower: number;
+  maxUpgradeLevel: number;
+}
+
+export interface SkillUpgradeState {
+  skillId: string;
+  level: number;
+  maxLevel: number;
+  currentCooldownMs: number;
+  currentPower: number;
+  nextUpgradeCost: number;
+  canUpgrade: boolean;
 }
 
 export interface PlayerSkillRuntimeState {
@@ -335,6 +354,7 @@ export interface PlayerProgressState {
   unlockedZoneIds: string[];
   ownedSkillIds: string[];
   equippedSkills: string[];
+  skillUpgrades: SkillUpgradeState[];
   skillRuntime: PlayerSkillRuntimeState[];
   skillCatalog: SkillCatalogEntry[];
 }
@@ -384,6 +404,7 @@ export interface PlayerStatusMessage {
   unlockedZoneIds: string[];
   ownedSkillIds: string[];
   equippedSkills: string[];
+  skillUpgrades: SkillUpgradeState[];
   skillRuntime: PlayerSkillRuntimeState[];
   skillCatalog: SkillCatalogEntry[];
 }

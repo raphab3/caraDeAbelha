@@ -1,5 +1,5 @@
 import { DEFAULT_SKILL_CATALOG, SKILL_SLOT_COUNT } from "./skillCatalog";
-import type { PlayerProgressState, PlayerSkillRuntimeState, PlayerStatusMessage, SkillCatalogEntry } from "../types/game";
+import type { PlayerProgressState, PlayerSkillRuntimeState, PlayerStatusMessage, SkillCatalogEntry, SkillUpgradeState } from "../types/game";
 
 function normalizeSkillCatalog(skillCatalog: SkillCatalogEntry[] | undefined): SkillCatalogEntry[] {
   if (!Array.isArray(skillCatalog) || skillCatalog.length === 0) {
@@ -42,16 +42,39 @@ function normalizeSkillRuntime(skillRuntime: PlayerSkillRuntimeState[] | undefin
   });
 }
 
+function normalizeSkillUpgrades(
+  skillUpgrades: SkillUpgradeState[] | undefined,
+  ownedSkillIds: string[],
+  skillCatalog: SkillCatalogEntry[],
+): SkillUpgradeState[] {
+  return ownedSkillIds.map((skillId) => {
+    const entry = Array.isArray(skillUpgrades) ? skillUpgrades.find((current) => current.skillId === skillId) : undefined;
+    const catalogEntry = skillCatalog.find((current) => current.id === skillId);
+
+    return {
+      skillId,
+      level: typeof entry?.level === "number" ? entry.level : 0,
+      maxLevel: typeof entry?.maxLevel === "number" ? entry.maxLevel : (catalogEntry?.maxUpgradeLevel ?? 0),
+      currentCooldownMs: typeof entry?.currentCooldownMs === "number" ? entry.currentCooldownMs : (catalogEntry?.baseCooldownMs ?? 0),
+      currentPower: typeof entry?.currentPower === "number" ? entry.currentPower : (catalogEntry?.basePower ?? 1),
+      nextUpgradeCost: typeof entry?.nextUpgradeCost === "number" ? entry.nextUpgradeCost : 0,
+      canUpgrade: typeof entry?.canUpgrade === "boolean" ? entry.canUpgrade : false,
+    };
+  });
+}
+
 export function normalizePlayerProgressState(playerProgress: PlayerProgressState): PlayerProgressState {
   const ownedSkillIds = normalizeOwnedSkillIds(playerProgress.ownedSkillIds);
   const equippedSkills = normalizeEquippedSkills(playerProgress.equippedSkills, ownedSkillIds);
+  const skillCatalog = normalizeSkillCatalog(playerProgress.skillCatalog);
 
   return {
     ...playerProgress,
     ownedSkillIds,
     equippedSkills,
+    skillUpgrades: normalizeSkillUpgrades(playerProgress.skillUpgrades, ownedSkillIds, skillCatalog),
     skillRuntime: normalizeSkillRuntime(playerProgress.skillRuntime, equippedSkills),
-    skillCatalog: normalizeSkillCatalog(playerProgress.skillCatalog),
+    skillCatalog,
   };
 }
 
@@ -67,6 +90,7 @@ export function playerProgressFromStatus(message: PlayerStatusMessage): PlayerPr
     unlockedZoneIds: message.unlockedZoneIds,
     ownedSkillIds: message.ownedSkillIds,
     equippedSkills: message.equippedSkills,
+    skillUpgrades: message.skillUpgrades,
     skillRuntime: message.skillRuntime,
     skillCatalog: message.skillCatalog,
   });

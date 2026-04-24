@@ -7,6 +7,9 @@ export const DEFAULT_SKILL_CATALOG: SkillCatalogEntry[] = [
     role: "mobilidade",
     summary: "Arrancada curta para reposicionar a abelha.",
     costHoney: 40,
+    baseCooldownMs: 1800,
+    basePower: 1,
+    maxUpgradeLevel: 3,
   },
   {
     id: "skill:atirar-ferrao",
@@ -14,6 +17,9 @@ export const DEFAULT_SKILL_CATALOG: SkillCatalogEntry[] = [
     role: "dano",
     summary: "Disparo ofensivo para a futura camada de combate.",
     costHoney: 60,
+    baseCooldownMs: 2500,
+    basePower: 1,
+    maxUpgradeLevel: 3,
   },
   {
     id: "skill:slime-de-mel",
@@ -21,6 +27,9 @@ export const DEFAULT_SKILL_CATALOG: SkillCatalogEntry[] = [
     role: "controle",
     summary: "Poça viscosa que prepara lentidão em inimigos.",
     costHoney: 80,
+    baseCooldownMs: 6000,
+    basePower: 1,
+    maxUpgradeLevel: 3,
   },
   {
     id: "skill:flor-de-nectar",
@@ -28,6 +37,9 @@ export const DEFAULT_SKILL_CATALOG: SkillCatalogEntry[] = [
     role: "suporte",
     summary: "Broto de néctar para futura cura ou regeneração em área.",
     costHoney: 100,
+    baseCooldownMs: 8000,
+    basePower: 1,
+    maxUpgradeLevel: 3,
   },
 ];
 

@@ -31,6 +31,9 @@ export const validateGameTypes = () => {
     unlockedZoneIds: ["zone_1", "zone_2"],
     ownedSkillIds: ["skill:impulso"],
     equippedSkills: ["skill:impulso", "", "", ""],
+    skillUpgrades: [
+      { skillId: "skill:impulso", level: 1, maxLevel: 3, currentCooldownMs: 1584, currentPower: 1.18, nextUpgradeCost: 60, canUpgrade: true },
+    ],
     skillRuntime: [
       { slot: 0, skillId: "skill:impulso", state: "ready", cooldownEndsAt: 0 },
       { slot: 1, skillId: "", state: "ready", cooldownEndsAt: 0 },
@@ -73,6 +76,10 @@ export const validateGameTypes = () => {
     unlockedZoneIds: ["zone_1", "zone_2", "zone_3"],
     ownedSkillIds: ["skill:impulso", "skill:flor-de-nectar"],
     equippedSkills: ["skill:impulso", "", "skill:flor-de-nectar", ""],
+    skillUpgrades: [
+      { skillId: "skill:impulso", level: 2, maxLevel: 3, currentCooldownMs: 1368, currentPower: 1.36, nextUpgradeCost: 85, canUpgrade: true },
+      { skillId: "skill:flor-de-nectar", level: 0, maxLevel: 3, currentCooldownMs: 8000, currentPower: 1, nextUpgradeCost: 75, canUpgrade: true },
+    ],
     skillRuntime: [
       { slot: 0, skillId: "skill:impulso", state: "cooldown", cooldownEndsAt: Date.now() + 1200 },
       { slot: 1, skillId: "", state: "ready", cooldownEndsAt: 0 },

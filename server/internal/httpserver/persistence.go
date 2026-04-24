@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"log"
 	"os"
@@ -79,7 +80,7 @@ func (store *sqlPlayerStore) Load(ctx context.Context, profileKey string) (*pers
 	row := store.db.QueryRowContext(
 		ctx,
 		`SELECT player_id, username, COALESCE(current_stage_id, ''), position_x, position_y, speed, pollen_carried, pollen_capacity,
-		        honey, level, xp, skill_points, current_zone_id, unlocked_zone_ids, owned_skill_ids, equipped_skills, last_seen_at
+		        honey, level, xp, skill_points, current_zone_id, unlocked_zone_ids, owned_skill_ids, equipped_skills, skill_upgrade_levels, last_seen_at
 		   FROM game_player_profiles
 		  WHERE profile_key = $1`,
 		profileKey,
@@ -102,6 +103,7 @@ func (store *sqlPlayerStore) Load(ctx context.Context, profileKey string) (*pers
 		unlockedZoneIDs pq.StringArray
 		ownedSkillIDs   pq.StringArray
 		equippedSkills  pq.StringArray
+		skillUpgradeLevelsJSON []byte
 		lastSeenAt      time.Time
 	)
 
@@ -122,6 +124,7 @@ func (store *sqlPlayerStore) Load(ctx context.Context, profileKey string) (*pers
 		&unlockedZoneIDs,
 		&ownedSkillIDs,
 		&equippedSkills,
+		&skillUpgradeLevelsJSON,
 		&lastSeenAt,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -129,6 +132,13 @@ func (store *sqlPlayerStore) Load(ctx context.Context, profileKey string) (*pers
 		}
 
 		return nil, err
+	}
+
+	skillUpgradeLevels := map[string]int{}
+	if len(skillUpgradeLevelsJSON) > 0 {
+		if err := json.Unmarshal(skillUpgradeLevelsJSON, &skillUpgradeLevels); err != nil {
+			return nil, err
+		}
 	}
 
 	return &persistedPlayerRecord{
@@ -156,6 +166,7 @@ func (store *sqlPlayerStore) Load(ctx context.Context, profileKey string) (*pers
 			UnlockedZoneIDs: append([]string{}, unlockedZoneIDs...),
 			OwnedSkillIDs:   normalizeOwnedSkillIDs(append([]string{}, ownedSkillIDs...)),
 			EquippedSkills:  normalizeEquippedSkills(append([]string{}, equippedSkills...), append([]string{}, ownedSkillIDs...)),
+			SkillUpgradeLevels: normalizeSkillUpgradeLevels(skillUpgradeLevels, append([]string{}, ownedSkillIDs...)),
 			UpdatedAt:       lastSeenAt,
 		},
 	}, nil
@@ -166,16 +177,21 @@ func (store *sqlPlayerStore) Save(ctx context.Context, snapshot persistenceSnaps
 		return nil
 	}
 
-	_, err := store.db.ExecContext(
+	skillUpgradeLevelsJSON, err := json.Marshal(normalizeSkillUpgradeLevels(snapshot.Progress.SkillUpgradeLevels, snapshot.Progress.OwnedSkillIDs))
+	if err != nil {
+		return err
+	}
+
+	_, err = store.db.ExecContext(
 		ctx,
 		`INSERT INTO game_player_profiles (
 		    profile_key, player_id, username, position_x, position_y, speed,
 		    pollen_carried, pollen_capacity, honey, level, xp, skill_points,
-		    current_zone_id, unlocked_zone_ids, owned_skill_ids, equipped_skills, current_stage_id, last_seen_at, updated_at
+		    current_zone_id, unlocked_zone_ids, owned_skill_ids, equipped_skills, skill_upgrade_levels, current_stage_id, last_seen_at, updated_at
 		) VALUES (
 		    $1, $2, $3, $4, $5, $6,
 		    $7, $8, $9, $10, $11, $12,
-		    $13, $14, $15, $16, $17, $18, NOW()
+		    $13, $14, $15, $16, $17, $18, $19, NOW()
 		)
 		ON CONFLICT (profile_key) DO UPDATE SET
 		    player_id = EXCLUDED.player_id,
@@ -193,6 +209,7 @@ func (store *sqlPlayerStore) Save(ctx context.Context, snapshot persistenceSnaps
 		    unlocked_zone_ids = EXCLUDED.unlocked_zone_ids,
 		    owned_skill_ids = EXCLUDED.owned_skill_ids,
 		    equipped_skills = EXCLUDED.equipped_skills,
+		    skill_upgrade_levels = EXCLUDED.skill_upgrade_levels,
 		    current_stage_id = EXCLUDED.current_stage_id,
 		    last_seen_at = EXCLUDED.last_seen_at,
 		    updated_at = NOW()`,
@@ -212,6 +229,7 @@ func (store *sqlPlayerStore) Save(ctx context.Context, snapshot persistenceSnaps
 		pq.Array(snapshot.Progress.UnlockedZoneIDs),
 		pq.Array(normalizeOwnedSkillIDs(snapshot.Progress.OwnedSkillIDs)),
 		pq.Array(normalizeEquippedSkills(snapshot.Progress.EquippedSkills, snapshot.Progress.OwnedSkillIDs)),
+		skillUpgradeLevelsJSON,
 		snapshot.Player.StageID,
 		snapshot.Player.LastSeenAt,
 	)

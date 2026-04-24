@@ -154,6 +154,13 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 			shouldBroadcast = hub.equipSkill(client.id, skillID, int(slotValue))
 
+		case "upgrade_skill":
+			skillID, ok := raw["skillId"].(string)
+			if !ok {
+				continue
+			}
+			shouldBroadcast = hub.upgradeSkill(client.id, skillID)
+
 		case "use_skill":
 			slotValue, ok := raw["slot"].(float64)
 			if !ok {

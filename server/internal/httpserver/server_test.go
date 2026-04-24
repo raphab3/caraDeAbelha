@@ -1390,6 +1390,57 @@ func TestWebSocketEquipSkillSendsInteractionAndUpdatedStatus(t *testing.T) {
 	}
 }
 
+func TestWebSocketUpgradeSkillSendsInteractionAndUpdatedStatus(t *testing.T) {
+	hub := newGameHub()
+	hub.world = buildTraversableTestWorld()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", hub.handleWebSocket)
+	testServer := httptest.NewServer(mux)
+	defer testServer.Close()
+
+	websocketURL := "ws" + strings.TrimPrefix(testServer.URL, "http") + "/ws"
+	connection := openGameSocket(t, websocketURL, "upgrader")
+	defer connection.Close()
+
+	session := readTypedSocketMessage[sessionMessage](t, connection)
+	_ = readTypedSocketMessage[worldStateMessage](t, connection)
+
+	hub.mu.Lock()
+	progress := hub.ensurePlayerProgressLocked(session.PlayerID)
+	progress.Honey = 200
+	progress.OwnedSkillIDs = []string{"skill:impulso"}
+	hub.mu.Unlock()
+
+	if err := connection.WriteJSON(upgradeSkillAction{Type: "upgrade_skill", SkillID: "skill:impulso"}); err != nil {
+		t.Fatalf("send upgrade_skill action: %v", err)
+	}
+
+	interaction := readTypedSocketMessage[interactionResultMessage](t, connection)
+	if interaction.Action != "upgrade_skill" || !interaction.Success {
+		t.Fatalf("expected successful upgrade_skill interaction, got action=%q success=%v", interaction.Action, interaction.Success)
+	}
+	if interaction.Amount != 1 {
+		t.Fatalf("expected level 1 after first upgrade, got %d", interaction.Amount)
+	}
+
+	status := readTypedSocketMessage[playerStatusMessage](t, connection)
+	if status.Honey != 165 {
+		t.Fatalf("expected honey 165 after upgrade, got %d", status.Honey)
+	}
+	if len(status.SkillUpgrades) != 1 {
+		t.Fatalf("expected one upgrade entry, got %d", len(status.SkillUpgrades))
+	}
+	if status.SkillUpgrades[0].Level != 1 {
+		t.Fatalf("expected skill level 1, got %d", status.SkillUpgrades[0].Level)
+	}
+	if status.SkillUpgrades[0].CurrentCooldownMs >= 1800 {
+		t.Fatalf("expected reduced cooldown after upgrade, got %d", status.SkillUpgrades[0].CurrentCooldownMs)
+	}
+	if status.SkillUpgrades[0].CurrentPower <= 1 {
+		t.Fatalf("expected improved power after upgrade, got %f", status.SkillUpgrades[0].CurrentPower)
+	}
+}
+
 func TestWebSocketUseSkillSendsInteractionResult(t *testing.T) {
 	hub := newGameHub()
 	hub.world = buildTraversableTestWorld()

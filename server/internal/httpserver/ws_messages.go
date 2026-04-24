@@ -40,6 +40,11 @@ type equipSkillAction struct {
 	Slot    int    `json:"slot"`
 }
 
+type upgradeSkillAction struct {
+	Type    string `json:"type"`
+	SkillID string `json:"skillId"`
+}
+
 type useSkillAction struct {
 	Type string `json:"type"`
 	Slot int    `json:"slot"`
@@ -156,11 +161,24 @@ type worldChunkState struct {
 }
 
 type skillCatalogEntryMessage struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Role      string `json:"role"`
-	Summary   string `json:"summary"`
-	CostHoney int    `json:"costHoney"`
+	ID              string  `json:"id"`
+	Name            string  `json:"name"`
+	Role            string  `json:"role"`
+	Summary         string  `json:"summary"`
+	CostHoney       int     `json:"costHoney"`
+	BaseCooldownMs  int     `json:"baseCooldownMs"`
+	BasePower       float64 `json:"basePower"`
+	MaxUpgradeLevel int     `json:"maxUpgradeLevel"`
+}
+
+type skillUpgradeMessage struct {
+	SkillID           string  `json:"skillId"`
+	Level             int     `json:"level"`
+	MaxLevel          int     `json:"maxLevel"`
+	CurrentCooldownMs int     `json:"currentCooldownMs"`
+	CurrentPower      float64 `json:"currentPower"`
+	NextUpgradeCost   int     `json:"nextUpgradeCost"`
+	CanUpgrade        bool    `json:"canUpgrade"`
 }
 
 type skillRuntimeMessage struct {
@@ -210,6 +228,7 @@ type playerStatusMessage struct {
 	UnlockedZoneIDs []string                   `json:"unlockedZoneIds"`
 	OwnedSkillIDs   []string                   `json:"ownedSkillIds"`
 	EquippedSkills  []string                   `json:"equippedSkills"`
+	SkillUpgrades   []skillUpgradeMessage      `json:"skillUpgrades"`
 	SkillRuntime    []skillRuntimeMessage      `json:"skillRuntime"`
 	SkillCatalog    []skillCatalogEntryMessage `json:"skillCatalog"`
 }
@@ -263,6 +282,7 @@ func newPlayerStatusMessage(progress *loopbase.PlayerProgress) playerStatusMessa
 			Type:           "player_status",
 			OwnedSkillIDs:  []string{},
 			EquippedSkills: make([]string, skillSlotCount),
+			SkillUpgrades:  []skillUpgradeMessage{},
 			SkillRuntime:   buildSkillRuntimeMessage(nil),
 			SkillCatalog:   buildSkillCatalogMessage(),
 		}
@@ -270,6 +290,7 @@ func newPlayerStatusMessage(progress *loopbase.PlayerProgress) playerStatusMessa
 
 	ownedSkillIDs := normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
 	equippedSkills := normalizeEquippedSkills(progress.EquippedSkills, ownedSkillIDs)
+	progress.SkillUpgradeLevels = normalizeSkillUpgradeLevels(progress.SkillUpgradeLevels, ownedSkillIDs)
 	progress.SkillRuntime = normalizeSkillRuntime(progress.SkillRuntime, equippedSkills, time.Now())
 
 	return playerStatusMessage{
@@ -285,9 +306,32 @@ func newPlayerStatusMessage(progress *loopbase.PlayerProgress) playerStatusMessa
 		UnlockedZoneIDs: progress.UnlockedZoneIDs,
 		OwnedSkillIDs:   ownedSkillIDs,
 		EquippedSkills:  equippedSkills,
+		SkillUpgrades:   buildSkillUpgradeMessage(progress.SkillUpgradeLevels, ownedSkillIDs),
 		SkillRuntime:    buildSkillRuntimeMessage(progress.SkillRuntime),
 		SkillCatalog:    buildSkillCatalogMessage(),
 	}
+}
+
+func buildSkillUpgradeMessage(skillUpgradeLevels map[string]int, ownedSkillIDs []string) []skillUpgradeMessage {
+	message := make([]skillUpgradeMessage, 0, len(ownedSkillIDs))
+	for _, skillID := range normalizeOwnedSkillIDs(ownedSkillIDs) {
+		definition, ok := findBeeSkillDefinition(skillID)
+		if !ok {
+			continue
+		}
+		level := skillUpgradeLevel(skillUpgradeLevels, skillID)
+		nextCost, canUpgrade := nextSkillUpgradeCost(skillID, level)
+		message = append(message, skillUpgradeMessage{
+			SkillID:           skillID,
+			Level:             level,
+			MaxLevel:          definition.MaxUpgradeLevel,
+			CurrentCooldownMs: int(skillCooldownForSkillLevel(skillID, level) / time.Millisecond),
+			CurrentPower:      skillPowerForLevel(skillID, level),
+			NextUpgradeCost:   nextCost,
+			CanUpgrade:        canUpgrade,
+		})
+	}
+	return message
 }
 
 func buildSkillRuntimeMessage(skillRuntime []loopbase.PlayerSkillRuntime) []skillRuntimeMessage {
@@ -321,11 +365,14 @@ func buildSkillCatalogMessage() []skillCatalogEntryMessage {
 	message := make([]skillCatalogEntryMessage, 0, len(catalog))
 	for _, entry := range catalog {
 		message = append(message, skillCatalogEntryMessage{
-			ID:        entry.ID,
-			Name:      entry.Name,
-			Role:      entry.Role,
-			Summary:   entry.Summary,
-			CostHoney: entry.CostHoney,
+			ID:              entry.ID,
+			Name:            entry.Name,
+			Role:            entry.Role,
+			Summary:         entry.Summary,
+			CostHoney:       entry.CostHoney,
+			BaseCooldownMs:  entry.BaseCooldownMs,
+			BasePower:       entry.BasePower,
+			MaxUpgradeLevel: entry.MaxUpgradeLevel,
 		})
 	}
 

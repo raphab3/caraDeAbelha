@@ -73,6 +73,10 @@ function isSkillEquipped(equippedSkills: string[], skillId: string): boolean {
   return equippedSkills.includes(skillId);
 }
 
+function formatCooldownLabel(cooldownMs: number): string {
+  return `${(cooldownMs / 1000).toFixed(cooldownMs >= 10000 ? 0 : 1)}s`;
+}
+
 function resolveActionLabel(
   entry: SkillCatalogEntry,
   isEditingSkills: boolean,
@@ -246,6 +250,8 @@ export const SkillShopPanel = ({
   const activeSkillOwned = normalizedProgress.ownedSkillIds.includes(activeSkill.id);
   const activeSkillEquipped = isSkillEquipped(normalizedProgress.equippedSkills, activeSkill.id);
   const activeSkillAction = resolveActionLabel(activeSkill, isEditingSkills, normalizedProgress, selectedSkillId);
+  const activeSkillUpgrade = normalizedProgress.skillUpgrades.find((entry) => entry.skillId === activeSkill.id);
+  const canUpgradeActiveSkill = Boolean(activeSkillOwned && activeSkillUpgrade?.canUpgrade && normalizedProgress.honey >= activeSkillUpgrade.nextUpgradeCost);
 
   return (
     <section
@@ -338,6 +344,31 @@ export const SkillShopPanel = ({
               {activeSkillOwned ? (activeSkillEquipped ? "Comprada e equipada" : "Comprada") : "Ainda nao comprada"}
             </p>
 
+            {activeSkillOwned ? (
+              <div className={styles.upgradeCard}>
+                <div className={styles.upgradeHeader}>
+                  <div>
+                    <p className={styles.upgradeEyebrow}>Upgrade</p>
+                    <p className={styles.upgradeLevel}>{`Nivel ${activeSkillUpgrade?.level ?? 0} de ${activeSkillUpgrade?.maxLevel ?? activeSkill.maxUpgradeLevel}`}</p>
+                  </div>
+                  <span className={styles.upgradePrice}>
+                    {activeSkillUpgrade?.canUpgrade ? `${activeSkillUpgrade.nextUpgradeCost} mel` : "Maximo"}
+                  </span>
+                </div>
+
+                <div className={styles.statGrid}>
+                  <div className={styles.statCard}>
+                    <span className={styles.statLabel}>Cooldown</span>
+                    <strong className={styles.statValue}>{formatCooldownLabel(activeSkillUpgrade?.currentCooldownMs ?? activeSkill.baseCooldownMs)}</strong>
+                  </div>
+                  <div className={styles.statCard}>
+                    <span className={styles.statLabel}>Power</span>
+                    <strong className={styles.statValue}>{(activeSkillUpgrade?.currentPower ?? activeSkill.basePower).toFixed(2)}x</strong>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {isEditingSkills ? (
               <div className={styles.bindings}>
                 {normalizedProgress.equippedSkills.map((equippedSkillId, slotIndex) => (
@@ -378,6 +409,26 @@ export const SkillShopPanel = ({
               >
                 {activeSkillAction.label}
               </button>
+
+              {activeSkillOwned ? (
+                <button
+                  className={[
+                    styles.button,
+                    styles.upgradeButton,
+                    !canUpgradeActiveSkill ? styles.buttonDisabled : "",
+                  ].join(" ")}
+                  disabled={!canUpgradeActiveSkill}
+                  onClick={() => {
+                    gameSessionController?.sendAction({
+                      type: "upgrade_skill",
+                      skillId: activeSkill.id,
+                    });
+                  }}
+                  type="button"
+                >
+                  {activeSkillUpgrade?.canUpgrade ? "Melhorar" : "No maximo"}
+                </button>
+              ) : null}
             </div>
           </div>
         </div>

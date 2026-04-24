@@ -309,6 +309,75 @@
   color: rgba(148, 163, 184, 0.86);
 }
 
+.upgradeCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid rgba(250, 204, 21, 0.22);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, rgba(120, 53, 15, 0.18) 0%, rgba(15, 23, 42, 0.56) 100%);
+}
+
+.upgradeHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.upgradeEyebrow {
+  margin: 0;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(253, 230, 138, 0.88);
+}
+
+.upgradeLevel {
+  margin: 0.18rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 900;
+  color: #fef3c7;
+}
+
+.upgradePrice {
+  font-size: 0.68rem;
+  font-weight: 900;
+  color: #fde68a;
+}
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.statCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid rgba(71, 85, 105, 0.68);
+  border-radius: 0.9rem;
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.statLabel {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.84);
+}
+
+.statValue {
+  font-size: 0.92rem;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
 .actions {
   display: flex;
   align-items: stretch;
@@ -350,6 +419,12 @@
 .buttonSelected {
   border-color: rgba(250, 204, 21, 0.72);
   background: linear-gradient(180deg, rgba(217, 119, 6, 0.3) 0%, rgba(120, 53, 15, 0.5) 100%);
+}
+
+.upgradeButton {
+  border-color: rgba(250, 204, 21, 0.3);
+  background: linear-gradient(180deg, rgba(217, 119, 6, 0.28) 0%, rgba(120, 53, 15, 0.48) 100%);
+  color: #fef3c7;
 }
 
 .toolbar {

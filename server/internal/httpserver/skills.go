@@ -19,6 +19,13 @@ type beeSkillDefinition struct {
 	Role      string
 	Summary   string
 	CostHoney int
+	BaseCooldownMs     int
+	BasePower          float64
+	MaxUpgradeLevel    int
+	UpgradeCostBase    int
+	UpgradeCostStep    int
+	CooldownStepPercent float64
+	PowerStep          float64
 }
 
 var beeSkillCatalog = []beeSkillDefinition{
@@ -28,6 +35,13 @@ var beeSkillCatalog = []beeSkillDefinition{
 		Role:      "mobilidade",
 		Summary:   "Arrancada curta para reposicionar a abelha.",
 		CostHoney: 40,
+		BaseCooldownMs:     1800,
+		BasePower:          1,
+		MaxUpgradeLevel:    3,
+		UpgradeCostBase:    35,
+		UpgradeCostStep:    25,
+		CooldownStepPercent: 0.12,
+		PowerStep:          0.18,
 	},
 	{
 		ID:        "skill:atirar-ferrao",
@@ -35,6 +49,13 @@ var beeSkillCatalog = []beeSkillDefinition{
 		Role:      "dano",
 		Summary:   "Disparo ofensivo para a futura camada de combate.",
 		CostHoney: 60,
+		BaseCooldownMs:     2500,
+		BasePower:          1,
+		MaxUpgradeLevel:    3,
+		UpgradeCostBase:    45,
+		UpgradeCostStep:    30,
+		CooldownStepPercent: 0.10,
+		PowerStep:          0.22,
 	},
 	{
 		ID:        "skill:slime-de-mel",
@@ -42,6 +63,13 @@ var beeSkillCatalog = []beeSkillDefinition{
 		Role:      "controle",
 		Summary:   "Poça viscosa que prepara lentidão em inimigos.",
 		CostHoney: 80,
+		BaseCooldownMs:     6000,
+		BasePower:          1,
+		MaxUpgradeLevel:    3,
+		UpgradeCostBase:    60,
+		UpgradeCostStep:    40,
+		CooldownStepPercent: 0.08,
+		PowerStep:          0.20,
 	},
 	{
 		ID:        "skill:flor-de-nectar",
@@ -49,6 +77,13 @@ var beeSkillCatalog = []beeSkillDefinition{
 		Role:      "suporte",
 		Summary:   "Broto de néctar para futura cura ou regeneração em área.",
 		CostHoney: 100,
+		BaseCooldownMs:     8000,
+		BasePower:          1,
+		MaxUpgradeLevel:    3,
+		UpgradeCostBase:    75,
+		UpgradeCostStep:    50,
+		CooldownStepPercent: 0.08,
+		PowerStep:          0.24,
 	},
 }
 
@@ -118,18 +153,91 @@ func normalizeEquippedSkills(skillSlots []string, ownedSkillIDs []string) []stri
 }
 
 func skillCooldownForSkill(skillID string) time.Duration {
-	switch skillID {
-	case "skill:impulso":
-		return 1800 * time.Millisecond
-	case "skill:atirar-ferrao":
-		return 2500 * time.Millisecond
-	case "skill:slime-de-mel":
-		return 6000 * time.Millisecond
-	case "skill:flor-de-nectar":
-		return 8000 * time.Millisecond
-	default:
+	return skillCooldownForSkillLevel(skillID, 0)
+}
+
+func normalizeSkillUpgradeLevels(skillUpgradeLevels map[string]int, ownedSkillIDs []string) map[string]int {
+	normalized := make(map[string]int)
+	owned := make(map[string]struct{}, len(ownedSkillIDs))
+	for _, skillID := range normalizeOwnedSkillIDs(ownedSkillIDs) {
+		owned[skillID] = struct{}{}
+	}
+
+	for _, definition := range beeSkillCatalog {
+		if _, ok := owned[definition.ID]; !ok {
+			continue
+		}
+		level := 0
+		if skillUpgradeLevels != nil {
+			level = skillUpgradeLevels[definition.ID]
+		}
+		if level < 0 {
+			level = 0
+		}
+		if level > definition.MaxUpgradeLevel {
+			level = definition.MaxUpgradeLevel
+		}
+		normalized[definition.ID] = level
+	}
+
+	return normalized
+}
+
+func skillUpgradeLevel(skillUpgradeLevels map[string]int, skillID string) int {
+	if skillUpgradeLevels == nil {
+		return 0
+	}
+	level := skillUpgradeLevels[skillID]
+	if level < 0 {
+		return 0
+	}
+	return level
+}
+
+func skillCooldownForSkillLevel(skillID string, level int) time.Duration {
+	definition, ok := findBeeSkillDefinition(skillID)
+	if !ok {
 		return 2500 * time.Millisecond
 	}
+	if level < 0 {
+		level = 0
+	}
+	if level > definition.MaxUpgradeLevel {
+		level = definition.MaxUpgradeLevel
+	}
+	reductionMultiplier := 1 - float64(level)*definition.CooldownStepPercent
+	if reductionMultiplier < 0.45 {
+		reductionMultiplier = 0.45
+	}
+	return time.Duration(float64(definition.BaseCooldownMs)*reductionMultiplier) * time.Millisecond
+}
+
+func skillPowerForLevel(skillID string, level int) float64 {
+	definition, ok := findBeeSkillDefinition(skillID)
+	if !ok {
+		return 1
+	}
+	if level < 0 {
+		level = 0
+	}
+	if level > definition.MaxUpgradeLevel {
+		level = definition.MaxUpgradeLevel
+	}
+	return definition.BasePower + float64(level)*definition.PowerStep
+}
+
+func nextSkillUpgradeCost(skillID string, level int) (int, bool) {
+	definition, ok := findBeeSkillDefinition(skillID)
+	if !ok {
+		return 0, false
+	}
+	if level < 0 {
+		level = 0
+	}
+	if level >= definition.MaxUpgradeLevel {
+		return 0, false
+	}
+	return definition.UpgradeCostBase + level*definition.UpgradeCostStep, true
 }
 
 func normalizeSkillRuntime(skillRuntime []loopbase.PlayerSkillRuntime, equippedSkills []string, now time.Time) []loopbase.PlayerSkillRuntime {

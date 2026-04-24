@@ -42,6 +42,7 @@ func (hub *gameHub) ensurePlayerProgressLocked(playerID string) *loopbase.Player
 		UnlockedZoneIDs: zones.DefaultUnlockedZoneIDs(),
 		OwnedSkillIDs:   []string{},
 		EquippedSkills:  make([]string, skillSlotCount),
+		SkillUpgradeLevels: map[string]int{},
 		SkillRuntime:    normalizeSkillRuntime(nil, make([]string, skillSlotCount), hub.now()),
 	}
 
@@ -535,13 +536,25 @@ func (hub *gameHub) resolveImpulsoDestinationLocked(player *playerState, directi
 		return 0, 0, false
 	}
 
+	distanceScale := math.Hypot(directionX, directionY)
+	if distanceScale <= movementStopDistance {
+		distanceScale = 1
+		directionX = 1
+		directionY = 0
+	} else {
+		directionX /= distanceScale
+		directionY /= distanceScale
+	}
+
+	dashDistance := impulsoDashDistance * distanceScale
+
 	lastValidX := player.X
 	lastValidY := player.Y
 	moved := false
-	steps := int(math.Ceil(impulsoDashDistance / impulsoDashSampleDistance))
+	steps := int(math.Ceil(dashDistance / impulsoDashSampleDistance))
 
 	for step := 1; step <= steps; step++ {
-		travel := math.Min(impulsoDashDistance, float64(step)*impulsoDashSampleDistance)
+		travel := math.Min(dashDistance, float64(step)*impulsoDashSampleDistance)
 		candidateX, candidateY := hub.clampWorldPosition(player.X+directionX*travel, player.Y+directionY*travel)
 		if !hub.isTraversableSegmentLocked(player, player.X, player.Y, candidateX, candidateY) {
 			break
@@ -566,15 +579,16 @@ func (hub *gameHub) sendUseSkillFailure(client *clientSession, reasonCode string
 	hub.sendInteractionResultWithCode(client, "use_skill", false, 0, reason, reasonCode)
 }
 
-func (hub *gameHub) triggerImpulsoLocked(player *playerState, slot int, now time.Time) (skillEffectMessage, bool) {
+func (hub *gameHub) triggerImpulsoLocked(player *playerState, slot int, now time.Time, level int) (skillEffectMessage, bool) {
 	if player == nil {
 		return skillEffectMessage{}, false
 	}
 
 	directionX, directionY := hub.resolveSkillDirectionLocked(player)
+	power := skillPowerForLevel("skill:impulso", level)
 	fromX := player.X
 	fromY := player.Y
-	toX, toY, ok := hub.resolveImpulsoDestinationLocked(player, directionX, directionY)
+	toX, toY, ok := hub.resolveImpulsoDestinationLocked(player, directionX*power, directionY*power)
 	if !ok {
 		return skillEffectMessage{}, false
 	}
@@ -609,7 +623,7 @@ func (hub *gameHub) triggerImpulsoLocked(player *playerState, slot int, now time
 	}, true
 }
 
-func (hub *gameHub) triggerAtirarFerraoLocked(player *playerState, slot int, now time.Time) (skillEffectMessage, bool) {
+func (hub *gameHub) triggerAtirarFerraoLocked(player *playerState, slot int, now time.Time, level int) (skillEffectMessage, bool) {
 	if player == nil {
 		return skillEffectMessage{}, false
 	}
@@ -621,9 +635,12 @@ func (hub *gameHub) triggerAtirarFerraoLocked(player *playerState, slot int, now
 
 	fromX := player.X
 	fromY := player.Y
-	toX, toY := hub.clampWorldPosition(fromX+directionX*ferraoProjectileDistance, fromY+directionY*ferraoProjectileDistance)
+	power := skillPowerForLevel("skill:atirar-ferrao", level)
+	travelDistance := ferraoProjectileDistance * power
+	toX, toY := hub.clampWorldPosition(fromX+directionX*travelDistance, fromY+directionY*travelDistance)
 	startedAt := now.UnixMilli()
-	expiresAt := now.Add(ferraoProjectileDuration).UnixMilli()
+	projectileDuration := time.Duration(float64(ferraoProjectileDuration) * (1 + (power-1)*0.3))
+	expiresAt := now.Add(projectileDuration).UnixMilli()
 	effectID := "skillfx:" + player.ID + ":" + strconv.Itoa(slot) + ":" + strconv.FormatInt(startedAt, 10) + ":ferrao"
 
 	return skillEffectMessage{
@@ -640,7 +657,7 @@ func (hub *gameHub) triggerAtirarFerraoLocked(player *playerState, slot int, now
 		ToY:           toY,
 		DirectionX:    directionX,
 		DirectionY:    directionY,
-		DurationMs:    int(ferraoProjectileDuration / time.Millisecond),
+		DurationMs:    int(projectileDuration / time.Millisecond),
 		StartedAt:     startedAt,
 		ExpiresAt:     expiresAt,
 	}, true
@@ -780,6 +797,7 @@ func (hub *gameHub) buySkill(clientID string, skillID string) bool {
 
 	progress := hub.ensurePlayerProgressLocked(clientID)
 	progress.OwnedSkillIDs = normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
+	progress.SkillUpgradeLevels = normalizeSkillUpgradeLevels(progress.SkillUpgradeLevels, progress.OwnedSkillIDs)
 	progress.EquippedSkills = normalizeEquippedSkills(progress.EquippedSkills, progress.OwnedSkillIDs)
 
 	for _, ownedSkillID := range progress.OwnedSkillIDs {
@@ -797,9 +815,61 @@ func (hub *gameHub) buySkill(clientID string, skillID string) bool {
 	progress.Honey -= skill.CostHoney
 	progress.OwnedSkillIDs = append(progress.OwnedSkillIDs, skillID)
 	progress.OwnedSkillIDs = normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
+	progress.SkillUpgradeLevels = normalizeSkillUpgradeLevels(progress.SkillUpgradeLevels, progress.OwnedSkillIDs)
 	progress.UpdatedAt = hub.now()
 
 	hub.sendInteractionResult(client, "buy_skill", true, skill.CostHoney, "Skill comprada")
+	hub.sendPlayerStatus(client, progress)
+	return false
+}
+
+func (hub *gameHub) upgradeSkill(clientID string, skillID string) bool {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	client, ok := hub.clients[clientID]
+	if !ok || client == nil {
+		return false
+	}
+
+	skill, ok := findBeeSkillDefinition(skillID)
+	if !ok {
+		hub.sendInteractionResult(client, "upgrade_skill", false, 0, "Skill invalida")
+		return false
+	}
+
+	progress := hub.ensurePlayerProgressLocked(clientID)
+	progress.OwnedSkillIDs = normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
+	progress.SkillUpgradeLevels = normalizeSkillUpgradeLevels(progress.SkillUpgradeLevels, progress.OwnedSkillIDs)
+
+	owned := false
+	for _, ownedSkillID := range progress.OwnedSkillIDs {
+		if ownedSkillID == skillID {
+			owned = true
+			break
+		}
+	}
+	if !owned {
+		hub.sendInteractionResult(client, "upgrade_skill", false, 0, "Compre a skill antes de melhorar")
+		return false
+	}
+
+	currentLevel := skillUpgradeLevel(progress.SkillUpgradeLevels, skillID)
+	nextCost, canUpgrade := nextSkillUpgradeCost(skillID, currentLevel)
+	if !canUpgrade {
+		hub.sendInteractionResult(client, "upgrade_skill", false, 0, "Skill ja esta no nivel maximo")
+		return false
+	}
+	if progress.Honey < nextCost {
+		hub.sendInteractionResult(client, "upgrade_skill", false, 0, "Mel insuficiente para melhorar")
+		return false
+	}
+
+	progress.Honey -= nextCost
+	progress.SkillUpgradeLevels[skillID] = currentLevel + 1
+	progress.UpdatedAt = hub.now()
+
+	hub.sendInteractionResult(client, "upgrade_skill", true, progress.SkillUpgradeLevels[skillID], skill.Name)
 	hub.sendPlayerStatus(client, progress)
 	return false
 }
@@ -825,6 +895,7 @@ func (hub *gameHub) equipSkill(clientID string, skillID string, slot int) bool {
 
 	progress := hub.ensurePlayerProgressLocked(clientID)
 	progress.OwnedSkillIDs = normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
+	progress.SkillUpgradeLevels = normalizeSkillUpgradeLevels(progress.SkillUpgradeLevels, progress.OwnedSkillIDs)
 
 	owned := false
 	for _, ownedSkillID := range progress.OwnedSkillIDs {
@@ -876,6 +947,7 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 
 	progress := hub.ensurePlayerProgressLocked(clientID)
 	progress.OwnedSkillIDs = normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
+	progress.SkillUpgradeLevels = normalizeSkillUpgradeLevels(progress.SkillUpgradeLevels, progress.OwnedSkillIDs)
 	progress.EquippedSkills = normalizeEquippedSkills(progress.EquippedSkills, progress.OwnedSkillIDs)
 	progress.SkillRuntime = normalizeSkillRuntime(progress.SkillRuntime, progress.EquippedSkills, now)
 
@@ -900,9 +972,10 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 
 	shouldBroadcast := false
 	var skillEffects []skillEffectMessage
+	currentLevel := skillUpgradeLevel(progress.SkillUpgradeLevels, skillID)
 	switch skillID {
 	case "skill:impulso":
-		effect, ok := hub.triggerImpulsoLocked(player, slot, now)
+		effect, ok := hub.triggerImpulsoLocked(player, slot, now, currentLevel)
 		if !ok {
 			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Sem espaco livre para usar Impulso agora")
 			return false
@@ -910,7 +983,7 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 		skillEffects = []skillEffectMessage{effect}
 		shouldBroadcast = true
 	case "skill:atirar-ferrao":
-		effect, ok := hub.triggerAtirarFerraoLocked(player, slot, now)
+		effect, ok := hub.triggerAtirarFerraoLocked(player, slot, now, currentLevel)
 		if !ok {
 			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Sem direcao valida para disparar o Ferrão")
 			return false
@@ -922,7 +995,7 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 		Slot:           slot,
 		SkillID:        skillID,
 		State:          skillStateCooldown,
-		CooldownEndsAt: now.Add(skillCooldownForSkill(skillID)),
+		CooldownEndsAt: now.Add(skillCooldownForSkillLevel(skillID, currentLevel)),
 	}
 	progress.UpdatedAt = now
 

@@ -23,6 +23,7 @@ func TestPlayerStatusMessageStructure(t *testing.T) {
 		UnlockedZoneIDs: []string{"zone-forest", "zone-meadow"},
 		OwnedSkillIDs:   []string{"skill:impulso", "skill:flor-de-nectar"},
 		EquippedSkills:  []string{"skill:impulso", "", "skill:flor-de-nectar", ""},
+		SkillUpgradeLevels: map[string]int{"skill:impulso": 2},
 		UpdatedAt:       time.Now(),
 	}
 
@@ -66,6 +67,9 @@ func TestPlayerStatusMessageStructure(t *testing.T) {
 	}
 	if len(msg.EquippedSkills) != skillSlotCount {
 		t.Errorf("expected %d equipped skill slots, got %d", skillSlotCount, len(msg.EquippedSkills))
+	}
+	if len(msg.SkillUpgrades) != 2 {
+		t.Errorf("expected 2 skill upgrades, got %d", len(msg.SkillUpgrades))
 	}
 	if len(msg.SkillCatalog) != len(beeSkillCatalog) {
 		t.Errorf("expected %d skill catalog entries, got %d", len(beeSkillCatalog), len(msg.SkillCatalog))
@@ -112,6 +116,7 @@ func TestPlayerStatusMessageJSON(t *testing.T) {
 		"unlockedZoneIds": true,
 		"ownedSkillIds":   true,
 		"equippedSkills":  true,
+		"skillUpgrades":   true,
 		"skillCatalog":    true,
 	}
 

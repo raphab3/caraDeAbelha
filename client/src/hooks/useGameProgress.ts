@@ -55,6 +55,7 @@ export function useGameProgress() {
       unlockedZoneIds: ["zone:starter_meadow"],
       ownedSkillIds: [],
       equippedSkills: Array.from({ length: SKILL_SLOT_COUNT }, () => ""),
+      skillUpgrades: [],
       skillRuntime: Array.from({ length: SKILL_SLOT_COUNT }, (_, slot) => ({
         slot,
         skillId: "",
