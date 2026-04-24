@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { WS_URL } from "../game/env";
 import { DEFAULT_SKILL_CATALOG, SKILL_SLOT_COUNT } from "../game/skillCatalog";
+import { normalizePlayerProgressState, playerProgressFromStatus } from "../game/skillState";
 import { WSClient } from "../game/WSClient";
 import type {
   ClientMessage,
@@ -30,7 +31,7 @@ const HIVE_TARGET_SNAP_DISTANCE = 0.65;
 const HIVE_TARGET_GRACE_MS = 1500;
 
 function createDefaultPlayerProgress() {
-  return {
+  return normalizePlayerProgressState({
     pollenCarried: 0,
     pollenCapacity: 40,
     honey: 0,
@@ -42,7 +43,7 @@ function createDefaultPlayerProgress() {
     ownedSkillIds: [],
     equippedSkills: Array.from({ length: SKILL_SLOT_COUNT }, () => ""),
     skillCatalog: DEFAULT_SKILL_CATALOG,
-  };
+  });
 }
 
 function createInitialState(
@@ -312,19 +313,7 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
         if (isPlayerStatusMessage(message)) {
           setGameSession((current) => ({
             ...current,
-            playerProgress: {
-              pollenCarried: message.pollenCarried,
-              pollenCapacity: message.pollenCapacity,
-              honey: message.honey,
-              level: message.level,
-              xp: message.xp,
-              skillPoints: message.skillPoints,
-              currentZoneId: message.currentZoneId,
-              unlockedZoneIds: message.unlockedZoneIds,
-              ownedSkillIds: message.ownedSkillIds,
-              equippedSkills: message.equippedSkills,
-              skillCatalog: message.skillCatalog,
-            },
+            playerProgress: playerProgressFromStatus(message),
           }));
           return;
         }

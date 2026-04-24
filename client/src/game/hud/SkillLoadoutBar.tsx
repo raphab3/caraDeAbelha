@@ -1,3 +1,4 @@
+import { normalizePlayerProgressState } from "../../game/skillState";
 import type { GameSessionController, PlayerProgressState, SkillCatalogEntry } from "../../types/game";
 import styles from "./SkillLoadoutBar.module.css";
 
@@ -32,7 +33,8 @@ export const SkillLoadoutBar = ({
     return null;
   }
 
-  const skillMap = getSkillMap(playerProgress.skillCatalog);
+  const normalizedProgress = normalizePlayerProgressState(playerProgress);
+  const skillMap = getSkillMap(normalizedProgress.skillCatalog);
   const selectedSkill = selectedSkillId ? skillMap.get(selectedSkillId) : undefined;
 
   const handleSlotClick = (slotIndex: number, equippedSkillId: string) => {
@@ -62,7 +64,7 @@ export const SkillLoadoutBar = ({
       </div>
 
       <div className={styles.slots}>
-        {playerProgress.equippedSkills.map((equippedSkillId, slotIndex) => {
+        {normalizedProgress.equippedSkills.map((equippedSkillId, slotIndex) => {
           const skill = equippedSkillId ? skillMap.get(equippedSkillId) : undefined;
           const isArmedSlot = Boolean(selectedSkillId);
 

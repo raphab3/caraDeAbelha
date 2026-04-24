@@ -160,18 +160,18 @@ type skillCatalogEntryMessage struct {
 // current zone and unlocked zones. Sent to the player whenever their progress changes.
 // This is the server-authoritative source of truth for player economy stats on the client.
 type playerStatusMessage struct {
-	Type            string   `json:"type"`
-	PlayerID        string   `json:"playerId"`
-	PollenCarried   int      `json:"pollenCarried"`
-	PollenCapacity  int      `json:"pollenCapacity"`
-	Honey           int      `json:"honey"`
-	Level           int      `json:"level"`
-	XP              int      `json:"xp"`
-	SkillPoints     int      `json:"skillPoints"`
-	CurrentZoneID   string   `json:"currentZoneId"`
-	UnlockedZoneIDs []string `json:"unlockedZoneIds"`
-	OwnedSkillIDs   []string `json:"ownedSkillIds"`
-	EquippedSkills  []string `json:"equippedSkills"`
+	Type            string                     `json:"type"`
+	PlayerID        string                     `json:"playerId"`
+	PollenCarried   int                        `json:"pollenCarried"`
+	PollenCapacity  int                        `json:"pollenCapacity"`
+	Honey           int                        `json:"honey"`
+	Level           int                        `json:"level"`
+	XP              int                        `json:"xp"`
+	SkillPoints     int                        `json:"skillPoints"`
+	CurrentZoneID   string                     `json:"currentZoneId"`
+	UnlockedZoneIDs []string                   `json:"unlockedZoneIds"`
+	OwnedSkillIDs   []string                   `json:"ownedSkillIds"`
+	EquippedSkills  []string                   `json:"equippedSkills"`
 	SkillCatalog    []skillCatalogEntryMessage `json:"skillCatalog"`
 }
 
@@ -220,10 +220,10 @@ type clientSnapshot struct {
 func newPlayerStatusMessage(progress *loopbase.PlayerProgress) playerStatusMessage {
 	if progress == nil {
 		return playerStatusMessage{
-			Type:         "player_status",
-			OwnedSkillIDs: []string{},
+			Type:           "player_status",
+			OwnedSkillIDs:  []string{},
 			EquippedSkills: make([]string, skillSlotCount),
-			SkillCatalog: buildSkillCatalogMessage(),
+			SkillCatalog:   buildSkillCatalogMessage(),
 		}
 	}
 

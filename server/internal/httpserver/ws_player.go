@@ -665,7 +665,7 @@ func (hub *gameHub) equipSkill(clientID string, skillID string, slot int) bool {
 	progress.EquippedSkills[slot] = skillID
 	progress.UpdatedAt = hub.now()
 
-	hub.sendInteractionResult(client, "equip_skill", true, slot + 1, "Skill equipada")
+	hub.sendInteractionResult(client, "equip_skill", true, slot+1, "Skill equipada")
 	hub.sendPlayerStatus(client, progress)
 	return false
 }

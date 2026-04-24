@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { DEFAULT_SKILL_CATALOG, SKILL_SLOT_COUNT } from "../game/skillCatalog";
+import { normalizePlayerProgressState, playerProgressFromStatus } from "../game/skillState";
 import type { InteractionResult, PlayerProgressState, PlayerStatusMessage } from "../types/game";
 
 /**
@@ -17,19 +18,7 @@ export function useGameProgress() {
   // Update progress from player_status message from server
   const updateFromMessage = (message: PlayerStatusMessage | InteractionResult) => {
     if (message.type === "player_status") {
-      setProgress({
-        pollenCarried: message.pollenCarried,
-        pollenCapacity: message.pollenCapacity,
-        honey: message.honey,
-        level: message.level,
-        xp: message.xp,
-        skillPoints: message.skillPoints,
-        currentZoneId: message.currentZoneId,
-        unlockedZoneIds: message.unlockedZoneIds,
-        ownedSkillIds: message.ownedSkillIds,
-        equippedSkills: message.equippedSkills,
-        skillCatalog: message.skillCatalog,
-      });
+      setProgress(playerProgressFromStatus(message));
       return;
     }
 
@@ -55,7 +44,7 @@ export function useGameProgress() {
   }, [lastInteraction]);
 
   return {
-    progress: progress ?? {
+    progress: progress ?? normalizePlayerProgressState({
       pollenCarried: 0,
       pollenCapacity: 40,
       honey: 0,
@@ -67,7 +56,7 @@ export function useGameProgress() {
       ownedSkillIds: [],
       equippedSkills: Array.from({ length: SKILL_SLOT_COUNT }, () => ""),
       skillCatalog: DEFAULT_SKILL_CATALOG,
-    },
+    }),
     lastInteraction,
     updateFromMessage,
   };

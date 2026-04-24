@@ -1,3 +1,4 @@
+import { normalizePlayerProgressState } from "../../game/skillState";
 import type { GameSessionController, PlayerProgressState, SkillCatalogEntry } from "../../types/game";
 import styles from "./SkillShopPanel.module.css";
 
@@ -54,10 +55,11 @@ export const SkillShopPanel = ({
   playerProgress,
   selectedSkillId,
 }: SkillShopPanelProps) => {
-  const firstEmptySlot = findFirstEmptySlot(playerProgress.equippedSkills);
+  const normalizedProgress = normalizePlayerProgressState(playerProgress);
+  const firstEmptySlot = findFirstEmptySlot(normalizedProgress.equippedSkills);
 
   const handleAction = (entry: SkillCatalogEntry) => {
-    const owned = playerProgress.ownedSkillIds.includes(entry.id);
+    const owned = normalizedProgress.ownedSkillIds.includes(entry.id);
     if (!owned) {
       gameSessionController?.sendAction({
         type: "buy_skill",
@@ -95,15 +97,15 @@ export const SkillShopPanel = ({
 
         <div className={styles.honey}>
           <span className={styles.honeyLabel}>Mel</span>
-          <span className={styles.honeyValue}>{playerProgress.honey}</span>
+          <span className={styles.honeyValue}>{normalizedProgress.honey}</span>
         </div>
       </div>
 
       <div className={styles.list}>
-        {playerProgress.skillCatalog.map((entry) => {
-          const owned = playerProgress.ownedSkillIds.includes(entry.id);
-          const equipped = isSkillEquipped(playerProgress.equippedSkills, entry.id);
-          const action = resolveActionLabel(entry, playerProgress, selectedSkillId);
+        {normalizedProgress.skillCatalog.map((entry) => {
+          const owned = normalizedProgress.ownedSkillIds.includes(entry.id);
+          const equipped = isSkillEquipped(normalizedProgress.equippedSkills, entry.id);
+          const action = resolveActionLabel(entry, normalizedProgress, selectedSkillId);
 
           return (
             <article

@@ -159,11 +159,33 @@ export default function PlayerExperience() {
           >
             {isFullscreen ? (
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m15 15 6 6m-6-6v4.8m0-4.8h4.8M9 19.8V15m0 0H4.2M9 15l-6 6M15 4.2V9m0 0h4.8M15 9l6-6M9 4.2V9m0 0H4.2M9 9 3 3"/>
+                <path d="M15 9V3" />
+                <path d="M21 3h-6" />
+                <path d="M9 15v6" />
+                <path d="M3 21h6" />
+                <path d="M21 3l-7 7" />
+                <path d="M3 21l7-7" />
+                <path d="M15 21h6" />
+                <path d="M21 21v-6" />
+                <path d="M3 3h6" />
+                <path d="M3 3v6" />
+                <path d="M21 21l-7-7" />
+                <path d="M3 3l7 7" />
               </svg>
             ) : (
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m21 21-6-6m6 6v-4.8m0 4.8h-4.8M3 16.2V21m0 0h4.8M3 21l6-6M21 7.8V3m0 0h-4.8M21 3l-6 6M3 7.8V3m0 0h4.8M3 3l6 6"/>
+                <path d="M14 10V3" />
+                <path d="M14 3h7" />
+                <path d="M10 14v7" />
+                <path d="M3 21h7" />
+                <path d="M21 3l-8 8" />
+                <path d="M3 21l8-8" />
+                <path d="M14 21h7" />
+                <path d="M21 21v-7" />
+                <path d="M3 3h7" />
+                <path d="M3 3v7" />
+                <path d="M21 21l-8-8" />
+                <path d="M3 3l8 8" />
               </svg>
             )}
           </button>
