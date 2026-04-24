@@ -27,6 +27,12 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     end: true,
   },
   {
+    to: "/admin/stages",
+    label: "Stages",
+    description: "Publicacao sem deploy.",
+    badge: "maps",
+  },
+  {
     to: "/admin/mapas",
     label: "Gerador de mapas",
     description: "Geracao e exportacao.",

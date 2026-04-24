@@ -15,16 +15,16 @@ Spec: `.specs/features/stage-management-runtime/spec.md`
 
 ## Task list
 
-- [ ] `TASK-SMR-01` Criar modelo persistente de stages e stage_versions.
-- [ ] `TASK-SMR-02` Extrair parser/validador reutilizavel de stage JSON.
-- [ ] `TASK-SMR-03` Criar registry de stages e cache de `worldLayout` ativo.
-- [ ] `TASK-SMR-04` Adicionar endpoints admin para listar, importar, validar e exportar stages.
-- [ ] `TASK-SMR-05` Adicionar publicacao, ativacao e rollback de stage version.
-- [ ] `TASK-SMR-06` Criar UI `/admin/stages` para gerenciar stages.
-- [ ] `TASK-SMR-07` Integrar Map Builder Pro com importacao direta no admin.
-- [ ] `TASK-SMR-08` Preparar `stageRuntime` no backend sem habilitar multi-map completo.
-- [ ] `TASK-SMR-09` Persistir stage padrao/ativo no restart e manter fallback por arquivo.
-- [ ] `TASK-SMR-10` Documentar fluxo operacional e criterios de performance.
+- [x] `TASK-SMR-01` Criar modelo persistente de stages e stage_versions.
+- [x] `TASK-SMR-02` Extrair parser/validador reutilizavel de stage JSON.
+- [x] `TASK-SMR-03` Criar registry de stages e cache de `worldLayout` ativo.
+- [x] `TASK-SMR-04` Adicionar endpoints admin para listar, importar, validar e exportar stages.
+- [x] `TASK-SMR-05` Adicionar publicacao, ativacao e rollback de stage version.
+- [x] `TASK-SMR-06` Criar UI `/admin/stages` para gerenciar stages.
+- [x] `TASK-SMR-07` Integrar Map Builder Pro com importacao direta no admin.
+- [x] `TASK-SMR-08` Preparar `stageRuntime` no backend sem habilitar multi-map completo.
+- [x] `TASK-SMR-09` Persistir stage padrao/ativo no restart e manter fallback por arquivo.
+- [x] `TASK-SMR-10` Documentar fluxo operacional e criterios de performance.
 
 ## Detalhamento
 

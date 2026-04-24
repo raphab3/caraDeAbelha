@@ -44,3 +44,7 @@ Pull requests should include a concise summary, test results (`make build`, `mak
 ## Security & Configuration Tips
 
 Do not commit local secrets. Copy environment files from documented examples when available, and keep LAN-specific values such as `LAN_HOST` local to your machine.
+
+## Stage Management
+
+Do not require redeploy for authored maps. New Map Builder output should go through `/admin/stages`, where JSON is validated, versioned, published, and cached as a `worldLayout`. Keep `server/maps/map.json` as fallback only, and avoid parsing stage JSON inside the gameplay loop.

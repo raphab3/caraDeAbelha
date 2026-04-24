@@ -33,35 +33,40 @@ type clientSession struct {
 }
 
 type gameHub struct {
-	mu              sync.Mutex
-	upgrader        websocket.Upgrader
-	clients         map[string]*clientSession
-	players         map[string]*playerState
-	profiles        map[string]*playerState
-	playerProgress  map[string]*loopbase.PlayerProgress // Player economy state: pollen, honey, level, zones
-	playerStore     playerStore
-	world           worldLayout
-	loopbase        *loopbase.LoopBaseService
-	zones           *zones.ZoneService
-	flowerSpawnSlots map[string]flowerSpawnSlot
-	activeFlowers    map[string]*activeFlowerRuntime
-	activeHives      map[string]*activeHiveRuntime
+	mu                sync.Mutex
+	upgrader          websocket.Upgrader
+	clients           map[string]*clientSession
+	players           map[string]*playerState
+	profiles          map[string]*playerState
+	playerProgress    map[string]*loopbase.PlayerProgress // Player economy state: pollen, honey, level, zones
+	playerStore       playerStore
+	stageStore        stageStore
+	stageRegistry     *stageRegistry
+	stageRuntimes     map[string]*stageRuntime
+	world             worldLayout
+	loopbase          *loopbase.LoopBaseService
+	zones             *zones.ZoneService
+	flowerSpawnSlots  map[string]flowerSpawnSlot
+	activeFlowers     map[string]*activeFlowerRuntime
+	activeHives       map[string]*activeHiveRuntime
 	activeCollections map[string]*collectionState
-	random          *rand.Rand
-	tick            uint64
-	now             func() time.Time
-	pingPeriod      time.Duration
-	pongWait        time.Duration
-	writeWait       time.Duration
+	random            *rand.Rand
+	tick              uint64
+	now               func() time.Time
+	pingPeriod        time.Duration
+	pongWait          time.Duration
+	writeWait         time.Duration
 }
 
 func newGameHub() *gameHub {
 	loopbaseService := loopbase.NewLoopBaseService()
 	zonesService := zones.NewZoneService()
-	
+	stageStore := newStageStoreFromEnv()
+	stageRegistry := newStageRegistry(stageStore)
+
 	// Connect zones service to loopbase for zone access validation
 	loopbaseService.SetZoneChecker(zonesService)
-	
+
 	hub := &gameHub{
 		upgrader: websocket.Upgrader{
 			CheckOrigin: func(_ *http.Request) bool {
@@ -73,7 +78,9 @@ func newGameHub() *gameHub {
 		profiles:       make(map[string]*playerState),
 		playerProgress: make(map[string]*loopbase.PlayerProgress),
 		playerStore:    newPlayerStoreFromEnv(),
-		world:          loadWorldLayout(),
+		stageStore:     stageStore,
+		stageRegistry:  stageRegistry,
+		world:          stageRegistry.loadInitialLayout(),
 		loopbase:       loopbaseService,
 		zones:          zonesService,
 		random:         rand.New(rand.NewSource(time.Now().UnixNano())),

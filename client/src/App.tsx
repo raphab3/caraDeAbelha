@@ -8,6 +8,7 @@ import { AdminInfoPanel } from "./components/AdminInfoPanel";
 const MapBuilder = lazy(() => import("./components/MapBuilder"));
 const MapGenerator = lazy(() => import("./components/MapGenerator"));
 const PlayerExperience = lazy(() => import("./components/PlayerExperience"));
+const StageManager = lazy(() => import("./components/StageManager"));
 
 interface RouteFallbackProps {
   title: string;
@@ -86,6 +87,28 @@ function AdminMapBuilderRoute() {
   );
 }
 
+function AdminStagesRoute() {
+  return (
+    <AdminLayout
+      description="Importacao, publicacao e rollback de stages sem deploy."
+      title="Gerenciamento de stages"
+    >
+      <Suspense
+        fallback={
+          <div className="grid min-h-[420px] place-items-center rounded-[28px] border border-white/10 bg-slate-950/70 px-6 text-center text-slate-300">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-200/70">Admin</p>
+              <p className="mt-3 text-base">Carregando stages...</p>
+            </div>
+          </div>
+        }
+      >
+        <StageManager />
+      </Suspense>
+    </AdminLayout>
+  );
+}
+
 export function App() {
   return (
     <Suspense
@@ -99,6 +122,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<PlayerExperience />} />
         <Route path="/admin" element={<AdminToolsRoute />} />
+        <Route path="/admin/stages" element={<AdminStagesRoute />} />
         <Route path="/admin/builder" element={<AdminMapBuilderRoute />} />
         <Route path="/admin/mapas" element={<AdminMapGeneratorRoute />} />
         <Route path="*" element={<Navigate replace to="/" />} />

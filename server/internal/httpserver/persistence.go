@@ -78,7 +78,7 @@ func (store *sqlPlayerStore) Load(ctx context.Context, profileKey string) (*pers
 
 	row := store.db.QueryRowContext(
 		ctx,
-		`SELECT player_id, username, position_x, position_y, speed, pollen_carried, pollen_capacity,
+		`SELECT player_id, username, COALESCE(current_stage_id, ''), position_x, position_y, speed, pollen_carried, pollen_capacity,
 		        honey, level, xp, skill_points, current_zone_id, unlocked_zone_ids, last_seen_at
 		   FROM game_player_profiles
 		  WHERE profile_key = $1`,
@@ -88,6 +88,7 @@ func (store *sqlPlayerStore) Load(ctx context.Context, profileKey string) (*pers
 	var (
 		playerID        string
 		username        string
+		currentStageID  string
 		positionX       float64
 		positionY       float64
 		speed           float64
@@ -105,6 +106,7 @@ func (store *sqlPlayerStore) Load(ctx context.Context, profileKey string) (*pers
 	if err := row.Scan(
 		&playerID,
 		&username,
+		&currentStageID,
 		&positionX,
 		&positionY,
 		&speed,
@@ -131,6 +133,7 @@ func (store *sqlPlayerStore) Load(ctx context.Context, profileKey string) (*pers
 		Player: &playerState{
 			ID:         playerID,
 			Username:   username,
+			StageID:    currentStageID,
 			X:          positionX,
 			Y:          positionY,
 			Speed:      speed,
@@ -162,11 +165,11 @@ func (store *sqlPlayerStore) Save(ctx context.Context, snapshot persistenceSnaps
 		`INSERT INTO game_player_profiles (
 		    profile_key, player_id, username, position_x, position_y, speed,
 		    pollen_carried, pollen_capacity, honey, level, xp, skill_points,
-		    current_zone_id, unlocked_zone_ids, last_seen_at, updated_at
+		    current_zone_id, unlocked_zone_ids, current_stage_id, last_seen_at, updated_at
 		) VALUES (
 		    $1, $2, $3, $4, $5, $6,
 		    $7, $8, $9, $10, $11, $12,
-		    $13, $14, $15, NOW()
+		    $13, $14, $15, $16, NOW()
 		)
 		ON CONFLICT (profile_key) DO UPDATE SET
 		    player_id = EXCLUDED.player_id,
@@ -182,6 +185,7 @@ func (store *sqlPlayerStore) Save(ctx context.Context, snapshot persistenceSnaps
 		    skill_points = EXCLUDED.skill_points,
 		    current_zone_id = EXCLUDED.current_zone_id,
 		    unlocked_zone_ids = EXCLUDED.unlocked_zone_ids,
+		    current_stage_id = EXCLUDED.current_stage_id,
 		    last_seen_at = EXCLUDED.last_seen_at,
 		    updated_at = NOW()`,
 		snapshot.ProfileKey,
@@ -198,6 +202,7 @@ func (store *sqlPlayerStore) Save(ctx context.Context, snapshot persistenceSnaps
 		snapshot.Progress.SkillPoints,
 		snapshot.Progress.CurrentZoneID,
 		pq.Array(snapshot.Progress.UnlockedZoneIDs),
+		snapshot.Player.StageID,
 		snapshot.Player.LastSeenAt,
 	)
 

@@ -139,6 +139,18 @@ docker compose ps
 - Backend: http://localhost:8080
 - Health check: http://localhost:8080/healthz
 
+## 🗺️ Gerenciamento de Stages
+
+Stages criados no Map Builder Pro podem ser enviados para o admin sem substituir `server/maps/map.json`:
+
+- Acesse `/admin/builder` e use `Salvar no admin` para importar o JSON gerado.
+- Acesse `/admin/stages` para listar, publicar, ativar, exportar, arquivar ou fazer rollback.
+- Com `DATABASE_URL` configurado, stages e versoes ficam persistidos no Postgres.
+- Sem banco configurado, o servidor usa um store em memoria para desenvolvimento e continua caindo no fallback `server/maps/map.json` no restart.
+- O JSON e validado e compilado para `worldLayout` na importacao/publicacao; o loop de jogo usa o layout ativo cacheado em memoria.
+
+O MVP mantém um stage ativo global, mas o backend ja carrega `stageId` e prepara `stageRuntime` para evoluir para jogadores em mapas diferentes.
+
 ## 🌐 Testar em Rede Local
 
 1. Descubra o IP: `hostname -I` ou `ip addr`

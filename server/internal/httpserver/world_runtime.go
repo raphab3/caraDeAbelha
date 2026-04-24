@@ -176,6 +176,35 @@ func (hub *gameHub) initializeWorldEntities() {
 	}
 
 	hub.ensureCollectorHive()
+	hub.syncDefaultStageRuntimeLocked()
+}
+
+func (hub *gameHub) syncDefaultStageRuntimeLocked() {
+	if hub == nil {
+		return
+	}
+
+	stageID := hub.world.stageID
+	if stageID == "" {
+		stageID = "stage:fallback"
+	}
+
+	versionID := ""
+	if hub.stageRegistry != nil {
+		versionID = hub.stageRegistry.activeVersionID()
+	}
+
+	hub.stageRuntimes = map[string]*stageRuntime{
+		stageID: {
+			stageID:     stageID,
+			versionID:   versionID,
+			layout:      hub.world,
+			players:     hub.players,
+			flowers:     hub.activeFlowers,
+			hives:       hub.activeHives,
+			collections: hub.activeCollections,
+		},
+	}
 }
 
 func (hub *gameHub) buildVisibleChunksLocked(centerChunkX int, centerChunkY int) []worldChunkState {

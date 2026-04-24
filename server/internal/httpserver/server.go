@@ -26,6 +26,9 @@ func NewHandler() http.Handler {
 
 	mux.HandleFunc("/ws", gameHub.handleWebSocket)
 	mux.HandleFunc("/admin/players", gameHub.handleAdminPlayers)
+	mux.HandleFunc("/admin/stages", gameHub.handleAdminStages)
+	mux.HandleFunc("/admin/stages/", gameHub.handleAdminStages)
+	mux.HandleFunc("/admin/stage-versions/", gameHub.handleAdminStages)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {

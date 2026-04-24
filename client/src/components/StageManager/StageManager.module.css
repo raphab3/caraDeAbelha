@@ -1,0 +1,172 @@
+.root {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.toolbar {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  background: rgba(2, 6, 23, 0.45);
+  box-shadow: 0 20px 44px rgba(2, 6, 23, 0.24);
+}
+
+.textarea {
+  min-height: 220px;
+  resize: vertical;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  background: rgba(2, 6, 23, 0.72);
+  color: #f8fafc;
+  font: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  outline: none;
+}
+
+.textarea:focus {
+  border-color: rgba(252, 211, 77, 0.48);
+  box-shadow: 0 0 0 2px rgba(252, 211, 77, 0.14);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.button,
+.secondaryButton,
+.dangerButton {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition: background 150ms ease, border-color 150ms ease, opacity 150ms ease;
+}
+
+.button {
+  border: 1px solid rgba(252, 211, 77, 0.34);
+  background: rgba(252, 211, 77, 0.16);
+  color: #fef3c7;
+}
+
+.button:hover {
+  background: rgba(252, 211, 77, 0.23);
+}
+
+.secondaryButton {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+}
+
+.secondaryButton:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
+.dangerButton {
+  border: 1px solid rgba(253, 164, 175, 0.24);
+  background: rgba(244, 63, 94, 0.1);
+  color: #ffe4e6;
+}
+
+.button:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.message,
+.error {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 16px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.message {
+  border: 1px solid rgba(110, 231, 183, 0.18);
+  background: rgba(16, 185, 129, 0.1);
+  color: #d1fae5;
+}
+
+.error {
+  border: 1px solid rgba(253, 164, 175, 0.24);
+  background: rgba(244, 63, 94, 0.1);
+  color: #ffe4e6;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.stageCard {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  background: rgba(15, 23, 42, 0.62);
+}
+
+.stageHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.badge {
+  min-height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.activeBadge {
+  border-color: rgba(110, 231, 183, 0.24);
+  background: rgba(16, 185, 129, 0.14);
+  color: #d1fae5;
+}
+
+.metaGrid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.metaBox {
+  min-width: 0;
+  padding: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.metaBox strong {
+  display: block;
+  margin-top: 0.35rem;
+  color: #ffffff;
+  overflow-wrap: anywhere;
+}

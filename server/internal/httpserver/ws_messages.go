@@ -32,6 +32,7 @@ type unlockZoneAction struct {
 type playerState struct {
 	ID         string    `json:"id"`
 	Username   string    `json:"username"`
+	StageID    string    `json:"stageId,omitempty"`
 	X          float64   `json:"x"`
 	Y          float64   `json:"y"`
 	TargetX    *float64  `json:"targetX,omitempty"`

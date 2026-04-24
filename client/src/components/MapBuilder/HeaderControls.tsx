@@ -9,6 +9,7 @@ interface HeaderControlsProps {
   proceduralSeed: string;
   onDefaultYChange: (nextY: number) => void;
   onExportStage: () => void;
+  onSaveStage: () => void;
   onToggleFullscreen: () => void;
   onGenerateBase: () => void;
   onMapNameChange: (name: string) => void;
@@ -27,6 +28,7 @@ export function HeaderControls({
   onExportStage,
   onToggleFullscreen,
   onGenerateBase,
+  onSaveStage,
   onMapNameChange,
   onMapSizeChange,
   onProceduralSeedChange,
@@ -62,6 +64,13 @@ export function HeaderControls({
             type="button"
           >
             Exportar
+          </button>
+          <button
+            className={styles.exportButton}
+            onClick={onSaveStage}
+            type="button"
+          >
+            Salvar no admin
           </button>
         </div>
       </div>

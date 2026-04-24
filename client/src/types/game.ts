@@ -59,6 +59,53 @@ export interface AdminPlayersState {
   error?: string;
 }
 
+export interface AdminStageSummaryDTO {
+  id: string;
+  slug: string;
+  displayName: string;
+  status: "draft" | "published" | "active" | "archived" | string;
+  activeVersionId?: string;
+  latestVersionId?: string;
+  latestVersion: number;
+  checksum?: string;
+  updatedAt: string;
+  createdAt: string;
+}
+
+export interface AdminStageVersionDTO {
+  id: string;
+  stageId: string;
+  version: number;
+  checksum: string;
+  validationStatus: "valid" | "invalid" | string;
+  validationErrors: string[];
+  createdAt: string;
+  publishedAt?: string;
+  activatedAt?: string;
+  sourceJson?: string;
+}
+
+export interface AdminStagesResponse {
+  status: string;
+  service: string;
+  timestamp: string;
+  stages: AdminStageSummaryDTO[];
+}
+
+export interface AdminStageImportResponse {
+  status: string;
+  stage: AdminStageSummaryDTO;
+  version: AdminStageVersionDTO;
+}
+
+export interface AdminStagesState {
+  state: "loading" | "online" | "offline";
+  service?: string;
+  updatedAt?: string;
+  stages: AdminStageSummaryDTO[];
+  error?: string;
+}
+
 export interface WorldPlayerState {
   id: string;
   username: string;

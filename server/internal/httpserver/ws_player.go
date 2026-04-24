@@ -49,6 +49,7 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 			profile = &playerState{
 				ID:         buildPlayerID(profileKey),
 				Username:   username,
+				StageID:    hub.world.stageID,
 				X:          spawnX,
 				Y:          spawnY,
 				Speed:      defaultPlayerSpeed,
@@ -70,6 +71,9 @@ func (hub *gameHub) register(connection *websocket.Conn, profileKey string, user
 	hub.advancePlayerLocked(profile, now)
 
 	profile.Username = username
+	if strings.TrimSpace(profile.StageID) == "" {
+		profile.StageID = hub.world.stageID
+	}
 	profile.LastSeenAt = now
 	replacedClient := hub.clients[profile.ID]
 	progress := hub.ensurePlayerProgressLocked(profile.ID)

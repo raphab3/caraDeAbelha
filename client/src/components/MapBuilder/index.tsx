@@ -9,11 +9,14 @@ import { HeaderControls } from "./HeaderControls";
 import { MapBuilderLayout } from "./MapBuilderLayout";
 import { SelectionInspector } from "./SelectionInspector";
 import { useMapBuilderStore } from "./useMapBuilderStore";
+import { API_URL } from "../../game/env";
 import { useFullscreenTarget } from "../../hooks/useFullscreenTarget";
 
 export default function MapBuilder() {
   const { isFullscreen, isSupported: isFullscreenSupported, targetRef, toggleFullscreen } = useFullscreenTarget<HTMLDivElement>();
   const [isUiHidden, setIsUiHidden] = useState(false);
+  const [adminSaveMessage, setAdminSaveMessage] = useState<string>();
+  const [adminSaveError, setAdminSaveError] = useState<string>();
   const mapInfo = useMapBuilderStore((state) => state.mapInfo);
   const proceduralBase = useMapBuilderStore((state) => state.proceduralBase);
   const placedItems = useMapBuilderStore((state) => state.placedItems);
@@ -51,6 +54,36 @@ export default function MapBuilder() {
     });
 
     downloadStageExport(payload, buildStageExportFileName(mapInfo));
+  };
+
+  const handleSaveStageToAdmin = async () => {
+    const payload = buildStageExport({
+      mapInfo,
+      proceduralBase,
+      placedItems,
+    });
+
+    setAdminSaveMessage("Enviando stage para o admin...");
+    setAdminSaveError(undefined);
+
+    try {
+      const response = await fetch(`${API_URL}/admin/stages/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceJson: JSON.stringify(payload, null, 2), actor: "map-builder" }),
+      });
+
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => undefined) as { error?: string; fields?: string[] } | undefined;
+        throw new Error([errorPayload?.error ?? `HTTP ${response.status}`, ...(errorPayload?.fields ?? [])].join(": "));
+      }
+
+      const result = await response.json() as { stage: { displayName: string }; version: { version: number } };
+      setAdminSaveMessage(`Stage "${result.stage.displayName}" salvo como v${result.version.version}.`);
+    } catch (error) {
+      setAdminSaveMessage(undefined);
+      setAdminSaveError(error instanceof Error ? error.message : "Falha ao salvar stage.");
+    }
   };
 
   const handleRotateQuarterTurn = (deltaDegrees: number) => {
@@ -149,6 +182,9 @@ export default function MapBuilder() {
             mapSize={mapInfo.size}
             onDefaultYChange={setDefaultY}
             onExportStage={handleExportStage}
+            onSaveStage={() => {
+              void handleSaveStageToAdmin();
+            }}
             onGenerateBase={() => generateProceduralBase(proceduralBase.seed)}
             onMapNameChange={setMapName}
             onMapSizeChange={setMapSize}
@@ -196,6 +232,11 @@ export default function MapBuilder() {
           />
         }
       />
+      {adminSaveMessage || adminSaveError ? (
+        <div className="pointer-events-none fixed left-1/2 top-4 z-50 w-[min(520px,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-white/10 bg-slate-950/90 px-4 py-3 text-sm text-slate-100 shadow-2xl backdrop-blur">
+          {adminSaveMessage ?? adminSaveError}
+        </div>
+      ) : null}
     </div>
   );
 }
