@@ -12,6 +12,16 @@ export interface MapInfo {
   name: string;
   size: number;
   defaultY: number;
+  mobConfig: WorldMobConfigExport;
+}
+
+export interface WorldMobConfigExport {
+  meleeCount: number;
+  rangedCount: number;
+  moveRadius: number;
+  pursuitLevel: number;
+  minLevel: number;
+  maxLevel: number;
 }
 
 export interface HoveredGridCell {
@@ -121,6 +131,7 @@ export interface WorldStageExport {
   displayName: string;
   audio: WorldStageAudio;
   edgeBehavior: WorldEdgeBehavior;
+  mobs: WorldMobConfigExport;
   tiles: MapTile[];
   props: WorldPrefabPlacementExport[];
   zones: WorldZoneExport[];
@@ -151,6 +162,7 @@ export interface MapBuilderState {
   setMapName: (name: string) => void;
   setMapSize: (size: number) => void;
   setDefaultY: (nextY: number) => void;
+  updateMobConfig: (config: Partial<WorldMobConfigExport>) => void;
   setProceduralSeed: (seed: string) => void;
   setSelectedAssetType: (prefabId: string | null) => void;
   setCurrentTool: (tool: MapBuilderTool) => void;

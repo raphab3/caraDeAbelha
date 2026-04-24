@@ -87,12 +87,22 @@ type worldLandmark struct {
 	Tag         string  `json:"tag"`
 }
 
+type worldMobConfig struct {
+	MeleeCount   int     `json:"meleeCount"`
+	RangedCount  int     `json:"rangedCount"`
+	MoveRadius   float64 `json:"moveRadius"`
+	PursuitLevel int     `json:"pursuitLevel"`
+	MinLevel     int     `json:"minLevel"`
+	MaxLevel     int     `json:"maxLevel"`
+}
+
 // worldMapContainer supports both legacy (array) and new (object) formats
 type worldMapContainer struct {
 	StageID      string                 `json:"stageId"`
 	DisplayName  string                 `json:"displayName"`
 	Audio        worldStageAudio        `json:"audio"`
 	EdgeBehavior *worldEdgeBehavior     `json:"edgeBehavior"`
+	Mobs         *worldMobConfig        `json:"mobs"`
 	Tiles        []worldMapRecord       `json:"tiles"`
 	Props        []worldPrefabPlacement `json:"props"`
 	Zones        []worldZone            `json:"zones"`
@@ -105,6 +115,7 @@ type worldLayout struct {
 	displayName  string
 	audio        worldStageAudio
 	edgeBehavior *worldEdgeBehavior
+	mobs         worldMobConfig
 	chunks       map[string]worldChunkState
 	props        []worldPrefabPlacement
 	zones        []worldZone
@@ -253,6 +264,37 @@ func normalizeWorldPrefabPlacement(placement worldPrefabPlacement) (worldPrefabP
 	return placement, nil
 }
 
+func normalizeWorldMobConfig(raw *worldMobConfig) worldMobConfig {
+	config := worldMobConfig{}
+	if raw != nil {
+		config = *raw
+	}
+
+	if config.MeleeCount < 0 {
+		config.MeleeCount = 0
+	}
+	if config.RangedCount < 0 {
+		config.RangedCount = 0
+	}
+	if config.MoveRadius <= 0 {
+		config.MoveRadius = 4.5
+	}
+	if config.PursuitLevel < 1 {
+		config.PursuitLevel = 1
+	}
+	if config.PursuitLevel > 5 {
+		config.PursuitLevel = 5
+	}
+	if config.MinLevel < 1 {
+		config.MinLevel = 1
+	}
+	if config.MaxLevel < config.MinLevel {
+		config.MaxLevel = config.MinLevel
+	}
+
+	return config
+}
+
 func loadWorldLayout() worldLayout {
 	mapPath, err := resolveWorldMapPath()
 	if err != nil {
@@ -345,6 +387,7 @@ func parseWorldLayoutFromContainer(container worldMapContainer) (worldLayout, er
 	zones := container.Zones
 	transitions := container.Transitions
 	landmarks := container.Landmarks
+	mobs := normalizeWorldMobConfig(container.Mobs)
 
 	if len(records) == 0 {
 		return worldLayout{}, fmt.Errorf("world map is empty")
@@ -364,6 +407,7 @@ func parseWorldLayoutFromContainer(container worldMapContainer) (worldLayout, er
 		displayName:  strings.TrimSpace(container.DisplayName),
 		audio:        container.Audio,
 		edgeBehavior: container.EdgeBehavior,
+		mobs:         mobs,
 		chunks:       make(map[string]worldChunkState),
 		props:        append([]worldPrefabPlacement{}, props...),
 		zones:        zones,

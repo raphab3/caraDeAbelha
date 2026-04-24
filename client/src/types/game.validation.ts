@@ -140,6 +140,7 @@ export const validateGameTypes = () => {
     stageName: "Bacia do Primeiro Voo",
     audioBgm: "assets/rpg-adventure.mp3",
     players: [],
+    mobs: [],
     chunks: [],
     props: [],
     landmarks: [],

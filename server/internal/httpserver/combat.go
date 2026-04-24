@@ -100,13 +100,20 @@ func (hub *gameHub) consumeSkillEnergyLocked(client *clientSession, progress *lo
 
 func (hub *gameHub) applyDamageLocked(source *playerState, target *playerState, amount int, skillID string, now time.Time) bool {
 	if source == nil || target == nil || amount <= 0 {
-		return false
+		if target == nil || amount <= 0 {
+			return false
+		}
 	}
 
 	progress := hub.ensurePlayerProgressLocked(target.ID)
 	hub.ensurePlayerCombatLocked(target, progress, now)
 	if progress.IsDead || progress.SpawnProtectionUntil.After(now) {
 		return false
+	}
+
+	sourceID := ""
+	if source != nil {
+		sourceID = source.ID
 	}
 
 	progress.CurrentLife -= amount
@@ -119,9 +126,9 @@ func (hub *gameHub) applyDamageLocked(source *playerState, target *playerState, 
 	hub.syncPlayerCombatStateLocked(target, progress)
 	hub.sendCombatEventToStageLocked(target.StageID, combatEventMessage{
 		Type:           "combat_event",
-		EventID:        combatEventID(source.ID, target.ID, skillID, "damage", now),
+		EventID:        combatEventID(sourceID, target.ID, skillID, "damage", now),
 		EventKind:      "damage",
-		SourcePlayerID: source.ID,
+		SourcePlayerID: sourceID,
 		TargetPlayerID: target.ID,
 		SkillID:        skillID,
 		Amount:         amount,

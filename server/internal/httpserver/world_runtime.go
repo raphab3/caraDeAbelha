@@ -64,6 +64,7 @@ func (hub *gameHub) initializeWorldEntities() {
 	hub.flowerSpawnSlots = make(map[string]flowerSpawnSlot)
 	hub.activeFlowers = make(map[string]*activeFlowerRuntime)
 	hub.activeHives = make(map[string]*activeHiveRuntime)
+	hub.activeMobs = make(map[string]*activeMobRuntime)
 	hub.activeCollections = make(map[string]*collectionState)
 	hub.activeCombatAreas = make(map[string]skillEffectMessage)
 
@@ -178,6 +179,7 @@ func (hub *gameHub) initializeWorldEntities() {
 	}
 
 	hub.ensureCollectorHive()
+	hub.initializeWorldMobs()
 	hub.syncDefaultStageRuntimeLocked()
 }
 
@@ -204,6 +206,7 @@ func (hub *gameHub) syncDefaultStageRuntimeLocked() {
 			players:     hub.players,
 			flowers:     hub.activeFlowers,
 			hives:       hub.activeHives,
+			mobs:        hub.activeMobs,
 			collections: hub.activeCollections,
 		},
 	}

@@ -355,6 +355,9 @@ func (hub *gameHub) stepMovingPlayers() bool {
 			changed = true
 		}
 	}
+	if hub.processMobRuntimeLocked(now) {
+		changed = true
+	}
 	if hub.processCombatRuntimeLocked(now) {
 		changed = true
 	}
@@ -1122,10 +1125,16 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Sem direcao valida para disparar o Ferrão")
 			return false
 		}
-		if target := hub.resolveProjectileHitLocked(player, effect); target != nil {
-			effect.ToX = target.X
-			effect.ToY = target.Y
-			hub.applyDamageLocked(player, target, int(math.Round(defaultFerraoDamage*effect.Power)), skillID, now)
+		impact := hub.resolveProjectileTargetLocked(player, effect)
+		if impact.Player != nil || impact.Mob != nil {
+			effect.ToX = impact.X
+			effect.ToY = impact.Y
+			if impact.Player != nil {
+				hub.applyDamageLocked(player, impact.Player, int(math.Round(defaultFerraoDamage*effect.Power)), skillID, now)
+			}
+			if impact.Mob != nil {
+				hub.applyDamageToMobLocked(player, impact.Mob, int(math.Round(defaultFerraoDamage*effect.Power)), skillID, now)
+			}
 			shouldBroadcast = true
 		}
 		skillEffects = []skillEffectMessage{effect}

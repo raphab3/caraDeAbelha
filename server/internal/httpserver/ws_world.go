@@ -33,6 +33,7 @@ func (hub *gameHub) snapshotForPlayerLocked(viewer *playerState) worldStateMessa
 		StageName:      hub.world.displayName,
 		AudioBGM:       hub.world.audio.BGM,
 		Players:        players,
+		Mobs:           hub.buildWorldMobsState(),
 		Chunks:         hub.buildVisibleChunksLocked(centerChunkX, centerChunkY),
 		Props:          hub.buildWorldPropsState(),
 		Landmarks:      hub.buildWorldLandmarksState(),

@@ -49,6 +49,7 @@ type gameHub struct {
 	flowerSpawnSlots  map[string]flowerSpawnSlot
 	activeFlowers     map[string]*activeFlowerRuntime
 	activeHives       map[string]*activeHiveRuntime
+	activeMobs        map[string]*activeMobRuntime
 	activeCollections map[string]*collectionState
 	activeCombatAreas map[string]skillEffectMessage
 	random            *rand.Rand

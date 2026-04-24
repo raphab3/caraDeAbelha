@@ -25,6 +25,7 @@ export default function MapBuilder() {
   const setMapName = useMapBuilderStore((state) => state.setMapName);
   const setMapSize = useMapBuilderStore((state) => state.setMapSize);
   const setDefaultY = useMapBuilderStore((state) => state.setDefaultY);
+  const updateMobConfig = useMapBuilderStore((state) => state.updateMobConfig);
   const setProceduralSeed = useMapBuilderStore((state) => state.setProceduralSeed);
   const setSelectedAssetType = useMapBuilderStore((state) => state.setSelectedAssetType);
   const setCurrentTool = useMapBuilderStore((state) => state.setCurrentTool);
@@ -183,6 +184,7 @@ export default function MapBuilder() {
             isFullscreenSupported={isFullscreenSupported}
             mapName={mapInfo.name}
             mapSize={mapInfo.size}
+            mobConfig={mapInfo.mobConfig}
             onDefaultYChange={setDefaultY}
             onExportStage={handleExportStage}
             onSaveStage={() => {
@@ -191,6 +193,7 @@ export default function MapBuilder() {
             onGenerateBase={() => generateProceduralBase(proceduralBase.seed)}
             onMapNameChange={setMapName}
             onMapSizeChange={setMapSize}
+            onMobConfigChange={updateMobConfig}
             onProceduralSeedChange={setProceduralSeed}
             onToggleFullscreen={() => {
               void toggleFullscreen();

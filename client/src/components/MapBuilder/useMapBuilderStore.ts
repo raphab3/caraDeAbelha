@@ -152,6 +152,14 @@ export const useMapBuilderStore = create<MapBuilderState>()((set, get) => ({
     name: DEFAULT_MAP_NAME,
     size: DEFAULT_MAP_BUILDER_SIZE,
     defaultY: 0,
+    mobConfig: {
+      meleeCount: 4,
+      rangedCount: 2,
+      moveRadius: 4.5,
+      pursuitLevel: 3,
+      minLevel: 1,
+      maxLevel: 3,
+    },
   },
   proceduralBase: initialProceduralBase,
   placedItems: [],
@@ -204,6 +212,17 @@ export const useMapBuilderStore = create<MapBuilderState>()((set, get) => ({
       mapInfo: {
         ...state.mapInfo,
         defaultY: normalizeCoordinate(nextY),
+      },
+    }));
+  },
+  updateMobConfig: (config) => {
+    set((state) => ({
+      mapInfo: {
+        ...state.mapInfo,
+        mobConfig: {
+          ...state.mapInfo.mobConfig,
+          ...config,
+        },
       },
     }));
   },

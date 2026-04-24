@@ -107,6 +107,7 @@ export default function PlayerExperience() {
               landmarks={gameSession.landmarks}
               lastInteraction={gameSession.lastInteraction}
               localPlayerId={gameSession.localPlayerId}
+              mobs={gameSession.mobs}
               onClearTargets={gameSession.clearTargets}
               onFlowerClick={gameSession.targetFlower}
               onHiveClick={gameSession.targetHive}

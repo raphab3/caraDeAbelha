@@ -85,6 +85,7 @@ type worldStateMessage struct {
 	StageName      string               `json:"stageName,omitempty"`
 	AudioBGM       string               `json:"audioBgm,omitempty"`
 	Players        []playerState        `json:"players"`
+	Mobs           []worldMobState      `json:"mobs,omitempty"`
 	Chunks         []worldChunkState    `json:"chunks"`
 	Props          []worldPropState     `json:"props,omitempty"`
 	Landmarks      []worldLandmarkState `json:"landmarks,omitempty"`
@@ -92,6 +93,18 @@ type worldStateMessage struct {
 	CenterChunkY   int                  `json:"centerChunkY"`
 	RenderDistance int                  `json:"renderDistance"`
 	ChunkSize      float64              `json:"chunkSize"`
+}
+
+type worldMobState struct {
+	ID          string  `json:"id"`
+	Kind        string  `json:"kind"`
+	X           float64 `json:"x"`
+	Y           float64 `json:"y"`
+	GroundY     float64 `json:"groundY"`
+	Level       int     `json:"level"`
+	CurrentLife int     `json:"currentLife"`
+	MaxLife     int     `json:"maxLife"`
+	IsDead      bool    `json:"isDead"`
 }
 
 type worldPropState struct {

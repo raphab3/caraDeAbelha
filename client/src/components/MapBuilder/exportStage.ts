@@ -1,5 +1,5 @@
 import { getGridOrigin, normalizeMapSize } from "./proceduralBase";
-import type { MapInfo, PlacedItem, ProceduralBaseState, WorldBounds, WorldPrefabPlacementExport, WorldStageExport } from "./types";
+import type { MapInfo, PlacedItem, ProceduralBaseState, WorldBounds, WorldMobConfigExport, WorldPrefabPlacementExport, WorldStageExport } from "./types";
 
 const DEFAULT_STAGE_NAME = "Novo Stage";
 const DEFAULT_STAGE_AUDIO = "assets/rpg-adventure.mp3";
@@ -64,6 +64,22 @@ function toWorldPrefabPlacement(item: PlacedItem): WorldPrefabPlacementExport {
   };
 }
 
+function normalizeMobConfig(config: WorldMobConfigExport): WorldMobConfigExport {
+  const meleeCount = Math.max(0, Math.round(config.meleeCount));
+  const rangedCount = Math.max(0, Math.round(config.rangedCount));
+  const minLevel = Math.max(1, Math.round(config.minLevel));
+  const maxLevel = Math.max(minLevel, Math.round(config.maxLevel));
+
+  return {
+    meleeCount,
+    rangedCount,
+    moveRadius: Math.max(1, Number(config.moveRadius) || 4.5),
+    pursuitLevel: Math.max(1, Math.min(5, Math.round(config.pursuitLevel))),
+    minLevel,
+    maxLevel,
+  };
+}
+
 export function buildStageExport({ mapInfo, proceduralBase, placedItems }: ExportStageInput): WorldStageExport {
   const displayName = mapInfo.name.trim() || DEFAULT_STAGE_NAME;
   const stageSlug = slugifyStageName(displayName);
@@ -81,6 +97,7 @@ export function buildStageExport({ mapInfo, proceduralBase, placedItems }: Expor
       playableBounds,
       outlandsBounds: expandBounds(playableBounds, outlandsPadding),
     },
+    mobs: normalizeMobConfig(mapInfo.mobConfig),
     tiles: proceduralBase.tiles,
     props: placedItems.map(toWorldPrefabPlacement),
     zones: [],

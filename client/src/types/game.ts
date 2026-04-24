@@ -202,6 +202,18 @@ export interface WorldLandmarkState {
   tag?: string;
 }
 
+export interface WorldMobState {
+  id: string;
+  kind: "melee" | "ranged" | string;
+  x: number;
+  y: number;
+  groundY?: number;
+  level: number;
+  currentLife: number;
+  maxLife: number;
+  isDead: boolean;
+}
+
 // Map zone metadata - defines spatial boundaries of game regions
 export interface MapZone {
   id: string;
@@ -228,6 +240,7 @@ export interface WorldStateMessage {
   stageName?: string;
   audioBgm?: string;
   players: WorldPlayerState[];
+  mobs: WorldMobState[];
   chunks: WorldChunkState[];
   props: WorldPropState[];
   landmarks: WorldLandmarkState[];
@@ -485,6 +498,7 @@ export interface GameSessionState {
   stageName?: string;
   audioBgm?: string;
   players: WorldPlayerState[];
+  mobs: WorldMobState[];
   chunks: WorldChunkState[];
   props: WorldPropState[];
   landmarks: WorldLandmarkState[];

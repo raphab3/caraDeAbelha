@@ -35,6 +35,7 @@ import type {
   WorldFlowerState,
   WorldHiveState,
   WorldLandmarkState,
+  WorldMobState,
   WorldPlayerState,
   WorldPropState,
 } from "../../types/game";
@@ -91,10 +92,14 @@ const impulseTrailOrbGeometry = new SphereGeometry(0.12, 14, 14);
 const impulseTrailRingGeometry = new RingGeometry(0.18, 0.3, 24);
 const projectileBodyGeometry = new SphereGeometry(0.1, 12, 12);
 const projectileTipGeometry = new ConeGeometry(0.08, 0.28, 16);
+const mobBodyGeometry = new SphereGeometry(0.42, 18, 18);
+const mobMeleeSpikeGeometry = new ConeGeometry(0.18, 0.34, 16);
+const mobAuraGeometry = new RingGeometry(0.42, 0.56, 24);
 
 projectileTipGeometry.rotateZ(-Math.PI / 2);
 
 beeStingerGeometry.rotateZ(-Math.PI / 2);
+mobMeleeSpikeGeometry.rotateZ(-Math.PI / 2);
 
 const localMarkerMaterial = new MeshBasicMaterial({
   color: "#fff1a8",
@@ -144,6 +149,9 @@ const disconnectedBeaconMaterial = new MeshStandardMaterial({
   emissive: "#ff6b3d",
   emissiveIntensity: 0.8,
 });
+const mobMeleeMaterial = new MeshStandardMaterial({ color: "#d9485f", roughness: 0.5, metalness: 0.08 });
+const mobRangedMaterial = new MeshStandardMaterial({ color: "#14b8a6", roughness: 0.38, metalness: 0.12 });
+const mobSpikeMaterial = new MeshStandardMaterial({ color: "#fff1c1", roughness: 0.18, metalness: 0.12 });
 
 const BEE_LEFT_STRIPE_OFFSET = new Vector3(-0.35, 0, 0);
 const BEE_RIGHT_STRIPE_OFFSET = new Vector3(0.35, 0, 0);
@@ -707,6 +715,56 @@ function RemoteBeesInstanced({ players, surfaceIndex }: { players: WorldPlayerSt
       <instancedMesh ref={leftWingRef} args={[beeWingGeometry, beeWingMaterial, players.length]} frustumCulled={false} />
       <instancedMesh ref={rightWingRef} args={[beeWingGeometry, beeWingMaterial, players.length]} frustumCulled={false} />
       <RemoteBeeNameplates players={players} surfaceIndex={surfaceIndex} />
+    </group>
+  );
+}
+
+function MobSwarm({ mobs, surfaceIndex }: { mobs: WorldMobState[]; surfaceIndex: WorldSurfaceIndex }) {
+  if (mobs.length === 0) {
+    return null;
+  }
+
+  return (
+    <group>
+      {mobs.map((mob, index) => {
+        const sceneX = toSceneAxis(mob.x);
+        const sceneZ = toSceneAxis(mob.y);
+        const sceneY = resolveBeeSceneHeight(surfaceIndex, mob.x, mob.y, 0, index * 0.37) - 0.02;
+        const lifeRatio = mob.maxLife > 0 ? MathUtils.clamp(mob.currentLife / mob.maxLife, 0, 1) : 0;
+        const isRanged = mob.kind === "ranged";
+
+        return (
+          <group key={mob.id} position={[sceneX, sceneY, sceneZ]}>
+            <mesh castShadow position={[0, 0.34 + Math.sin(index) * 0.04, 0]}>
+              <primitive attach="geometry" object={mobBodyGeometry} />
+              <primitive attach="material" object={isRanged ? mobRangedMaterial : mobMeleeMaterial} />
+            </mesh>
+
+            {isRanged ? (
+              <mesh position={[0, 0.36, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <primitive attach="geometry" object={mobAuraGeometry} />
+                <meshBasicMaterial color="#99f6e4" opacity={0.55} transparent depthWrite={false} side={DoubleSide} />
+              </mesh>
+            ) : (
+              <mesh castShadow position={[0.34, 0.34, 0]}>
+                <primitive attach="geometry" object={mobMeleeSpikeGeometry} />
+                <primitive attach="material" object={mobSpikeMaterial} />
+              </mesh>
+            )}
+
+            <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[Math.max(0.24, lifeRatio * 0.86), 1, 1]}>
+              <primitive attach="geometry" object={mobAuraGeometry} />
+              <meshBasicMaterial color={isRanged ? "#5eead4" : "#fb7185"} opacity={0.85} transparent depthWrite={false} side={DoubleSide} />
+            </mesh>
+
+            <Html center distanceFactor={10} position={[0, 1.08, 0]} sprite transform>
+              <div className={styles.beeNameplate}>
+                <span>{isRanged ? `Vespa ${mob.level}` : `Besouro ${mob.level}`}</span>
+              </div>
+            </Html>
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -1283,6 +1341,7 @@ function InfiniteGround({
 
 interface HiveCoreProps {
   players: WorldPlayerState[];
+  mobs: WorldMobState[];
   chunks: WorldChunkState[];
   props: WorldPropState[];
   landmarks: WorldLandmarkState[];
@@ -1305,6 +1364,7 @@ interface HiveCoreProps {
 
 function HiveCore({
   players,
+  mobs,
   chunks,
   props,
   landmarks,
@@ -1498,7 +1558,8 @@ function HiveCore({
       ) : null}
 
       <RemoteBeesInstanced players={remotePlayers} surfaceIndex={surfaceIndex} />
-  <SkillEffectsLayer skillEffects={skillEffects} surfaceIndex={surfaceIndex} />
+    <MobSwarm mobs={mobs} surfaceIndex={surfaceIndex} />
+    <SkillEffectsLayer skillEffects={skillEffects} surfaceIndex={surfaceIndex} />
 
       {connectionState === "disconnected" ? (
         <mesh
@@ -1513,6 +1574,7 @@ function HiveCore({
 
 interface GameViewportProps {
   players: WorldPlayerState[];
+  mobs: WorldMobState[];
   chunks: WorldChunkState[];
   props: WorldPropState[];
   landmarks: WorldLandmarkState[];
@@ -1553,6 +1615,7 @@ function resolveFlowerCollectDurationMs(lastInteraction: InteractionResult | und
 
 export function GameViewport({
   players,
+  mobs,
   chunks,
   props,
   landmarks,
@@ -1597,6 +1660,16 @@ export function GameViewport({
       return Math.abs(centerChunkX - px) <= renderDistance && Math.abs(centerChunkY - py) <= renderDistance;
     });
   }, [players, localPlayer, chunkSize, renderDistance]);
+  const nearbyMobs = useMemo(() => {
+    if (!localPlayer || chunkSize <= 0) return mobs;
+    const centerChunkX = toChunkCoord(localPlayer.x, chunkSize);
+    const centerChunkY = toChunkCoord(localPlayer.y, chunkSize);
+    return mobs.filter((mob) => {
+      const px = toChunkCoord(mob.x, chunkSize);
+      const py = toChunkCoord(mob.y, chunkSize);
+      return Math.abs(centerChunkX - px) <= renderDistance && Math.abs(centerChunkY - py) <= renderDistance;
+    });
+  }, [mobs, localPlayer, chunkSize, renderDistance]);
   const visibleHives = useMemo(() => collectVisibleHives(chunks), [chunks]);
   const flowerCollectDurationMs = useMemo(
     () => resolveFlowerCollectDurationMs(lastInteraction),
@@ -1631,6 +1704,7 @@ export function GameViewport({
           landmarks={landmarks}
           localPlayerId={localPlayerId}
           localPlayerPositionRef={localPlayerPositionRef}
+          mobs={nearbyMobs}
           onMoveToTarget={onMoveToTarget}
           onFlowerClick={onFlowerClick}
           onHiveClick={onHiveClick}

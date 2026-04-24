@@ -14,6 +14,7 @@ type stageRuntime struct {
 	players     map[string]*playerState
 	flowers     map[string]*activeFlowerRuntime
 	hives       map[string]*activeHiveRuntime
+	mobs        map[string]*activeMobRuntime
 	collections map[string]*collectionState
 }
 
