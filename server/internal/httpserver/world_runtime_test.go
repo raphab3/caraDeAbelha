@@ -108,6 +108,36 @@ func TestProcessWorldInteractionsCollectsFlowerAfterTouchDuration(t *testing.T) 
 	}
 }
 
+func TestAddXPToProgressLockedCapsAtLevelNinetyNine(t *testing.T) {
+	baseTime := time.Date(2026, time.April, 24, 10, 0, 0, 0, time.UTC)
+	hub := newRuntimeTestHub(baseTime)
+	progress := hub.ensurePlayerProgressLocked("player:test:max-level")
+	progress.Level = 98
+	progress.XP = 0
+
+	leveledUp := hub.addXPToProgressLocked(progress, 20_000)
+	if !leveledUp {
+		t.Fatalf("expected progression to level up to the cap")
+	}
+
+	if progress.Level != 99 {
+		t.Fatalf("expected level 99, got %d", progress.Level)
+	}
+
+	if progress.XP != 0 {
+		t.Fatalf("expected XP to stop at 0 on max level, got %d", progress.XP)
+	}
+
+	expectedCapacity := 40 + (99-1)*5
+	if progress.PollenCapacity != expectedCapacity {
+		t.Fatalf("expected pollen capacity %d at level 99, got %d", expectedCapacity, progress.PollenCapacity)
+	}
+
+	if progress.SkillPoints != 2 {
+		t.Fatalf("expected a single skill point gain on the last level up, got %d", progress.SkillPoints)
+	}
+}
+
 func TestProcessWorldInteractionsDepositsHoneyAutomatically(t *testing.T) {
 	baseTime := time.Date(2026, time.April, 22, 15, 5, 0, 0, time.UTC)
 	hub := newRuntimeTestHub(baseTime)

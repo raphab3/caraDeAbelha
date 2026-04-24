@@ -203,9 +203,9 @@ func TestAddXPCapAtMaxLevel(t *testing.T) {
 	prog.Level = MaxLevel - 1
 	prog.XP = 0
 
-	// xpRequired for level 49→50 = 100 * 50 = 5000
-	// Adding 6000 should level up to 50 and cap XP at 0
-	leveledUp, newLevel, err := service.AddXP(playerID, 6000)
+	// xpRequired for level 98→99 = 100 * 98 = 9800
+	// Adding 10000 should level up to 99 and cap XP at 0
+	leveledUp, newLevel, err := service.AddXP(playerID, 10000)
 
 	if err != nil {
 		t.Fatalf("AddXP failed: %v", err)
@@ -312,22 +312,22 @@ func TestCalculateDerivedAttributesMaxLevel(t *testing.T) {
 	derived := service.CalculateDerivedAttributes(prog)
 
 	// Base: HP=20, Dmg=5, Armor=0
-	// Level bonus: +2 HP, +1 Dmg per level (49 bonus levels for level 50)
-	// Expected: HP=20+2*49=118, Dmg=5+1*49=54, Armor=0+0.5*49=24 (rounded down)
-	expectedHP := uint32(20 + 2*49)
-	expectedDamage := uint32(5 + 1*49)
-	expectedArmor := uint32((49) / 2)
+	// Level bonus: +2 HP, +1 Dmg per level (98 bonus levels for level 99)
+	// Expected: HP=20+2*98=216, Dmg=5+1*98=103, Armor=0+0.5*98=49
+	expectedHP := uint32(20 + 2*98)
+	expectedDamage := uint32(5 + 1*98)
+	expectedArmor := uint32(98 / 2)
 
 	if derived.HP != expectedHP {
-		t.Errorf("level 50 HP: expected %d, got %d", expectedHP, derived.HP)
+		t.Errorf("level %d HP: expected %d, got %d", MaxLevel, expectedHP, derived.HP)
 	}
 
 	if derived.Damage != expectedDamage {
-		t.Errorf("level 50 Damage: expected %d, got %d", expectedDamage, derived.Damage)
+		t.Errorf("level %d Damage: expected %d, got %d", MaxLevel, expectedDamage, derived.Damage)
 	}
 
 	if derived.Armor != expectedArmor {
-		t.Errorf("level 50 Armor: expected %d, got %d", expectedArmor, derived.Armor)
+		t.Errorf("level %d Armor: expected %d, got %d", MaxLevel, expectedArmor, derived.Armor)
 	}
 }
 

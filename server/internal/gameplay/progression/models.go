@@ -26,10 +26,12 @@ type Attributes struct {
 // ItemInstance represents a single equipped item with metadata.
 //
 // ItemID: References an item from a catalog (e.g., "sword_iron", "armor_leather").
-//         Used to look up stat bonuses and visual properties.
+//
+//	Used to look up stat bonuses and visual properties.
 //
 // Slot: Which equipment slot this item occupies (e.g., "main_hand", "armor").
-//       Must match one of the EQUIPMENT_SLOT constants.
+//
+//	Must match one of the EQUIPMENT_SLOT constants.
 //
 // JSON Marshaling:
 // - ItemID → itemId (camelCase)
@@ -50,7 +52,7 @@ type ItemInstance struct {
 // XP System:
 // - XP accumulates within a level: [0, xpRequiredForLevel).
 // - xpRequiredForLevel = 100 * level (e.g., level 1 needs 100 XP, level 2 needs 200 more).
-// - At level 50, no further leveling; excess XP is capped.
+// - At level 99, no further leveling; excess XP is capped.
 //
 // Skill Points:
 // - Awarded 1 point per level up (starting at level 1).
@@ -74,8 +76,8 @@ type PlayerProgression struct {
 	// Range: [0, xpRequiredForLevel) where xpRequiredForLevel = 100 * Level.
 	XP uint64 `json:"xp"`
 
-	// Level: Character level. Range: [1, 50].
-	// Max level caps at 50; attempting to exceed this returns an error.
+	// Level: Character level. Range: [1, 99].
+	// Max level caps at 99; attempting to exceed this returns an error.
 	Level uint32 `json:"level"`
 
 	// SkillPoints: Unspent skill points available for allocation.

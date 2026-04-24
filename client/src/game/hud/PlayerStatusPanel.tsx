@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { PlayerProgressState } from "../../types/game";
 
+const MAX_PLAYER_LEVEL = 99;
+
 export interface PlayerStatusPanelProps {
   currentZoneName: string;
   isMobile: boolean;
@@ -36,6 +38,10 @@ function clampPanelPosition(position: FloatingPanelPosition, panel: HTMLElement 
 }
 
 function getXpRequiredForLevel(level: number): number {
+  if (level >= MAX_PLAYER_LEVEL) {
+    return 0;
+  }
+
   return Math.max(level * 100, 100);
 }
 
@@ -48,7 +54,8 @@ interface PlayerStatusPanelContentProps {
 
 function PlayerStatusPanelContent({ currentZoneName, onClose, onDragStart, playerProgress }: PlayerStatusPanelContentProps) {
   const xpRequired = getXpRequiredForLevel(playerProgress.level);
-  const xpProgress = Math.min((playerProgress.xp / xpRequired) * 100, 100);
+  const isAtMaxLevel = playerProgress.level >= MAX_PLAYER_LEVEL;
+  const xpProgress = isAtMaxLevel || xpRequired <= 0 ? 100 : Math.min((playerProgress.xp / xpRequired) * 100, 100);
   const pollenProgress = playerProgress.pollenCapacity > 0
     ? Math.min((playerProgress.pollenCarried / playerProgress.pollenCapacity) * 100, 100)
     : 0;
@@ -100,7 +107,7 @@ function PlayerStatusPanelContent({ currentZoneName, onClose, onDragStart, playe
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs font-bold uppercase tracking-[0.26em] text-amber-100/80">Nível atual</span>
-              <span className="text-sm font-semibold text-slate-300">XP {playerProgress.xp} / {xpRequired}</span>
+              <span className="text-sm font-semibold text-slate-300">{isAtMaxLevel ? `Nível máximo ${MAX_PLAYER_LEVEL}` : `XP ${playerProgress.xp} / ${xpRequired}`}</span>
             </div>
 
             <div className="mt-3 h-3 overflow-hidden rounded-full border border-slate-700/80 bg-slate-950/80">
@@ -110,7 +117,7 @@ function PlayerStatusPanelContent({ currentZoneName, onClose, onDragStart, playe
               />
             </div>
 
-            <p className="mt-2 text-xs text-slate-300">Faltam {Math.max(xpRequired - playerProgress.xp, 0)} XP para o próximo nível.</p>
+            <p className="mt-2 text-xs text-slate-300">{isAtMaxLevel ? "Você chegou ao teto atual de progressão." : `Faltam ${Math.max(xpRequired - playerProgress.xp, 0)} XP para o próximo nível.`}</p>
           </div>
         </div>
       </div>

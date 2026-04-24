@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/loopbase"
+	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/progression"
 )
 
 const defaultFlowerCollectRadius = 0.65
@@ -530,8 +531,8 @@ func (hub *gameHub) addXPToProgressLocked(progress *loopbase.PlayerProgress, amo
 
 	progress.XP += amount
 	leveledUp := false
-	for progress.Level < 50 {
-		xpRequired := progress.Level * 100
+	for progress.Level < int(progression.MaxLevel) {
+		xpRequired := int(progression.CalculateXPRequiredForLevel(uint32(progress.Level)))
 		if progress.XP < xpRequired {
 			break
 		}
@@ -539,8 +540,12 @@ func (hub *gameHub) addXPToProgressLocked(progress *loopbase.PlayerProgress, amo
 		progress.XP -= xpRequired
 		progress.Level++
 		progress.SkillPoints++
-		progress.PollenCapacity = 40 + (progress.Level-1)*5
+		progress.PollenCapacity = progression.CalculatePollenCapacityForLevel(uint32(progress.Level))
 		leveledUp = true
+	}
+
+	if progress.Level >= int(progression.MaxLevel) {
+		progress.XP = 0
 	}
 
 	progress.UpdatedAt = hub.now()

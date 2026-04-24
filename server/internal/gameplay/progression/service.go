@@ -11,7 +11,7 @@ import (
 // Server-Authoritative Design:
 // All progression calculations happen on the server. The service:
 // - Validates XP additions (no negative, no overflow)
-// - Enforces max level (50) with no rollover
+// - Enforces max level (99) with no rollover
 // - Calculates derived attributes deterministically
 // - Prevents direct level/XP manipulation (only AddXP method modifies progression)
 //
@@ -23,7 +23,7 @@ import (
 // In-memory map for now. Future: Replace with database for persistence.
 // Map key: playerID, value: PlayerProgression pointer.
 type ProgressionService struct {
-	mu          sync.RWMutex
+	mu           sync.RWMutex
 	progressions map[string]*PlayerProgression
 }
 
@@ -49,16 +49,21 @@ func NewProgressionService() *ProgressionService {
 // - Gets harder as player levels up (quadratic growth)
 // - Familiar from many RPGs (feels right to players)
 //
-// Max Level: 50
-// - xpRequiredForLevel(50) = 100 * 50 = 5000 XP for level 50 alone
-// - Total XP to reach level 50: sum(100 * i) for i=1..50 = 127,500 XP
+// Max Level: 99
+// - xpRequiredForLevel(99) = 100 * 99 = 9,900 XP for level 99 alone
+// - Total XP to reach level 99: sum(100 * i) for i=1..98 = 485,100 XP
 // - Prevents infinite progression; encourages alts and goal-setting
 //
 // Overflow Behavior:
-// - Excess XP beyond level 50 is discarded (cap at max level)
+// - Excess XP beyond level 99 is discarded (cap at max level)
 // - No "overflow XP" mechanic (keeps accounting simple)
 
-const MaxLevel = uint32(50)
+const (
+	MaxLevel               = uint32(99)
+	baseXPPerLevel         = uint64(100)
+	basePollenCapacity     = uint32(40)
+	pollenCapacityPerLevel = uint32(5)
+)
 
 // calculateXPRequiredForLevel computes the XP needed to advance to the next level.
 // Formula: 100 * currentLevel
@@ -66,11 +71,23 @@ const MaxLevel = uint32(50)
 // Examples:
 // - calculateXPRequiredForLevel(1) = 100 (player at level 1 needs 100 XP to reach level 2)
 // - calculateXPRequiredForLevel(2) = 200 (player at level 2 needs 200 XP to reach level 3)
-// - calculateXPRequiredForLevel(49) = 4900 (player at level 49 needs 4900 XP to reach level 50)
+// - calculateXPRequiredForLevel(98) = 9800 (player at level 98 needs 9800 XP to reach level 99)
 //
 // Returns uint64 to prevent overflow when multiplying large level numbers.
+func CalculateXPRequiredForLevel(currentLevel uint32) uint64 {
+	return baseXPPerLevel * uint64(currentLevel)
+}
+
 func calculateXPRequiredForLevel(currentLevel uint32) uint64 {
-	return uint64(100) * uint64(currentLevel)
+	return CalculateXPRequiredForLevel(currentLevel)
+}
+
+func CalculatePollenCapacityForLevel(level uint32) int {
+	if level <= 1 {
+		return int(basePollenCapacity)
+	}
+
+	return int(basePollenCapacity + (level-1)*pollenCapacityPerLevel)
 }
 
 // AddXP adds the specified amount of XP to a player's progression.
@@ -86,11 +103,11 @@ func calculateXPRequiredForLevel(currentLevel uint32) uint64 {
 //
 // Behavior:
 // 1. Validate player exists; return error if not found
-// 2. Validate player is not already at max level (50)
+// 2. Validate player is not already at max level (99)
 // 3. Add XP to current XP pool
 // 4. Check if accumulated XP exceeds next level threshold
 // 5. If level-up: increment level, award skill point, reset XP pool, check for more level-ups
-// 6. If at level 50 and still have excess XP: cap XP to 0 (prevent overflow)
+// 6. If at level 99 and still have excess XP: cap XP to 0 (prevent overflow)
 // 7. Return leveledUp flag and new level
 //
 // Example Flow:
@@ -111,8 +128,8 @@ func calculateXPRequiredForLevel(currentLevel uint32) uint64 {
 // - Return leveledUp=true, newLevel=3
 //
 // Example at Max Level:
-// Player at level 50 tries to add 100 XP:
-// - Return leveledUp=false, newLevel=50, err="player already at max level"
+// Player at level 99 tries to add 100 XP:
+// - Return leveledUp=false, newLevel=99, err="player already at max level"
 func (s *ProgressionService) AddXP(playerID string, amount uint64) (leveledUp bool, newLevel uint32, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -171,6 +188,7 @@ func (s *ProgressionService) AddXP(playerID string, amount uint64) (leveledUp bo
 //   - HP: +2 per level (level 5 = base 20 + 2*4 = 28 HP)
 //   - Damage: +1 per level
 //   - Armor: +0.5 per level (stored as uint32, so rounds down)
+//
 // - EquipmentBonus: Sum of stat modifiers from all equipped items
 //
 // Example:
@@ -198,7 +216,7 @@ func (s *ProgressionService) CalculateDerivedAttributes(progression *PlayerProgr
 	// Apply level bonuses
 	// Level 1 players get no level bonus (Level - 1 = 0)
 	// Level 2 players get 1x level bonus
-	// Level 50 players get 49x level bonus
+	// Level 99 players get 98x level bonus
 	levelBonus := progression.Level - 1
 
 	// HP: +2 per level
