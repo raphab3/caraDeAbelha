@@ -68,6 +68,7 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteract
 
   const pollenPercent = playerProgress.pollenCapacity > 0 ? (playerProgress.pollenCarried / playerProgress.pollenCapacity) * 100 : 0;
   const lifePercent = playerProgress.maxLife > 0 ? (playerProgress.currentLife / playerProgress.maxLife) * 100 : 0;
+  const energyPercent = playerProgress.maxEnergy > 0 ? (playerProgress.currentEnergy / playerProgress.maxEnergy) * 100 : 0;
   const respawnSeconds =
     playerProgress.isDead && playerProgress.respawnEndsAt
       ? Math.max(0, Math.ceil((playerProgress.respawnEndsAt - Date.now()) / 1000))
@@ -121,9 +122,25 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteract
 
           <div className="w-px h-8 bg-slate-700/60" />
 
+            <div className={styles.vitalBlock}>
+              <span className={styles.vitalLabel}>Energia</span>
+              <div className={styles.vitalValue}>
+                {playerProgress.currentEnergy}
+                <span>/ {playerProgress.maxEnergy}</span>
+              </div>
+              <div className={styles.lifeTrack}>
+                <div
+                  className="h-full rounded-[inherit] bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-300 transition-all duration-300"
+                  style={{ width: `${energyPercent}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="w-px h-8 bg-slate-700/60" />
+
           {/* Pollen */}
           <div className="flex flex-col items-center">
-            <span className="text-[9px] font-bold text-amber-200/80 uppercase tracking-widest mb-1">Energia (Pólen)</span>
+              <span className="text-[9px] font-bold text-amber-200/80 uppercase tracking-widest mb-1">Pólen</span>
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.8)]" />
               <span className="text-base font-black text-white drop-shadow-md tracking-tight">
@@ -136,6 +153,7 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteract
                 style={{ width: `${pollenPercent}%` }}
               />
             </div>
+              <span className="mt-1 text-[10px] font-medium text-slate-400">Coleta para converter em mel</span>
           </div>
           
           {/* Divider */}

@@ -288,6 +288,9 @@ func shouldSendInitialProgress(progress *loopbase.PlayerProgress) bool {
 	if progress.PollenCarried != 0 || progress.Honey != 0 || progress.Level != 1 || progress.XP != 0 || progress.SkillPoints != 1 {
 		return true
 	}
+	if progress.CurrentEnergy != defaultMaxPlayerEnergy || progress.MaxEnergy != defaultMaxPlayerEnergy {
+		return true
+	}
 
 	if progress.PollenCapacity != 40 || progress.CurrentZoneID != zones.DefaultCurrentZoneID() {
 		return true

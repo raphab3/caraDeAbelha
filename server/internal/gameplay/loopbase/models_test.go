@@ -246,7 +246,7 @@ func TestPlayerProgressJSONMarshal(t *testing.T) {
 	}
 
 	// Verify all expected fields are present with correct camelCase names
-	expectedFields := []string{"playerId", "pollenCarried", "pollenCapacity", "honey", "level", "xp", "skillPoints", "currentZoneId", "unlockedZoneIds"}
+	expectedFields := []string{"playerId", "pollenCarried", "pollenCapacity", "honey", "level", "xp", "skillPoints", "currentZoneId", "unlockedZoneIds", "currentLife", "maxLife", "currentEnergy", "maxEnergy"}
 	for _, field := range expectedFields {
 		if _, exists := jsonMap[field]; !exists {
 			t.Errorf("expected JSON field %q not found in marshaled output", field)

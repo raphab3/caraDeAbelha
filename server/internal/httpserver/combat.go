@@ -10,8 +10,10 @@ import (
 
 const (
 	defaultMaxPlayerLife        = 100
+	defaultMaxPlayerEnergy      = 100
 	defaultLifeRegenDelay       = 5 * time.Second
 	defaultLifeRegenPerSecond   = 4.0
+	defaultEnergyRegenPerSecond = 10.0
 	defaultCombatTagDuration    = 5 * time.Second
 	defaultRespawnDelay         = 3 * time.Second
 	defaultSpawnProtectionDelay = 2 * time.Second
@@ -36,8 +38,20 @@ func (hub *gameHub) ensurePlayerCombatLocked(player *playerState, progress *loop
 	if progress.CurrentLife > progress.MaxLife {
 		progress.CurrentLife = progress.MaxLife
 	}
+	if progress.MaxEnergy <= 0 {
+		progress.MaxEnergy = defaultMaxPlayerEnergy
+	}
+	if progress.CurrentEnergy <= 0 && !progress.IsDead {
+		progress.CurrentEnergy = progress.MaxEnergy
+	}
+	if progress.CurrentEnergy > progress.MaxEnergy {
+		progress.CurrentEnergy = progress.MaxEnergy
+	}
 	if progress.LastLifeRegenAt.IsZero() {
 		progress.LastLifeRegenAt = now
+	}
+	if progress.LastEnergyRegenAt.IsZero() {
+		progress.LastEnergyRegenAt = now
 	}
 
 	hub.syncPlayerCombatStateLocked(player, progress)
@@ -73,13 +87,14 @@ func (hub *gameHub) isPlayerActionBlockedByDeathLocked(clientID string, action s
 }
 
 func (hub *gameHub) consumeSkillEnergyLocked(client *clientSession, progress *loopbase.PlayerProgress, skill beeSkillDefinition) bool {
-	if progress.PollenCarried < skill.EnergyCostPollen {
-		hub.sendUseSkillFailure(client, "insufficient_energy", "Energia (Polen) insuficiente")
+	if progress.CurrentEnergy < skill.EnergyCostPollen {
+		hub.sendUseSkillFailure(client, "insufficient_energy", "Energia insuficiente")
 		hub.sendPlayerStatus(client, progress)
 		return false
 	}
 
-	progress.PollenCarried -= skill.EnergyCostPollen
+	progress.CurrentEnergy -= skill.EnergyCostPollen
+	progress.LastEnergyRegenAt = hub.now()
 	return true
 }
 
@@ -200,10 +215,12 @@ func (hub *gameHub) respawnDeadPlayerLocked(player *playerState, progress *loopb
 	hub.clearPlayerMovementLocked(player)
 	player.UpdatedAt = now
 	progress.CurrentLife = progress.MaxLife
+	progress.CurrentEnergy = progress.MaxEnergy
 	progress.IsDead = false
 	progress.RespawnAt = time.Time{}
 	progress.LastDamageAt = time.Time{}
 	progress.LastLifeRegenAt = now
+	progress.LastEnergyRegenAt = now
 	progress.SpawnProtectionUntil = now.Add(defaultSpawnProtectionDelay)
 	progress.CombatTagUntil = time.Time{}
 	progress.SlowUntil = time.Time{}
@@ -246,6 +263,31 @@ func (hub *gameHub) regeneratePlayerLifeLocked(player *playerState, progress *lo
 	return hub.healPlayerLocked(player, player, amount, "natural_regen", now)
 }
 
+func (hub *gameHub) regeneratePlayerEnergyLocked(progress *loopbase.PlayerProgress, now time.Time) bool {
+	if progress == nil || progress.IsDead || progress.CurrentEnergy >= progress.MaxEnergy {
+		progress.LastEnergyRegenAt = now
+		return false
+	}
+
+	elapsed := now.Sub(progress.LastEnergyRegenAt).Seconds()
+	if elapsed <= 0 {
+		return false
+	}
+
+	amount := int(math.Floor(elapsed * defaultEnergyRegenPerSecond))
+	if amount <= 0 {
+		return false
+	}
+
+	progress.LastEnergyRegenAt = now
+	progress.CurrentEnergy += amount
+	if progress.CurrentEnergy > progress.MaxEnergy {
+		progress.CurrentEnergy = progress.MaxEnergy
+	}
+	progress.UpdatedAt = now
+	return true
+}
+
 func (hub *gameHub) clearPlayerCombatAreasLocked(playerID string) {
 	for effectID, effect := range hub.activeCombatAreas {
 		if effect.OwnerPlayerID == playerID {
@@ -264,6 +306,9 @@ func (hub *gameHub) processCombatRuntimeLocked(now time.Time) bool {
 			continue
 		}
 		if hub.regeneratePlayerLifeLocked(player, progress, now) {
+			changed = true
+		}
+		if hub.regeneratePlayerEnergyLocked(progress, now) {
 			changed = true
 		}
 		if progress.SlowUntil.Before(now) && !progress.IsDead && player.Speed != defaultPlayerSpeed {

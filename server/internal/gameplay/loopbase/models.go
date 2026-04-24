@@ -28,9 +28,12 @@ type PlayerProgress struct {
 	SkillRuntime         []PlayerSkillRuntime `json:"skillRuntime"`
 	CurrentLife          int                  `json:"currentLife"`
 	MaxLife              int                  `json:"maxLife"`
+	CurrentEnergy        int                  `json:"currentEnergy"`
+	MaxEnergy            int                  `json:"maxEnergy"`
 	IsDead               bool                 `json:"isDead"`
 	LastDamageAt         time.Time            `json:"-"`
 	LastLifeRegenAt      time.Time            `json:"-"`
+	LastEnergyRegenAt    time.Time            `json:"-"`
 	RespawnAt            time.Time            `json:"-"`
 	SpawnProtectionUntil time.Time            `json:"-"`
 	CombatTagUntil       time.Time            `json:"-"`

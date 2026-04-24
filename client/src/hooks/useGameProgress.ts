@@ -65,6 +65,8 @@ export function useGameProgress() {
       skillCatalog: DEFAULT_SKILL_CATALOG,
       currentLife: 100,
       maxLife: 100,
+      currentEnergy: 100,
+      maxEnergy: 100,
       isDead: false,
     }),
     lastInteraction,

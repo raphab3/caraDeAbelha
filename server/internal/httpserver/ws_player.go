@@ -1109,7 +1109,7 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 	case "skill:impulso":
 		effect, ok := hub.triggerImpulsoLocked(player, slot, now, currentLevel)
 		if !ok {
-			progress.PollenCarried += skill.EnergyCostPollen
+			progress.CurrentEnergy += skill.EnergyCostPollen
 			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Sem espaco livre para usar Impulso agora")
 			return false
 		}
@@ -1118,7 +1118,7 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 	case "skill:atirar-ferrao":
 		effect, ok := hub.triggerAtirarFerraoLocked(player, slot, now, currentLevel)
 		if !ok {
-			progress.PollenCarried += skill.EnergyCostPollen
+			progress.CurrentEnergy += skill.EnergyCostPollen
 			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Sem direcao valida para disparar o Ferrão")
 			return false
 		}
@@ -1132,7 +1132,7 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 	case "skill:slime-de-mel":
 		effect, ok := hub.triggerSlimeDeMelLocked(player, slot, now, currentLevel)
 		if !ok {
-			progress.PollenCarried += skill.EnergyCostPollen
+			progress.CurrentEnergy += skill.EnergyCostPollen
 			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Nao foi possivel posicionar o Slime de Mel")
 			return false
 		}
@@ -1141,7 +1141,7 @@ func (hub *gameHub) useSkill(clientID string, slot int) bool {
 	case "skill:flor-de-nectar":
 		effect, ok := hub.triggerFlorDeNectarLocked(player, slot, now, currentLevel)
 		if !ok {
-			progress.PollenCarried += skill.EnergyCostPollen
+			progress.CurrentEnergy += skill.EnergyCostPollen
 			hub.sendUseSkillFailure(client, useSkillReasonBlockedPath, "Nao foi possivel florescer Nectar agora")
 			return false
 		}

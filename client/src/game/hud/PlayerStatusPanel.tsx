@@ -56,6 +56,9 @@ function PlayerStatusPanelContent({ currentZoneName, onClose, onDragStart, playe
   const xpRequired = getXpRequiredForLevel(playerProgress.level);
   const isAtMaxLevel = playerProgress.level >= MAX_PLAYER_LEVEL;
   const xpProgress = isAtMaxLevel || xpRequired <= 0 ? 100 : Math.min((playerProgress.xp / xpRequired) * 100, 100);
+  const energyProgress = playerProgress.maxEnergy > 0
+    ? Math.min((playerProgress.currentEnergy / playerProgress.maxEnergy) * 100, 100)
+    : 0;
   const pollenProgress = playerProgress.pollenCapacity > 0
     ? Math.min((playerProgress.pollenCarried / playerProgress.pollenCapacity) * 100, 100)
     : 0;
@@ -122,13 +125,23 @@ function PlayerStatusPanelContent({ currentZoneName, onClose, onDragStart, playe
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <article className="rounded-[22px] border border-slate-800/90 bg-slate-900/72 p-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-200/70">Energia</p>
+          <p className="mt-2 text-2xl font-black text-white">{playerProgress.currentEnergy}<span className="ml-1 text-sm font-semibold text-slate-400">/ {playerProgress.maxEnergy}</span></p>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
+            <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-300" style={{ width: `${energyProgress}%` }} />
+          </div>
+          <p className="mt-3 text-xs text-slate-400">Recupera sozinha ao longo do tempo.</p>
+        </article>
+
         <article className="rounded-[22px] border border-slate-800/90 bg-slate-900/72 p-3">
           <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-yellow-200/70">Pólen</p>
           <p className="mt-2 text-2xl font-black text-white">{playerProgress.pollenCarried}<span className="ml-1 text-sm font-semibold text-slate-400">/ {playerProgress.pollenCapacity}</span></p>
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
             <div className="h-full rounded-full bg-gradient-to-r from-yellow-400 to-amber-500" style={{ width: `${pollenProgress}%` }} />
           </div>
+          <p className="mt-3 text-xs text-slate-400">Leve para a colmeia e converta em mel.</p>
         </article>
 
         <article className="rounded-[22px] border border-slate-800/90 bg-slate-900/72 p-3">

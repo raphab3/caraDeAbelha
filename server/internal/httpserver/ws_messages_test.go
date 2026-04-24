@@ -12,19 +12,21 @@ import (
 // TestPlayerStatusMessageStructure verifies playerStatusMessage JSON marshaling.
 func TestPlayerStatusMessageStructure(t *testing.T) {
 	progress := &loopbase.PlayerProgress{
-		PlayerID:        "player-123",
-		PollenCarried:   42,
-		PollenCapacity:  100,
-		Honey:           5,
-		Level:           2,
-		XP:              150,
-		SkillPoints:     1,
-		CurrentZoneID:   "zone-forest",
-		UnlockedZoneIDs: []string{"zone-forest", "zone-meadow"},
-		OwnedSkillIDs:   []string{"skill:impulso", "skill:flor-de-nectar"},
-		EquippedSkills:  []string{"skill:impulso", "", "skill:flor-de-nectar", ""},
+		PlayerID:           "player-123",
+		PollenCarried:      42,
+		PollenCapacity:     100,
+		Honey:              5,
+		Level:              2,
+		XP:                 150,
+		SkillPoints:        1,
+		CurrentZoneID:      "zone-forest",
+		UnlockedZoneIDs:    []string{"zone-forest", "zone-meadow"},
+		OwnedSkillIDs:      []string{"skill:impulso", "skill:flor-de-nectar"},
+		EquippedSkills:     []string{"skill:impulso", "", "skill:flor-de-nectar", ""},
 		SkillUpgradeLevels: map[string]int{"skill:impulso": 2},
-		UpdatedAt:       time.Now(),
+		CurrentEnergy:      64,
+		MaxEnergy:          100,
+		UpdatedAt:          time.Now(),
 	}
 
 	msg := newPlayerStatusMessage(progress)
@@ -59,6 +61,12 @@ func TestPlayerStatusMessageStructure(t *testing.T) {
 	if msg.CurrentZoneID != progress.CurrentZoneID {
 		t.Errorf("expected CurrentZoneID %q, got %q", progress.CurrentZoneID, msg.CurrentZoneID)
 	}
+	if msg.CurrentEnergy != progress.CurrentEnergy {
+		t.Errorf("expected CurrentEnergy %d, got %d", progress.CurrentEnergy, msg.CurrentEnergy)
+	}
+	if msg.MaxEnergy != progress.MaxEnergy {
+		t.Errorf("expected MaxEnergy %d, got %d", progress.MaxEnergy, msg.MaxEnergy)
+	}
 	if len(msg.UnlockedZoneIDs) != len(progress.UnlockedZoneIDs) {
 		t.Errorf("expected %d unlocked zones, got %d", len(progress.UnlockedZoneIDs), len(msg.UnlockedZoneIDs))
 	}
@@ -88,6 +96,8 @@ func TestPlayerStatusMessageJSON(t *testing.T) {
 		SkillPoints:     0,
 		CurrentZoneID:   "zone-start",
 		UnlockedZoneIDs: []string{"zone-start"},
+		CurrentEnergy:   80,
+		MaxEnergy:       100,
 	}
 
 	msg := newPlayerStatusMessage(progress)
@@ -118,6 +128,8 @@ func TestPlayerStatusMessageJSON(t *testing.T) {
 		"equippedSkills":  true,
 		"skillUpgrades":   true,
 		"skillCatalog":    true,
+		"currentEnergy":   true,
+		"maxEnergy":       true,
 	}
 
 	for expectedField := range expectedFields {
@@ -138,6 +150,9 @@ func TestPlayerStatusMessageJSON(t *testing.T) {
 	}
 	if parsed["honey"] != float64(3) {
 		t.Errorf("expected honey 3 in JSON, got %v", parsed["honey"])
+	}
+	if parsed["currentEnergy"] != float64(80) {
+		t.Errorf("expected currentEnergy 80 in JSON, got %v", parsed["currentEnergy"])
 	}
 	if parsed["skillCatalog"] == nil {
 		t.Fatalf("expected skillCatalog in JSON payload")
@@ -162,6 +177,9 @@ func TestPlayerStatusMessageWithNilProgress(t *testing.T) {
 	}
 	if len(msg.SkillCatalog) != len(beeSkillCatalog) {
 		t.Errorf("expected default skill catalog with %d entries, got %d", len(beeSkillCatalog), len(msg.SkillCatalog))
+	}
+	if msg.CurrentEnergy != defaultMaxPlayerEnergy || msg.MaxEnergy != defaultMaxPlayerEnergy {
+		t.Errorf("expected default energy %d/%d with nil progress, got %d/%d", defaultMaxPlayerEnergy, defaultMaxPlayerEnergy, msg.CurrentEnergy, msg.MaxEnergy)
 	}
 }
 
@@ -277,6 +295,8 @@ func TestPlayerStatusMessageRoundTrip(t *testing.T) {
 		UnlockedZoneIDs: []string{"zone-start", "zone-forest", "zone-meadow"},
 		OwnedSkillIDs:   []string{"skill:impulso", "skill:slime-de-mel"},
 		EquippedSkills:  []string{"skill:impulso", "", "skill:slime-de-mel", ""},
+		CurrentEnergy:   55,
+		MaxEnergy:       100,
 	}
 
 	original := newPlayerStatusMessage(progress)
@@ -301,6 +321,9 @@ func TestPlayerStatusMessageRoundTrip(t *testing.T) {
 	}
 	if restored.Honey != original.Honey {
 		t.Errorf("Honey mismatch: %d vs %d", original.Honey, restored.Honey)
+	}
+	if restored.CurrentEnergy != original.CurrentEnergy {
+		t.Errorf("CurrentEnergy mismatch: %d vs %d", original.CurrentEnergy, restored.CurrentEnergy)
 	}
 	if len(restored.UnlockedZoneIDs) != len(original.UnlockedZoneIDs) {
 		t.Errorf("UnlockedZoneIDs length mismatch: %d vs %d", len(original.UnlockedZoneIDs), len(restored.UnlockedZoneIDs))

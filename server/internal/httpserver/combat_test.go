@@ -35,16 +35,20 @@ func TestCombatProjectileDamageAndEnergyCost(t *testing.T) {
 	target := addCombatTestPlayer(hub, "player:target", 2.0, 0.5, now)
 	progress := hub.ensurePlayerProgressLocked(caster.ID)
 	progress.PollenCarried = progress.PollenCapacity
+	progress.CurrentEnergy = progress.MaxEnergy
 	skill, ok := findBeeSkillDefinition("skill:atirar-ferrao")
 	if !ok {
 		t.Fatalf("expected Atirar Ferrao definition")
 	}
 
 	if !hub.consumeSkillEnergyLocked(nil, progress, skill) {
-		t.Fatalf("expected enough pollen energy to cast")
+		t.Fatalf("expected enough energy to cast")
 	}
-	if progress.PollenCarried != progress.PollenCapacity-skill.EnergyCostPollen {
-		t.Fatalf("expected pollen energy cost %d, got carried=%d", skill.EnergyCostPollen, progress.PollenCarried)
+	if progress.CurrentEnergy != progress.MaxEnergy-skill.EnergyCostPollen {
+		t.Fatalf("expected energy cost %d, got current=%d", skill.EnergyCostPollen, progress.CurrentEnergy)
+	}
+	if progress.PollenCarried != progress.PollenCapacity {
+		t.Fatalf("expected carried pollen to remain %d, got %d", progress.PollenCapacity, progress.PollenCarried)
 	}
 
 	effect, ok := hub.triggerAtirarFerraoLocked(caster, 0, now, 0)
@@ -62,6 +66,22 @@ func TestCombatProjectileDamageAndEnergyCost(t *testing.T) {
 	targetProgress := hub.ensurePlayerProgressLocked(target.ID)
 	if targetProgress.CurrentLife != defaultMaxPlayerLife-defaultFerraoDamage {
 		t.Fatalf("expected target life %d, got %d", defaultMaxPlayerLife-defaultFerraoDamage, targetProgress.CurrentLife)
+	}
+}
+
+func TestCombatEnergyRegeneratesOverTime(t *testing.T) {
+	now := time.Date(2026, time.April, 24, 13, 1, 0, 0, time.UTC)
+	hub := newRuntimeTestHub(now)
+	player := addCombatTestPlayer(hub, "player:caster", 0.5, 0.5, now)
+	progress := hub.ensurePlayerProgressLocked(player.ID)
+	progress.CurrentEnergy = 10
+	progress.LastEnergyRegenAt = now
+
+	if !hub.processCombatRuntimeLocked(now.Add(2 * time.Second)) {
+		t.Fatalf("expected combat runtime to regenerate energy")
+	}
+	if progress.CurrentEnergy <= 10 {
+		t.Fatalf("expected energy to regenerate, got %d", progress.CurrentEnergy)
 	}
 }
 

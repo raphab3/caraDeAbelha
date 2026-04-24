@@ -43,12 +43,15 @@ export const validateGameTypes = () => {
     skillCatalog: DEFAULT_SKILL_CATALOG,
     currentLife: 80,
     maxLife: 100,
+    currentEnergy: 65,
+    maxEnergy: 100,
     isDead: false,
   };
 
   console.assert(testProgress.pollenCarried === 50, "PlayerProgressState: pollenCarried mismatch");
   console.assert(testProgress.pollenCapacity === 100, "PlayerProgressState: pollenCapacity mismatch");
   console.assert(testProgress.honey === 250, "PlayerProgressState: honey mismatch");
+  console.assert(testProgress.currentEnergy === 65, "PlayerProgressState: currentEnergy mismatch");
 
   // Validate InteractionResult structure
   const testInteraction: InteractionResult = {
@@ -92,12 +95,15 @@ export const validateGameTypes = () => {
     skillCatalog: DEFAULT_SKILL_CATALOG,
     currentLife: 75,
     maxLife: 100,
+    currentEnergy: 40,
+    maxEnergy: 100,
     isDead: false,
   };
 
   console.assert(testStatusMsg.type === "player_status", "PlayerStatusMessage: type mismatch");
   console.assert(testStatusMsg.playerId === "p1", "PlayerStatusMessage: playerId mismatch");
   console.assert(testStatusMsg.pollenCarried === 75, "PlayerStatusMessage: pollenCarried mismatch");
+  console.assert(testStatusMsg.currentEnergy === 40, "PlayerStatusMessage: currentEnergy mismatch");
 
   const testSkillEffectsMessage: SkillEffectsMessage = {
     type: "skill_effects",

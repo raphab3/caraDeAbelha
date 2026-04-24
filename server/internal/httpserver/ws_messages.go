@@ -257,6 +257,8 @@ type playerStatusMessage struct {
 	SkillCatalog          []skillCatalogEntryMessage `json:"skillCatalog"`
 	CurrentLife           int                        `json:"currentLife"`
 	MaxLife               int                        `json:"maxLife"`
+	CurrentEnergy         int                        `json:"currentEnergy"`
+	MaxEnergy             int                        `json:"maxEnergy"`
 	IsDead                bool                       `json:"isDead"`
 	RespawnEndsAt         int64                      `json:"respawnEndsAt,omitempty"`
 	SpawnProtectionEndsAt int64                      `json:"spawnProtectionEndsAt,omitempty"`
@@ -316,6 +318,8 @@ func newPlayerStatusMessage(progress *loopbase.PlayerProgress) playerStatusMessa
 			SkillCatalog:   buildSkillCatalogMessage(),
 			CurrentLife:    defaultMaxPlayerLife,
 			MaxLife:        defaultMaxPlayerLife,
+			CurrentEnergy:  defaultMaxPlayerEnergy,
+			MaxEnergy:      defaultMaxPlayerEnergy,
 		}
 	}
 
@@ -342,6 +346,8 @@ func newPlayerStatusMessage(progress *loopbase.PlayerProgress) playerStatusMessa
 		SkillCatalog:          buildSkillCatalogMessage(),
 		CurrentLife:           progress.CurrentLife,
 		MaxLife:               progress.MaxLife,
+		CurrentEnergy:         progress.CurrentEnergy,
+		MaxEnergy:             progress.MaxEnergy,
 		IsDead:                progress.IsDead,
 		RespawnEndsAt:         combatTimeMillis(progress.RespawnAt),
 		SpawnProtectionEndsAt: combatTimeMillis(progress.SpawnProtectionUntil),

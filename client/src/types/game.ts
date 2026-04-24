@@ -379,6 +379,8 @@ export interface PlayerProgressState {
   skillCatalog: SkillCatalogEntry[];
   currentLife: number;
   maxLife: number;
+  currentEnergy: number;
+  maxEnergy: number;
   isDead: boolean;
   respawnEndsAt?: number;
   spawnProtectionEndsAt?: number;
@@ -446,6 +448,8 @@ export interface PlayerStatusMessage {
   skillCatalog: SkillCatalogEntry[];
   currentLife: number;
   maxLife: number;
+  currentEnergy: number;
+  maxEnergy: number;
   isDead: boolean;
   respawnEndsAt?: number;
   spawnProtectionEndsAt?: number;
