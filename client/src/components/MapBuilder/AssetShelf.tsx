@@ -30,7 +30,7 @@ export function AssetShelf({ items, selectedPrefabId, onSelect }: AssetShelfProp
   }, [items]);
 
   return (
-    <section className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(2,6,23,0.88),rgba(2,6,23,0.94))] p-3 shadow-[0_18px_44px_rgba(2,6,23,0.32)] backdrop-blur-xl md:p-4">
+    <section className="rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(2,6,23,0.88),rgba(2,6,23,0.94))] p-2.5 shadow-[0_14px_30px_rgba(2,6,23,0.28)] backdrop-blur-xl md:p-3">
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">Biblioteca de itens</p>
@@ -41,11 +41,11 @@ export function AssetShelf({ items, selectedPrefabId, onSelect }: AssetShelfProp
         </span>
       </div>
 
-      <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
         {groupedItems.map(([category, categoryItems]) => (
-          <section key={category} className="min-w-[200px] max-w-[220px] shrink-0 rounded-[22px] border border-white/10 bg-black/20 p-3">
+          <section key={category} className="min-w-[170px] max-w-[190px] shrink-0 rounded-[18px] border border-white/10 bg-black/20 p-2.5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-amber-200/72">{CATEGORY_LABELS[category]}</p>
-            <div className="mt-3 grid max-h-[168px] gap-2 overflow-y-auto pr-1">
+            <div className="mt-2 grid max-h-[140px] gap-1.5 overflow-y-auto pr-1">
               {categoryItems.map((item) => {
                 const isSelected = item.prefabId === selectedPrefabId;
 
@@ -53,7 +53,7 @@ export function AssetShelf({ items, selectedPrefabId, onSelect }: AssetShelfProp
                   <button
                     key={item.prefabId}
                     className={[
-                      "flex min-h-10 w-full items-center justify-between gap-3 rounded-2xl border px-3 py-2.5 text-left text-sm font-semibold transition-colors",
+                      "flex min-h-9 w-full items-center justify-between gap-2 rounded-xl border px-2.5 py-2 text-left text-sm font-semibold transition-colors",
                       isSelected
                         ? "border-amber-300/45 bg-amber-300/16 text-amber-100"
                         : "border-white/10 bg-white/5 text-slate-100 hover:border-amber-200/20 hover:bg-white/10",
