@@ -85,6 +85,30 @@ function formatDistanceLabel(distance: number): string {
   return `${distance.toFixed(distance >= 10 ? 0 : 1)}m`;
 }
 
+function resolveDistanceLabel(skillId: string): string {
+  switch (skillId) {
+    case "skill:impulso":
+      return "Pulo";
+    case "skill:atirar-ferrao":
+      return "Alcance";
+    default:
+      return "Distancia";
+  }
+}
+
+function resolvePowerLabel(skillId: string): string {
+  switch (skillId) {
+    case "skill:atirar-ferrao":
+      return "Poder";
+    case "skill:slime-de-mel":
+      return "Intensidade";
+    case "skill:flor-de-nectar":
+      return "Forca";
+    default:
+      return "Power";
+  }
+}
+
 function resolveActionLabel(
   entry: SkillCatalogEntry,
   isEditingSkills: boolean,
@@ -260,15 +284,17 @@ export const SkillShopPanel = ({
   const activeSkillAction = resolveActionLabel(activeSkill, isEditingSkills, normalizedProgress, selectedSkillId);
   const activeSkillUpgrade = normalizedProgress.skillUpgrades.find((entry) => entry.skillId === activeSkill.id);
   const canUpgradeActiveSkill = Boolean(activeSkillOwned && activeSkillUpgrade?.canUpgrade && normalizedProgress.honey >= activeSkillUpgrade.nextUpgradeCost);
+  const distanceLabel = resolveDistanceLabel(activeSkill.id);
+  const powerLabel = resolvePowerLabel(activeSkill.id);
   const currentStats = [
     { key: "cooldown", label: "Cooldown", value: formatCooldownLabel(activeSkillUpgrade?.currentCooldownMs ?? activeSkill.baseCooldownMs), visible: true },
-    { key: "distance", label: "Distancia", value: formatDistanceLabel(activeSkillUpgrade?.currentDistance ?? activeSkill.baseDistance), visible: (activeSkillUpgrade?.currentDistance ?? activeSkill.baseDistance) > 0 },
-    { key: "power", label: "Power", value: formatPowerLabel(activeSkillUpgrade?.currentPower ?? activeSkill.basePower), visible: (activeSkillUpgrade?.currentPower ?? activeSkill.basePower) > 0 },
+    { key: "distance", label: distanceLabel, value: formatDistanceLabel(activeSkillUpgrade?.currentDistance ?? activeSkill.baseDistance), visible: (activeSkillUpgrade?.currentDistance ?? activeSkill.baseDistance) > 0 },
+    { key: "power", label: powerLabel, value: formatPowerLabel(activeSkillUpgrade?.currentPower ?? activeSkill.basePower), visible: (activeSkillUpgrade?.currentPower ?? activeSkill.basePower) > 0 },
   ].filter((entry) => entry.visible);
   const nextStats = [
     { key: "cooldown", label: "Cooldown", value: formatCooldownLabel(activeSkillUpgrade?.nextCooldownMs ?? activeSkill.baseCooldownMs), visible: Boolean(activeSkillUpgrade?.canUpgrade) },
-    { key: "distance", label: "Distancia", value: formatDistanceLabel(activeSkillUpgrade?.nextDistance ?? activeSkill.baseDistance), visible: Boolean(activeSkillUpgrade?.canUpgrade) && (activeSkillUpgrade?.nextDistance ?? activeSkill.baseDistance) > 0 },
-    { key: "power", label: "Power", value: formatPowerLabel(activeSkillUpgrade?.nextPower ?? activeSkill.basePower), visible: Boolean(activeSkillUpgrade?.canUpgrade) && (activeSkillUpgrade?.nextPower ?? activeSkill.basePower) > 0 },
+    { key: "distance", label: distanceLabel, value: formatDistanceLabel(activeSkillUpgrade?.nextDistance ?? activeSkill.baseDistance), visible: Boolean(activeSkillUpgrade?.canUpgrade) && (activeSkillUpgrade?.nextDistance ?? activeSkill.baseDistance) > 0 },
+    { key: "power", label: powerLabel, value: formatPowerLabel(activeSkillUpgrade?.nextPower ?? activeSkill.basePower), visible: Boolean(activeSkillUpgrade?.canUpgrade) && (activeSkillUpgrade?.nextPower ?? activeSkill.basePower) > 0 },
   ].filter((entry) => entry.visible);
 
   return (
