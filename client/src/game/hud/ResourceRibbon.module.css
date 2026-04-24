@@ -1,0 +1,117 @@
+.loading {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border: 1px solid #334155;
+  border-radius: 0.75rem;
+  background: rgba(15, 23, 42, 0.8);
+  box-shadow: 0 20px 25px rgba(15, 23, 42, 0.3);
+  backdrop-filter: blur(12px);
+}
+
+.loadingText {
+  color: #fde68a;
+  font-weight: 500;
+}
+
+.root {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 1rem;
+  pointer-events: none;
+}
+
+.groups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  border: 1px solid rgba(51, 65, 85, 0.6);
+  border-radius: var(--radius-pill);
+  background: rgba(15, 23, 42, 0.7);
+  box-shadow: 0 20px 25px rgba(15, 23, 42, 0.28);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+}
+
+.levelPill {
+  padding: 0.375rem 1.25rem 0.375rem 0.375rem;
+}
+
+.resourcePill {
+  gap: 1.25rem;
+  padding: 0.625rem 1.25rem;
+}
+
+.flowerStatusWrap {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.flowerStatus {
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 20px 25px rgba(15, 23, 42, 0.3);
+  backdrop-filter: blur(12px);
+}
+
+.flowerCollecting {
+  border-color: rgba(167, 243, 208, 0.6);
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.9), rgba(163, 230, 53, 0.9));
+  color: #ecfdf5;
+}
+
+.flowerTargeting {
+  border-color: rgba(186, 230, 253, 0.6);
+  background: linear-gradient(90deg, rgba(14, 165, 233, 0.9), rgba(34, 211, 238, 0.9));
+  color: #f0f9ff;
+}
+
+.flashWrap {
+  position: fixed;
+  top: 6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: bounce 1s infinite;
+  pointer-events: none;
+}
+
+.flash {
+  padding: 0.5rem 1.25rem;
+  border: 2px solid;
+  border-radius: var(--radius-pill);
+  color: #ffffff;
+  font-size: 1.125rem;
+  font-weight: 900;
+}
+
+.flashXp {
+  border-color: rgba(240, 171, 252, 0.5);
+  background: linear-gradient(90deg, #d946ef, #7c3aed);
+  box-shadow: 0 4px 24px rgba(168, 85, 247, 0.45);
+}
+
+.flashReward {
+  border-color: rgba(134, 239, 172, 0.5);
+  background: linear-gradient(90deg, #22c55e, #059669);
+  box-shadow: 0 4px 24px rgba(16, 185, 129, 0.5);
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translate(-50%, -25%); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); }
+  50% { transform: translate(-50%, 0); animation-timing-function: cubic-bezier(0, 0, 0.2, 1); }
+}

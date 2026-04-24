@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import styles from "./MiniMap.module.css";
 import type { FlowerInteractionState, HiveInteractionState, WorldHiveState, WorldPlayerState } from "../../types/game";
 
 const RADAR_RADIUS = 50;
@@ -53,6 +54,10 @@ const COLLECTOR_HIVE_FALLBACK: WorldHiveState = {
 	toneColor: "#d7963a",
 	glowColor: "#ffe08a",
 };
+
+function cx(...classes: Array<string | false | undefined>): string {
+	return classes.filter(Boolean).join(" ");
+}
 
 function clampPercent(value: number): number {
 	return Math.min(100, Math.max(0, value));
@@ -216,12 +221,12 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 
 	return (
 		<aside
-			className={`mini-map${collapsed ? " mini-map--collapsed" : ""}`}
+			className={cx(styles.miniMap, collapsed && styles.collapsed)}
 			aria-label="Mini mapa dos jogadores"
 		>
-			<div className="mini-map__header">
-				<div className="mini-map__header-left">
-					<span className="mini-map__radar-icon" aria-hidden="true">
+			<div className={styles.header}>
+				<div className={styles.headerLeft}>
+					<span className={styles.radarIcon} aria-hidden="true">
 						<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
 							<circle cx="10" cy="10" r="8.5" stroke="currentColor" strokeWidth="1.4" opacity="0.6" />
 							<circle cx="10" cy="10" r="5.5" stroke="currentColor" strokeWidth="1.2" opacity="0.45" />
@@ -232,14 +237,14 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 					</span>
 				</div>
 
-				<div className="mini-map__header-actions">
+				<div className={styles.headerActions}>
 					{!collapsed ? (
-						<span className="mini-map__bounds">{Math.round(bounds.width)}m</span>
+						<span className={styles.bounds}>{Math.round(bounds.width)}m</span>
 					) : null}
 
 					<button
 						type="button"
-						className="mini-map__toggle"
+						className={styles.toggle}
 						aria-label={collapsed ? "Expandir minimapa" : "Minimizar minimapa"}
 						aria-keyshortcuts="M"
 						aria-expanded={!collapsed}
@@ -252,27 +257,27 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 
 			{!collapsed ? (
 				<>
-					<div className="mini-map__surface">
-						<div className="mini-map__grid" />
+					<div className={styles.surface}>
+						<div className={styles.grid} />
 
-						<span className="mini-map__compass mini-map__compass--n">N</span>
-						<span className="mini-map__compass mini-map__compass--s">S</span>
-						<span className="mini-map__compass mini-map__compass--w">O</span>
-						<span className="mini-map__compass mini-map__compass--e">L</span>
+						<span className={cx(styles.compass, styles.compassN)}>N</span>
+						<span className={cx(styles.compass, styles.compassS)}>S</span>
+						<span className={cx(styles.compass, styles.compassW)}>O</span>
+						<span className={cx(styles.compass, styles.compassE)}>L</span>
 
 						<div
-							className="mini-map__marker"
+							className={styles.marker}
 							style={{ left: `${collectorPoi.left}%`, top: `${collectorPoi.top}%` }}
 						>
-							<span className="mini-map__collector-marker" aria-label={collectorPoi.label} />
+							<span className={styles.collectorMarker} aria-label={collectorPoi.label} />
 						</div>
 
 						{flowerPoi ? (
 							<div
-								className="mini-map__marker"
+								className={styles.marker}
 								style={{ left: `${flowerPoi.left}%`, top: `${flowerPoi.top}%` }}
 							>
-								<span className={`mini-map__flower-marker${flowerInteraction?.phase === "collecting" ? " mini-map__flower-marker--collecting" : ""}`} aria-label={flowerPoi.label} />
+								<span className={cx(styles.flowerMarker, flowerInteraction?.phase === "collecting" && styles.flowerMarkerCollecting)} aria-label={flowerPoi.label} />
 							</div>
 						) : null}
 
@@ -280,29 +285,29 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 							player.isLocal ? (
 								<div
 									key={player.id}
-									className="mini-map__marker mini-map__marker--local"
+									className={cx(styles.marker, styles.markerLocal)}
 									style={{ left: `${player.left}%`, top: `${player.top}%` }}
 								>
-									<span className="mini-map__local-triangle" aria-label="Você" />
+									<span className={styles.localTriangle} aria-label="Você" />
 								</div>
 							) : (
 								<button
 									key={player.id}
 									type="button"
-									className={`mini-map__marker mini-map__marker--remote${hoveredPlayerId === player.id ? " mini-map__marker--hovered" : ""}`}
+									className={cx(styles.marker, styles.markerRemote, hoveredPlayerId === player.id && styles.markerHovered)}
 									style={{ left: `${player.left}%`, top: `${player.top}%` }}
 									aria-label={`Ir até ${player.username} em lat ${formatLatitude(player.y)} e long ${formatLongitude(player.x)}`}
 									onClick={() => onPlayerClick?.(player.x, player.y)}
 									onMouseEnter={() => setHoveredPlayerId(player.id)}
 									onMouseLeave={() => setHoveredPlayerId(null)}
 								>
-									<span className="mini-map__dot" />
-									<span className="mini-map__dot-pulse" />
+									<span className={styles.dot} />
+									<span className={styles.dotPulse} />
 
 									{hoveredPlayerId === player.id ? (
-										<span className="mini-map__tooltip">
+										<span className={styles.tooltip}>
 											<strong>{player.username}</strong>
-											<span className="mini-map__tooltip-id">ID: {player.id.slice(0, 6)}</span>
+											<span className={styles.tooltipId}>ID: {player.id.slice(0, 6)}</span>
 										</span>
 									) : null}
 								</button>
@@ -310,7 +315,7 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 						)}
 
 						{localMarker && targetPlayer ? (
-							<svg className="mini-map__lines" aria-hidden="true">
+							<svg className={styles.lines} aria-hidden="true">
 								<line
 									x1={`${localMarker.left}%`}
 									y1={`${localMarker.top}%`}
@@ -324,12 +329,12 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 						) : null}
 					</div>
 
-					<div className="mini-map__footer">
-						<div className="mini-map__actions">
+					<div className={styles.footer}>
+						<div className={styles.actions}>
 							{localPlayer ? (
 								<button
 									type="button"
-									className="mini-map__action-button"
+									className={styles.actionButton}
 									aria-label="Voltar para o encontro"
 									onClick={() => {
 										onClearTargets?.();
@@ -345,7 +350,7 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 
 							<button
 								type="button"
-								className={`mini-map__action-button mini-map__action-button--collector${isCollectorTargeted ? " mini-map__action-button--active" : ""}`}
+								className={cx(styles.actionButton, isCollectorTargeted && styles.actionButtonActive)}
 								aria-label="Ir andando para a colmeia coletora"
 								onClick={() => onCollectorClick?.(collectorHive)}
 							>
@@ -359,8 +364,8 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 							</button>
 						</div>
 
-						<div className="mini-map__coordinates" aria-label="Coordenadas atuais">
-							<span className="mini-map__coord-icon" aria-hidden="true">
+						<div className={styles.coordinates} aria-label="Coordenadas atuais">
+							<span className={styles.coordIcon} aria-hidden="true">
 								📍
 							</span>
 							<span>
@@ -373,8 +378,8 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 						</div>
 
 						{collectorPoi ? (
-							<div className="mini-map__coordinates mini-map__coordinates--collector" aria-label="Ponto de entrega principal">
-								<span className="mini-map__collector-dot" aria-hidden="true" />
+							<div className={cx(styles.coordinates, styles.coordinatesCollector)} aria-label="Ponto de entrega principal">
+								<span className={styles.collectorDot} aria-hidden="true" />
 								<span>Coletor principal visível</span>
 							</div>
 						) : null}

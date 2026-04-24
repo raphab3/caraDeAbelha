@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { FlowerInteractionState, InteractionResult, PlayerProgressState } from "../../types/game";
+import styles from "./ResourceRibbon.module.css";
 
 export interface ResourceRibbonProps {
   playerProgress: PlayerProgressState | undefined;
@@ -59,8 +60,8 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteract
 
   if (!playerProgress) {
     return (
-      <div className="fixed top-4 left-4 px-4 py-2 bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-700 shadow-xl flex items-center justify-center">
-        <span className="text-amber-200 font-medium">Carregando progresso...</span>
+      <div className={styles.loading}>
+        <span className={styles.loadingText}>Carregando progresso...</span>
       </div>
     );
   }
@@ -76,14 +77,14 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteract
         : null;
   const flowerInteractionTone =
     flowerInteraction?.phase === "collecting"
-      ? "from-emerald-500/90 to-lime-400/90 border-emerald-200/60 text-emerald-50"
-      : "from-sky-500/90 to-cyan-400/90 border-sky-200/60 text-sky-50";
+      ? styles.flowerCollecting
+      : styles.flowerTargeting;
 
   return (
-    <div className="px-4 py-4 flex items-start justify-between pointer-events-none">
-      <div className="flex flex-wrap gap-4 items-start">
+    <div className={styles.root}>
+      <div className={styles.groups}>
         {/* Level & XP Card */}
-        <div className="flex bg-slate-900/70 backdrop-blur-md rounded-full items-center p-1.5 pr-5 border border-slate-700/60 shadow-xl pointer-events-auto">
+        <div className={[styles.pill, styles.levelPill].join(" ")}>
           <div className="w-11 h-11 rounded-full flex items-center justify-center bg-gradient-to-b from-amber-400 to-amber-700 text-white font-black text-xl border-2 border-amber-200 shadow-inner">
             {playerProgress.level}
           </div>
@@ -101,7 +102,7 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteract
         </div>
 
         {/* Resources Card */}
-        <div className="flex bg-slate-900/70 backdrop-blur-md rounded-full items-center px-5 py-2.5 border border-slate-700/60 shadow-xl gap-5 pointer-events-auto">
+        <div className={[styles.pill, styles.resourcePill].join(" ")}>
           {/* Pollen */}
           <div className="flex flex-col items-center">
             <span className="text-[9px] font-bold text-amber-200/80 uppercase tracking-widest mb-1">Pólen</span>
@@ -134,9 +135,9 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteract
       </div>
 
       {flowerInteractionLabel ? (
-        <div className="pointer-events-none flex items-start justify-end">
+        <div className={styles.flowerStatusWrap}>
           <div
-            className={`min-h-11 rounded-full border bg-gradient-to-r px-4 py-2 shadow-xl backdrop-blur-md ${flowerInteractionTone}`}
+            className={[styles.flowerStatus, flowerInteractionTone].join(" ")}
             role="status"
             aria-live="polite"
           >
@@ -153,8 +154,8 @@ export const ResourceRibbon = ({ playerProgress, lastInteraction, flowerInteract
 
       {/* Flash Feedback */}
       {flashMessage && (
-        <div className="fixed top-24 left-1/2 transform -translate-x-1/2 animate-bounce pointer-events-none">
-          <div className={`text-white px-5 py-2 rounded-full font-black text-lg border-2 ${flashTone === "xp" ? "bg-gradient-to-r from-fuchsia-500 to-violet-600 shadow-[0_4px_24px_rgba(168,85,247,0.45)] border-fuchsia-300/50" : "bg-gradient-to-r from-green-500 to-emerald-600 shadow-[0_4px_24px_rgba(16,185,129,0.5)] border-green-300/50"}`}>
+        <div className={styles.flashWrap}>
+          <div className={[styles.flash, flashTone === "xp" ? styles.flashXp : styles.flashReward].join(" ")}>
             {flashMessage}
           </div>
         </div>

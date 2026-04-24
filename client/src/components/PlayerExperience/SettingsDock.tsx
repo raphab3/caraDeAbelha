@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 
+import styles from "./SettingsDock.module.css";
+
 interface SettingsDockProps {
   isAudioMuted: boolean;
   isOpen: boolean;
@@ -46,16 +48,16 @@ export function SettingsDock({
   }, [isOpen, onRequestClose]);
 
   return (
-    <div className="settings-dock" ref={rootRef}>
+    <div className={styles.dock} ref={rootRef}>
       {isOpen ? (
-        <div className="settings-dock__panel" role="menu" aria-label="Configuracoes da experiencia">
+        <div className={styles.panel} role="menu" aria-label="Configuracoes da experiencia">
           <button
             type="button"
-            className="settings-dock__action"
+            className={styles.action}
             onClick={onToggleAudio}
             role="menuitem"
           >
-            <span className="settings-dock__action-icon" aria-hidden="true">
+            <span className={styles.actionIcon} aria-hidden="true">
               {isAudioMuted ? (
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M11 5 6 9H2v6h4l5 4z" />
@@ -75,11 +77,11 @@ export function SettingsDock({
 
           <button
             type="button"
-            className="settings-dock__action settings-dock__action--danger"
+            className={[styles.action, styles.actionDanger].join(" ")}
             onClick={onExit}
             role="menuitem"
           >
-            <span className="settings-dock__action-icon" aria-hidden="true">
+            <span className={styles.actionIcon} aria-hidden="true">
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <path d="M16 17l5-5-5-5" />
@@ -93,13 +95,13 @@ export function SettingsDock({
 
       <button
         type="button"
-        className="settings-dock__trigger"
+        className={styles.trigger}
         aria-label="Abrir configuracoes"
         aria-expanded={isOpen}
         aria-haspopup="menu"
         onClick={onToggleOpen}
       >
-        <span className="settings-dock__trigger-badge" aria-hidden="true">
+        <span className={styles.triggerBadge} aria-hidden="true">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.35" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 21v-7" />
             <path d="M4 10V3" />

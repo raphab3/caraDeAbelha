@@ -9,6 +9,7 @@ import { GameHUD } from "../../game/hud";
 import { useFullscreenTarget } from "../../hooks/useFullscreenTarget";
 import { useGameSession } from "../../hooks/useGameSession";
 import { useStageBgm } from "../../hooks/useStageBgm";
+import styles from "./PlayerExperience.module.css";
 
 const USERNAME_STORAGE_KEY = "cara-de-abelha.username";
 const AUDIO_MUTED_STORAGE_KEY = "cara-de-abelha.audio-muted";
@@ -74,20 +75,21 @@ export default function PlayerExperience() {
   const showGameHud = hasStartedAdventure && !showDisconnectModal;
   const showHeroCopy = !hasStartedAdventure;
   const shellClassName = [
-    "app-shell player-experience",
-    hasStartedAdventure ? "player-experience--started" : "",
-    isFullscreen ? "player-experience--immersive" : "",
+    styles.shell,
+    hasStartedAdventure ? styles.shellStarted : "",
+    isFullscreen ? styles.shellImmersive : "",
   ]
     .filter(Boolean)
     .join(" ");
 
   function renderStage() {
     const stageClassName = isFullscreen
-      ? "experience-stage player-experience__stage player-experience__stage--immersive w-screen h-screen overflow-hidden bg-black"
-      : "experience-stage player-experience__stage";
+      ? [styles.stage, styles.stageImmersive, "w-screen h-screen overflow-hidden bg-black"].join(" ")
+      : styles.stage;
     const viewportClassName = [
-      "viewport-shell viewport-shell--gameplay",
-      isFullscreen ? "player-viewport-shell" : "",
+      styles.viewportShell,
+      styles.viewportGameplay,
+      isFullscreen ? styles.playerViewportShell : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -117,8 +119,8 @@ export default function PlayerExperience() {
             />
           </div>
         ) : (
-          <div className={`${viewportClassName} player-preview-shell`}>
-            <div className="player-login-backdrop" aria-hidden="true" />
+          <div className={[viewportClassName, styles.previewShell].join(" ")}>
+            <div className={styles.loginBackdrop} aria-hidden="true" />
           </div>
         )}
 
@@ -148,7 +150,7 @@ export default function PlayerExperience() {
           <button
             aria-label={isFullscreen ? "Sair da tela cheia" : "Entrar em tela cheia"}
             aria-pressed={isFullscreen}
-            className="viewport-fullscreen-toggle !w-12 !h-12 flex items-center justify-center !p-0"
+            className={styles.fullscreenToggle}
             onClick={() => {
               void toggleFullscreen();
             }}
@@ -242,13 +244,13 @@ export default function PlayerExperience() {
   return (
     <main className={shellClassName}>
       {showHeroCopy ? (
-        <section className="hero-copy" aria-label="Resumo do jogo">
-          <p className="eyebrow">MMORPG de navegador</p>
-          <h1>Cara de Abelha</h1>
+        <section className={styles.heroCopy} aria-label="Resumo do jogo">
+          <p className={styles.eyebrow}>MMORPG de navegador</p>
+          <h1 className={styles.heroTitle}>Cara de Abelha</h1>
         </section>
       ) : null}
 
-      <section className="experience-card" aria-label="Entrada do jogador">
+      <section className={styles.experienceCard} aria-label="Entrada do jogador">
         {!isFullscreen ? <PwaInstallPrompt /> : null}
         {renderStage()}
       </section>

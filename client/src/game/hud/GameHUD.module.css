@@ -1,0 +1,25 @@
+.topRibbon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.leftPanel {
+  position: absolute;
+  left: 0;
+  top: 5rem;
+  z-index: 30;
+  pointer-events: auto;
+}
+
+.bottomFeed {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  pointer-events: none;
+}

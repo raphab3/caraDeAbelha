@@ -1,0 +1,108 @@
+.root {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.hero {
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-panel);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.58));
+  box-shadow: 0 28px 70px rgba(2, 6, 23, 0.34);
+}
+
+.heroInner {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.statusPill,
+.mapLink {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 1rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.statusPill {
+  text-transform: uppercase;
+}
+
+.healthOnline {
+  border-color: rgba(110, 231, 183, 0.25);
+  background: rgba(110, 231, 183, 0.12);
+  color: #d1fae5;
+}
+
+.healthOffline {
+  border-color: rgba(253, 164, 175, 0.25);
+  background: rgba(253, 164, 175, 0.12);
+  color: #ffe4e6;
+}
+
+.healthLoading {
+  border-color: rgba(252, 211, 77, 0.25);
+  background: rgba(252, 211, 77, 0.12);
+  color: #fef3c7;
+}
+
+.mapLink {
+  border-color: rgba(252, 211, 77, 0.35);
+  background: rgba(252, 211, 77, 0.14);
+  color: #fef3c7;
+  transition: background var(--motion-fast);
+}
+
+.mapLink:hover {
+  background: rgba(252, 211, 77, 0.2);
+}
+
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.metricCard {
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  background: rgba(2, 6, 23, 0.45);
+  box-shadow: 0 20px 44px rgba(2, 6, 23, 0.26);
+  backdrop-filter: blur(8px);
+}
+
+.metricValue {
+  margin-top: 1rem;
+  display: block;
+  color: #ffffff;
+  font-size: clamp(1.5rem, 2vw, 2rem);
+  font-weight: 600;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 768px) {
+  .hero {
+    padding: 1.75rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .heroInner {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+}

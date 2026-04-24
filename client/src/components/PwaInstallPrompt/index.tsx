@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { usePwaInstallPrompt } from "../../hooks/usePwaInstallPrompt";
+import styles from "./PwaInstallPrompt.module.css";
 
 const DISMISS_STORAGE_KEY = "cara-de-abelha.installPromptDismissedUntil";
 const DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -50,20 +51,20 @@ export function PwaInstallPrompt() {
   }
 
   return (
-    <aside aria-label="Instalar app" className="player-install-banner">
-      <div className="player-install-banner__copy">
-        <p className="player-install-banner__eyebrow">Instale o app</p>
-        <div className="player-install-banner__title">Leve o jardim para a tela inicial</div>
-        <p className="player-install-banner__text">
+    <aside aria-label="Instalar app" className={styles.banner}>
+      <div className={styles.copy}>
+        <p className={styles.eyebrow}>Instale o app</p>
+        <div className={styles.title}>Leve o jardim para a tela inicial</div>
+        <p className={styles.text}>
           Abra mais rapido, entre com menos distracoes do navegador e volte para a aventura com um toque.
         </p>
-        <p className="player-install-banner__hint">{installHint}</p>
+        <p className={styles.hint}>{installHint}</p>
       </div>
 
-      <div className="player-install-banner__actions">
+      <div className={styles.actions}>
         {canInstall ? (
           <button
-            className="player-install-banner__button"
+            className={styles.button}
             disabled={isPrompting}
             onClick={() => {
               void handleInstall();
@@ -75,7 +76,7 @@ export function PwaInstallPrompt() {
         ) : null}
 
         <button
-          className="player-install-banner__dismiss"
+          className={styles.dismiss}
           onClick={() => {
             persistDismissal();
             setIsDismissed(true);

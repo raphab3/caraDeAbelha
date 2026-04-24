@@ -1,0 +1,59 @@
+.focusCard {
+  min-width: 112px;
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid rgba(109, 75, 11, 0.2);
+  border-radius: 16px;
+  background: rgba(255, 250, 232, 0.94);
+  color: #392108;
+  text-align: center;
+  box-shadow: 0 12px 24px rgba(51, 31, 8, 0.2);
+  pointer-events: none;
+}
+
+.focusCardCollecting {
+  background: rgba(255, 245, 214, 0.98);
+  border-color: rgba(238, 179, 50, 0.42);
+}
+
+.focusTitle {
+  font-size: 0.74rem;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.focusSubtitle {
+  color: rgba(67, 41, 8, 0.76);
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.focusProgress {
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: rgba(100, 64, 14, 0.12);
+}
+
+.focusProgressFill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ffcf54, #f59e0b);
+  animation: focus-progress-fill linear forwards;
+}
+
+@keyframes focus-progress-fill {
+  from {
+    width: 0%;
+  }
+
+  to {
+    width: 100%;
+  }
+}

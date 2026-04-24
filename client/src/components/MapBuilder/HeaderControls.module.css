@@ -1,0 +1,104 @@
+.panel {
+  max-width: 980px;
+  padding: 0.625rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.72));
+  box-shadow: 0 12px 28px rgba(2, 6, 23, 0.32);
+  backdrop-filter: blur(16px);
+}
+
+.topRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.titleGroup {
+  min-width: 0;
+  flex: 1;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.button,
+.exportButton {
+  min-height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background var(--motion-fast), border-color var(--motion-fast);
+}
+
+.button:hover {
+  border-color: rgba(253, 230, 138, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.exportButton {
+  border-color: rgba(252, 211, 77, 0.3);
+  background: rgba(252, 211, 77, 0.14);
+  color: #fef3c7;
+}
+
+.exportButton:hover {
+  background: rgba(252, 211, 77, 0.2);
+}
+
+.fields {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.input {
+  min-height: 2.25rem;
+  padding: 0 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  background: rgba(2, 6, 23, 0.8);
+  color: #ffffff;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.input:focus {
+  border-color: rgba(252, 211, 77, 0.55);
+  box-shadow: 0 0 0 2px rgba(252, 211, 77, 0.2);
+}
+
+@media (min-width: 640px) {
+  .fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .fields {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

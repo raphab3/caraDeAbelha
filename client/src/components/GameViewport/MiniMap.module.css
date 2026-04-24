@@ -1,0 +1,368 @@
+.miniMap {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  z-index: var(--z-overlay);
+  width: min(260px, calc(100% - 36px));
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(100, 200, 255, 0.14);
+  border-radius: 22px;
+  background: rgba(12, 24, 44, 0.28);
+  color: #e8f8ff;
+  box-shadow: none;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+.collapsed {
+  gap: 0;
+  width: fit-content;
+  min-width: 72px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.headerLeft,
+.headerActions {
+  display: flex;
+  align-items: center;
+}
+
+.headerLeft {
+  gap: 8px;
+}
+
+.headerActions {
+  gap: 6px;
+}
+
+.radarIcon {
+  color: #4bd4ff;
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(100, 200, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(100, 200, 255, 0.08);
+  color: rgba(200, 236, 255, 0.8);
+  font-size: 0.6rem;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: all;
+  transition: background var(--motion-fast), color var(--motion-fast);
+}
+
+.toggle:hover {
+  background: rgba(100, 200, 255, 0.18);
+  color: #e8f8ff;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid rgba(100, 200, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.bounds {
+  padding: 5px 10px;
+  border: 1px solid rgba(100, 200, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(60, 140, 200, 0.18);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #a8e4ff;
+}
+
+.surface {
+  position: relative;
+  aspect-ratio: 1;
+  border: 1px solid rgba(100, 200, 120, 0.12);
+  border-radius: 14px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 60% 55%, rgba(48, 116, 60, 0.32) 0%, rgba(38, 90, 48, 0.24) 42%, rgba(22, 48, 28, 0.28) 100%),
+    radial-gradient(circle at 30% 30%, rgba(70, 90, 50, 0.2), transparent 52%),
+    linear-gradient(160deg, rgba(55, 95, 60, 0.18) 0%, rgba(28, 60, 38, 0.22) 100%);
+}
+
+.grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(180, 230, 180, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(180, 230, 180, 0.06) 1px, transparent 1px);
+  background-size: 25% 25%;
+}
+
+.compass {
+  position: absolute;
+  z-index: 3;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(12, 28, 18, 0.56);
+  color: rgba(220, 240, 220, 0.82);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+.compassN { top: 6px; left: 50%; transform: translateX(-50%); }
+.compassS { bottom: 6px; left: 50%; transform: translateX(-50%); }
+.compassW { top: 50%; left: 6px; transform: translateY(-50%); }
+.compassE { top: 50%; right: 6px; transform: translateY(-50%); }
+
+.lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.marker {
+  position: absolute;
+  z-index: 4;
+  transform: translate(-50%, -50%);
+}
+
+.markerLocal {
+  pointer-events: none;
+}
+
+.localTriangle {
+  display: block;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 14px solid #4ecfff;
+  filter: drop-shadow(0 0 5px rgba(78, 207, 255, 0.7));
+}
+
+.collectorMarker,
+.flowerMarker {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 2px rgba(9, 17, 28, 0.48);
+}
+
+.collectorMarker {
+  border: 2px solid rgba(255, 240, 185, 0.92);
+  border-radius: 4px;
+  background: radial-gradient(circle at 35% 35%, #fff7b3 0%, #ffc74d 52%, #a65d08 100%);
+  transform: rotate(45deg);
+  box-shadow:
+    0 0 0 2px rgba(9, 17, 28, 0.48),
+    0 0 14px rgba(255, 196, 77, 0.55);
+}
+
+.flowerMarker {
+  border: 2px solid rgba(206, 255, 244, 0.9);
+  background: radial-gradient(circle at 40% 35%, #c5fff2 0%, #6ef1c3 58%, #0f7b57 100%);
+  animation: flower-pulse 1.8s ease-in-out infinite;
+}
+
+.flowerMarkerCollecting {
+  border-color: rgba(244, 255, 194, 0.95);
+  background: radial-gradient(circle at 40% 35%, #fff7b7 0%, #b4ff64 56%, #347a14 100%);
+  animation-duration: 1s;
+}
+
+@keyframes flower-pulse {
+  0%,
+  100% { transform: scale(0.9); }
+  50% { transform: scale(1.15); }
+}
+
+.markerRemote {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  pointer-events: all;
+  transform: translate(-50%, -50%);
+}
+
+.dot {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 80, 80, 0.6);
+  border-radius: 50%;
+  background: #e03030;
+  box-shadow: 0 0 6px rgba(220, 40, 40, 0.8);
+}
+
+.dotPulse {
+  position: absolute;
+  z-index: 1;
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid rgba(220, 60, 60, 0.5);
+  border-radius: 50%;
+  background: rgba(220, 40, 40, 0.22);
+  animation: pulse 1.6s ease-out infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  60% { transform: scale(1.4); opacity: 0.3; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+.markerHovered .dot {
+  background: #ff5050;
+  box-shadow: 0 0 12px rgba(255, 60, 60, 1);
+}
+
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid rgba(100, 200, 255, 0.26);
+  border-radius: 8px;
+  background: rgba(10, 22, 38, 0.96);
+  color: #e8f8ff;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  transform: translateX(-50%);
+}
+
+.tooltip strong {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.tooltipId {
+  font-size: 0.66rem;
+  color: rgba(160, 220, 255, 0.7);
+}
+
+.footer {
+  display: grid;
+  gap: 6px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+.actionButton {
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 224, 150, 0.44);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255, 231, 140, 0.94), rgba(255, 171, 68, 0.92));
+  color: #30200d;
+  cursor: pointer;
+  pointer-events: all;
+  box-shadow: 0 12px 24px rgba(18, 10, 2, 0.24);
+  transition: transform var(--motion-fast), box-shadow var(--motion-fast), filter var(--motion-fast), border-color var(--motion-fast);
+}
+
+.actionButton:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+  box-shadow: 0 16px 28px rgba(18, 10, 2, 0.3);
+}
+
+.actionButton:focus-visible {
+  outline: 2px solid rgba(255, 232, 176, 0.94);
+  outline-offset: 3px;
+}
+
+.actionButtonActive {
+  border-color: rgba(255, 248, 204, 0.9);
+  box-shadow: 0 0 0 2px rgba(255, 237, 168, 0.36), 0 16px 30px rgba(18, 10, 2, 0.34);
+}
+
+.coordinates {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(200, 236, 255, 0.88);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.coordinatesCollector {
+  color: rgba(255, 227, 161, 0.92);
+}
+
+.collectorDot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #ffe38d, #ff9c2f);
+  box-shadow: 0 0 10px rgba(255, 184, 61, 0.55);
+}
+
+.coordIcon {
+  font-size: 0.9rem;
+}
+
+@media (max-width: 960px) {
+  .miniMap {
+    left: 14px;
+    bottom: 14px;
+  }
+}
+
+@media (max-width: 640px) {
+  .miniMap {
+    left: 12px;
+    bottom: 12px;
+    width: min(210px, calc(100% - 24px));
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .collapsed {
+    width: fit-content;
+    min-width: 58px;
+    padding: 10px;
+  }
+
+  .bounds {
+    font-size: 0.68rem;
+  }
+}

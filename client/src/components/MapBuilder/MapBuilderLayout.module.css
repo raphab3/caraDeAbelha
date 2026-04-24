@@ -1,0 +1,99 @@
+.root {
+  height: 100%;
+  min-height: 72vh;
+}
+
+.workbench {
+  position: relative;
+  height: 100%;
+  min-height: 72vh;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 30px;
+  background: linear-gradient(180deg, rgba(2, 6, 23, 0.62), rgba(2, 6, 23, 0.82));
+  box-shadow: 0 26px 70px rgba(2, 6, 23, 0.34);
+}
+
+.canvas {
+  height: 100%;
+  min-height: 72vh;
+}
+
+.slot {
+  pointer-events: none;
+  position: absolute;
+  z-index: 20;
+}
+
+.slot > * {
+  pointer-events: auto;
+}
+
+.headerSlot {
+  inset-inline: 0.75rem;
+  top: 0.75rem;
+}
+
+.shelfDesktop {
+  left: 0.75rem;
+  top: 8.5rem;
+  bottom: 4rem;
+  width: 250px;
+  display: none;
+}
+
+.toolbarSlot {
+  inset-inline: 0.75rem;
+  bottom: 0.75rem;
+}
+
+.inspectorDesktop {
+  right: 1rem;
+  top: 1rem;
+  display: none;
+  width: 100%;
+  max-width: 320px;
+}
+
+.inspectorMobile {
+  inset-inline: 0.75rem;
+  bottom: 17.5rem;
+}
+
+.shelfMobile {
+  inset-inline: 0.75rem;
+  bottom: 4rem;
+}
+
+@media (min-width: 1024px) {
+  .workbench,
+  .canvas {
+    min-height: calc(100vh - 3.5rem);
+  }
+
+  .headerSlot,
+  .toolbarSlot {
+    left: 268px;
+    right: 344px;
+  }
+
+  .headerSlot {
+    top: 1rem;
+  }
+
+  .shelfDesktop,
+  .inspectorDesktop {
+    display: block;
+  }
+
+  .inspectorMobile,
+  .shelfMobile {
+    display: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .inspectorMobile {
+    max-width: 320px;
+  }
+}

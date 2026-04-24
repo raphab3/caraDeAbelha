@@ -3,6 +3,7 @@ import { ResourceRibbon } from "./ResourceRibbon";
 import { ObjectivePanel } from "./ObjectivePanel";
 import { InteractionFeed } from "./InteractionFeed";
 import { ZoneUnlockPanel } from "./ZoneUnlockPanel";
+import styles from "./GameHUD.module.css";
 
 export interface GameHUDProps {
   playerProgress: PlayerProgressState | undefined;
@@ -30,7 +31,7 @@ export const GameHUD = ({
   return (
     <>
       {/* Top Ribbon with Resources */}
-      <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none">
+      <div className={styles.topRibbon}>
         <ResourceRibbon
           playerProgress={playerProgress}
           lastInteraction={lastInteraction}
@@ -39,7 +40,7 @@ export const GameHUD = ({
       </div>
 
       {/* Left Panel with Objectives */}
-      <div className="absolute left-0 top-20 z-30 pointer-events-auto">
+      <div className={styles.leftPanel}>
         <ObjectivePanel playerProgress={playerProgress} />
       </div>
 
@@ -51,7 +52,7 @@ export const GameHUD = ({
       />
 
       {/* Center-Bottom Interaction Feed */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none">
+      <div className={styles.bottomFeed}>
         <InteractionFeed lastInteraction={lastInteraction} />
       </div>
     </>

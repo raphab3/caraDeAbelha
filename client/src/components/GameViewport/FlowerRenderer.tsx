@@ -14,6 +14,7 @@ import {
 } from "three";
 
 import type { FlowerInteractionState, WorldFlowerState } from "../../types/game";
+import styles from "./FlowerRenderer.module.css";
 import { toSceneAxis, toTerrainSurfaceY } from "./worldSurface";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -375,14 +376,14 @@ export function FlowerRenderer({
 					]}
 				>
 					<Html center distanceFactor={8} sprite transform>
-						<div className={`flower-focus-card${isCollecting ? " flower-focus-card--collecting" : ""}`}>
-							<div className="flower-focus-card__title">{resolveFlowerDisplayName(focusFlower)}</div>
-							<div className="flower-focus-card__subtitle">{getFlowerProgressLabel(isCollecting)}</div>
+						<div className={[styles.focusCard, isCollecting ? styles.focusCardCollecting : ""].filter(Boolean).join(" ")}>
+							<div className={styles.focusTitle}>{resolveFlowerDisplayName(focusFlower)}</div>
+							<div className={styles.focusSubtitle}>{getFlowerProgressLabel(isCollecting)}</div>
 							{isCollecting ? (
-								<div className="flower-focus-progress" aria-label="Progresso de coleta">
+								<div className={styles.focusProgress} aria-label="Progresso de coleta">
 									<div
 										key={`${focusFlower.id}:${flowerInteraction?.startedAt ?? 0}`}
-										className="flower-focus-progress__fill"
+										className={styles.focusProgressFill}
 										style={{ animationDuration: `${collectDurationMs ?? DEFAULT_FLOWER_COLLECT_DURATION_MS}ms` }}
 									/>
 								</div>

@@ -1,4 +1,5 @@
 import type { GameSessionState, HealthStatusState, RenderPerformanceSnapshot } from "../../types/game";
+import styles from "./StatusPanel.module.css";
 
 interface StatusPanelProps {
   backendHealth: HealthStatusState;
@@ -37,70 +38,70 @@ function getConnectionLabel(gameSession: GameSessionState): string {
 }
 
 export function StatusPanel({ backendHealth, gameSession, apiUrl, renderPerformance, wsUrl }: StatusPanelProps) {
-  const statusClassName = `status-pill status-pill--${backendHealth.state}`;
+  const statusClassName = [styles.pill, styles[backendHealth.state]].join(" ");
   const activeWorldObjects = gameSession.chunks.reduce(
     (total, chunk) => total + chunk.flowers.length + chunk.trees.length + chunk.hives.length,
     0,
   ) + gameSession.props.length + gameSession.landmarks.length;
 
   return (
-    <aside className="status-panel" aria-label="Estado atual do ambiente">
+    <aside className={styles.panel} aria-label="Estado atual do ambiente">
       <div className={statusClassName}>{getStatusLabel(backendHealth)}</div>
 
-      <div className="status-grid">
-        <article className="status-card">
+      <div className={styles.grid}>
+        <article className={styles.card}>
           <h2>Infra pronta</h2>
           <p>Fog, chao em esteira e mundo por chunks ativos mantem a cena leve mesmo quando ela cresce.</p>
         </article>
 
-        <article className="status-card">
+        <article className={styles.card}>
           <h2>API local</h2>
           <p>{apiUrl}</p>
         </article>
 
-        <article className="status-card">
+        <article className={styles.card}>
           <h2>WS ativo</h2>
           <p>{getConnectionLabel(gameSession)}</p>
         </article>
 
-        <article className="status-card">
+        <article className={styles.card}>
           <h2>Jogadores</h2>
           <p>{gameSession.players.length} jogadores no raio visivel da sua abelha</p>
         </article>
 
-        <article className="status-card">
+        <article className={styles.card}>
           <h2>Chunks ativos</h2>
           <p>
             {gameSession.chunks.length} carregados com raio {gameSession.renderDistance} e chunk de {gameSession.chunkSize || "-"}
           </p>
         </article>
 
-        <article className="status-card">
+        <article className={styles.card}>
           <h2>Mundo visivel</h2>
           <p>{activeWorldObjects} props do mapa renderizadas agora</p>
         </article>
 
-        <article className="status-card">
+        <article className={styles.card}>
           <h2>Renderer</h2>
           <p>{renderPerformance.drawCalls} draw calls e {renderPerformance.triangles.toLocaleString("pt-BR")} triangulos</p>
         </article>
 
-        <article className="status-card">
+        <article className={styles.card}>
           <h2>FPS</h2>
           <p>{renderPerformance.fps} fps com {renderPerformance.geometries} geometrias e {renderPerformance.textures} texturas</p>
         </article>
 
-        <article className="status-card">
+        <article className={styles.card}>
           <h2>Jogador local</h2>
           <p>{gameSession.localUsername ?? "username ainda nao escolhido"}</p>
         </article>
 
-        <article className="status-card">
+        <article className={styles.card}>
           <h2>Controles</h2>
           <p>Clique esquerdo no chao para mover. Use o botao direito para orbitar a camera.</p>
         </article>
 
-        <article className="status-card">
+        <article className={styles.card}>
           <h2>Ultimo ping</h2>
           <p>
             {backendHealth.updatedAt
@@ -109,7 +110,7 @@ export function StatusPanel({ backendHealth, gameSession, apiUrl, renderPerforma
           </p>
         </article>
 
-        <article className="status-card">
+        <article className={styles.card}>
           <h2>Endpoints</h2>
           <p>{apiUrl}</p>
           <p>{wsUrl}</p>

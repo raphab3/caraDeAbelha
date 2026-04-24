@@ -21,6 +21,7 @@ import type { Group, Mesh } from "three";
 
 import { InstancedWorldField } from "./InstancedWorldField";
 import { AtmosphereBackdrop } from "./AtmosphereBackdrop";
+import styles from "./GameViewport.module.css";
 import { MiniMap } from "./MiniMap";
 import { type TapTargetingConfig, type TapTargetingHandlers, useTapTargeting } from "./useTapTargeting";
 import type {
@@ -464,7 +465,7 @@ function BeeActor({
       />
 
       <Html center distanceFactor={8} position={[0, 1.42, 0]} sprite transform>
-        <div className={`bee-nameplate${isLocal ? " bee-nameplate--local" : ""}`}>
+        <div className={[styles.beeNameplate, isLocal ? styles.beeNameplateLocal : ""].filter(Boolean).join(" ")}>
           {player.username}
         </div>
       </Html>
@@ -485,7 +486,7 @@ function RemoteBeeNameplates({ players, surfaceIndex }: { players: WorldPlayerSt
           ]}
         >
           <Html center distanceFactor={8} sprite transform>
-            <div className="bee-nameplate">{player.username}</div>
+            <div className={styles.beeNameplate}>{player.username}</div>
           </Html>
         </group>
       ))}
@@ -1401,7 +1402,7 @@ export function GameViewport({
   );
 
   return (
-    <div className="viewport-canvas-shell">
+    <div className={styles.canvasShell}>
       <Canvas
         camera={{ position: viewportScale.cameraPosition, fov: DEFAULT_CAMERA_FOV }}
         dpr={[1, 1.6]}

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createNoise2D } from "simplex-noise";
 import seedrandom from "seedrandom";
 
-import "./styles.css";
+import styles from "./MapGenerator.module.css";
 import type { LayoutStyle, MapGeneratorSettings, MapStats, MapTile, TerrainProp, TerrainType } from "./types";
 
 const DEFAULT_SETTINGS: MapGeneratorSettings = {
@@ -399,7 +399,7 @@ function SliderField({
 	return (
 		<ControlField label={label} valueLabel={valueLabel} helperText={helperText}>
 			<input
-				className="map-generator-slider"
+				className={styles.slider}
 				max={max}
 				min={min}
 				onChange={(event) => onChange(Number(event.target.value))}
@@ -616,11 +616,11 @@ export default function MapGenerator({ embedded = false }: MapGeneratorProps) {
 		? "grid gap-6 2xl:grid-cols-[minmax(0,1fr)_280px]"
 		: "grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]";
 	const canvasFrameClassName = embedded
-		? "map-generator-canvas-frame relative aspect-square min-h-[320px] overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 shadow-inner shadow-black/30 md:min-h-[420px] 2xl:min-h-[560px]"
-		: "map-generator-canvas-frame relative aspect-square min-h-[360px] overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 shadow-inner shadow-black/30 md:min-h-[460px] xl:min-h-[560px]";
+		? `${styles.canvasFrame} relative aspect-square min-h-[320px] overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 shadow-inner shadow-black/30 md:min-h-[420px] 2xl:min-h-[560px]`
+		: `${styles.canvasFrame} relative aspect-square min-h-[360px] overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 shadow-inner shadow-black/30 md:min-h-[460px] xl:min-h-[560px]`;
 
 	return (
-		<div className="map-generator-shell min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(250,204,21,0.18),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(14,165,233,0.18),_transparent_28%),linear-gradient(135deg,_#020617_0%,_#0f172a_48%,_#1e293b_100%)] text-slate-100">
+		<div className={`${styles.shell} min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(250,204,21,0.18),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(14,165,233,0.18),_transparent_28%),linear-gradient(135deg,_#020617_0%,_#0f172a_48%,_#1e293b_100%)] text-slate-100`}>
 			<main className={shellClassName}>
 				<header className="rounded-[32px] border border-white/10 bg-slate-950/65 p-6 shadow-[0_30px_80px_rgba(2,6,23,0.45)] backdrop-blur-xl lg:p-8">
 					<div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">

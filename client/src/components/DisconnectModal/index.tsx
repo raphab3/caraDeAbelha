@@ -1,3 +1,5 @@
+import styles from "./DisconnectModal.module.css";
+
 interface DisconnectModalProps {
   error?: string;
   username?: string;
@@ -7,27 +9,27 @@ interface DisconnectModalProps {
 
 export function DisconnectModal({ error, username, onExit, onReconnect }: DisconnectModalProps) {
   return (
-    <div className="disconnect-modal" role="presentation">
+    <div className={styles.modal} role="presentation">
       <section
         aria-labelledby="disconnect-modal-title"
         aria-modal="true"
-        className="disconnect-modal__card"
+        className={styles.card}
         role="dialog"
       >
-        <p className="disconnect-modal__eyebrow">Sessao interrompida</p>
-        <h2 id="disconnect-modal-title">Voce foi desconectado</h2>
-        <p className="disconnect-modal__copy">
+        <p className={styles.eyebrow}>Sessao interrompida</p>
+        <h2 className={styles.title} id="disconnect-modal-title">Voce foi desconectado</h2>
+        <p className={styles.copy}>
           {error ?? "A conexao com o jardim caiu ou ficou tempo demais sem resposta."}
         </p>
 
-        {username ? <p className="disconnect-modal__meta">Reconectar como {username}</p> : null}
+        {username ? <p className={styles.meta}>Reconectar como {username}</p> : null}
 
-        <div className="disconnect-modal__actions">
-          <button className="disconnect-modal__secondary" onClick={onExit} type="button">
+        <div className={styles.actions}>
+          <button className={styles.secondary} onClick={onExit} type="button">
             Sair
           </button>
 
-          <button className="disconnect-modal__primary" onClick={onReconnect} type="button">
+          <button className={styles.primary} onClick={onReconnect} type="button">
             Reconectar
           </button>
         </div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { GameSessionController, PlayerProgressState } from "../../types/game";
+import styles from "./ZoneUnlockPanel.module.css";
 
 export interface ZoneUnlockPanelProps {
   playerProgress: PlayerProgressState | undefined;
@@ -89,35 +90,35 @@ export const ZoneUnlockPanel = ({
   };
 
   return (
-    <div className="fixed bottom-8 right-8 z-35 w-80 pointer-events-auto">
-      <div className="bg-white/90 rounded-lg border-2 border-amber-500 shadow-2xl p-6 backdrop-blur">
+    <div className={styles.root}>
+      <div className={styles.card}>
         {/* Header */}
-        <h2 className="text-lg font-bold text-amber-900 mb-4 uppercase tracking-wider">
+        <h2 className={styles.title}>
           Desbloquear Zona
         </h2>
 
         {/* Zone Name */}
-        <div className="mb-4 pb-3 border-b border-amber-200">
-          <p className="text-sm font-semibold text-amber-700 mb-1">Zona</p>
-          <p className="text-xl font-bold text-amber-900">{zoneInfo.name}</p>
+        <div className={styles.zone}>
+          <p className={styles.label}>Zona</p>
+          <p className={styles.zoneName}>{zoneInfo.name}</p>
         </div>
 
         {/* Cost Display */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className={styles.costGrid}>
           {/* Honey Cost */}
-          <div className="bg-amber-50 rounded px-3 py-2 border border-amber-200">
-            <p className="text-xs font-semibold text-amber-700 mb-1">Custo</p>
-            <p className="text-lg font-bold text-amber-900">{zoneInfo.cost}</p>
-            <p className="text-xs text-amber-600">Mel</p>
+          <div className={styles.stat}>
+            <p className={styles.label}>Custo</p>
+            <p className={styles.value}>{zoneInfo.cost}</p>
+            <p className={styles.meta}>Mel</p>
           </div>
 
           {/* Player Honey */}
-          <div className={`rounded px-3 py-2 border ${canAfford ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
-            <p className="text-xs font-semibold text-amber-700 mb-1">Seu Mel</p>
-            <p className={`text-lg font-bold ${canAfford ? "text-green-700" : "text-red-700"}`}>
+          <div className={[styles.stat, canAfford ? styles.statAffordable : styles.statInsufficient].join(" ")}>
+            <p className={styles.label}>Seu Mel</p>
+            <p className={[styles.value, canAfford ? styles.valueAffordable : styles.valueInsufficient].join(" ")}>
               {playerHoney}
             </p>
-            <p className="text-xs text-amber-600">Saldo</p>
+            <p className={styles.meta}>Saldo</p>
           </div>
         </div>
 
@@ -125,17 +126,13 @@ export const ZoneUnlockPanel = ({
         <button
           onClick={handleUnlock}
           disabled={!canAfford}
-          className={`w-full py-3 rounded-lg font-bold text-base uppercase tracking-wide transition-all duration-200 ${
-            canAfford
-              ? "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-lg hover:shadow-xl active:scale-95 cursor-pointer"
-              : "bg-gray-300 text-gray-500 cursor-not-allowed opacity-60"
-          }`}
+          className={[styles.button, canAfford ? styles.buttonEnabled : styles.buttonDisabled].join(" ")}
         >
           {canAfford ? "Desbloquear Zona" : "Mel Insuficiente"}
         </button>
 
         {/* Info Text */}
-        <p className="text-xs text-amber-700 mt-3 text-center italic">
+        <p className={styles.hint}>
           {zoneInfo.cost === 0
             ? "Esta é uma zona inicial"
             : `Desbloqueie com mel para explorar novos territórios`}

@@ -27,7 +27,7 @@ Go code should follow `gofmt`. Keep server behavior authoritative: validate game
 
 TypeScript uses strict mode. Use `PascalCase` for React components, `camelCase` for functions, variables, props, and JSON protocol fields, and descriptive hook names such as `useGameSession`.
 
-New or refactored visual components should use local `*.module.css` files. Keep `client/src/styles.css` for Tailwind import, global reset/base rules, tokens, and shared styles.
+New or refactored visual components should use local `*.module.css` files. Keep `client/src/styles.css` for Tailwind import, global reset/base rules, tokens, and shared styles. Example: `LoginGate/index.tsx` imports `LoginGate.module.css`; use Tailwind only for small one-off utilities, not full component layouts.
 
 ## Testing Guidelines
 

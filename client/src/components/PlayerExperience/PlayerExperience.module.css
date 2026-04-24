@@ -1,0 +1,240 @@
+.shell {
+  width: min(1180px, 100%);
+  min-height: 100vh;
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+  padding: 28px;
+}
+
+.shellImmersive {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  gap: 0;
+  padding: 0;
+}
+
+.shellImmersive .heroCopy {
+  display: none;
+}
+
+.shellImmersive .experienceCard {
+  gap: 0;
+}
+
+.stage {
+  position: relative;
+  isolation: isolate;
+}
+
+.stageImmersive {
+  min-height: 100vh;
+}
+
+.stage:fullscreen {
+  background: #20150d;
+}
+
+.stage:fullscreen .viewportShell {
+  height: 100%;
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.previewShell {
+  position: relative;
+}
+
+.viewportShell {
+  width: 100%;
+  min-height: 540px;
+  border: 1px solid rgba(70, 42, 9, 0.18);
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+  background: linear-gradient(155deg, rgba(255, 245, 214, 0.56), rgba(161, 126, 38, 0.16));
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(12px);
+}
+
+.viewportShell canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.viewportGameplay,
+.viewportGameplay canvas {
+  cursor: var(--cursor-bee-default);
+}
+
+.viewportGameplay button,
+.viewportGameplay [role="button"],
+.viewportGameplay a {
+  cursor: var(--cursor-bee-pointer);
+}
+
+.viewportGameplay button:disabled,
+.viewportGameplay [aria-busy="true"] {
+  cursor: var(--cursor-bee-wait);
+}
+
+.playerViewportShell {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: #050505;
+  box-shadow: none;
+}
+
+.loginBackdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 213, 102, 0.2), transparent 22%),
+    radial-gradient(circle at 82% 16%, rgba(113, 167, 76, 0.24), transparent 24%),
+    radial-gradient(circle at 50% 100%, rgba(255, 173, 51, 0.16), transparent 34%),
+    linear-gradient(180deg, #050507 0%, #140d09 52%, #24160a 100%);
+}
+
+.loginBackdrop::before,
+.loginBackdrop::after {
+  content: "";
+  position: absolute;
+  border-radius: var(--radius-pill);
+  filter: blur(48px);
+  opacity: 0.65;
+}
+
+.loginBackdrop::before {
+  width: min(48vw, 420px);
+  height: min(48vw, 420px);
+  top: 8%;
+  right: -8%;
+  background: rgba(255, 206, 92, 0.22);
+}
+
+.loginBackdrop::after {
+  width: min(56vw, 520px);
+  height: min(56vw, 520px);
+  left: -12%;
+  bottom: -18%;
+  background: rgba(92, 146, 62, 0.18);
+}
+
+.heroCopy {
+  max-width: 720px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  font-size: 0.76rem;
+  color: rgba(61, 39, 10, 0.72);
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: clamp(2.8rem, 7vw, 4.9rem);
+  line-height: 0.96;
+  color: #20150d;
+}
+
+.experienceCard {
+  display: grid;
+  gap: 18px;
+}
+
+.fullscreenToggle {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: var(--z-overlay);
+  width: 48px;
+  height: 48px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(63, 41, 11, 0.16);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 249, 228, 0.92);
+  color: #322010;
+  font: inherit;
+  font-size: 0.94rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 14px 28px rgba(57, 32, 6, 0.16);
+  backdrop-filter: blur(8px);
+}
+
+.fullscreenToggle:focus-visible {
+  outline: 2px solid #fff0a4;
+  outline-offset: 3px;
+}
+
+.fullscreenToggle[aria-pressed="true"] {
+  background: rgba(61, 31, 5, 0.9);
+  color: #fff4d6;
+  border-color: rgba(255, 226, 165, 0.28);
+}
+
+@media (max-width: 960px) {
+  .shell {
+    padding: 20px;
+  }
+
+  .viewportShell {
+    min-height: 420px;
+  }
+
+  .fullscreenToggle {
+    top: 14px;
+    right: 14px;
+  }
+}
+
+@media (max-width: 640px) {
+  .shell {
+    gap: 18px;
+    padding: 16px;
+  }
+
+  .heroCopy {
+    max-width: 24rem;
+  }
+
+  .heroTitle {
+    font-size: clamp(2.4rem, 14vw, 3.5rem);
+  }
+
+  .viewportShell {
+    min-height: 340px;
+  }
+
+  .shellStarted:not(.shellImmersive) .heroCopy {
+    display: none;
+  }
+
+  .shellStarted:not(.shellImmersive) .experienceCard,
+  .shellStarted:not(.shellImmersive) .stage {
+    min-height: calc(100vh - 32px);
+  }
+
+  .shellStarted:not(.shellImmersive) .viewportShell {
+    min-height: min(72vh, 560px);
+  }
+
+  .fullscreenToggle {
+    top: 12px;
+    right: 12px;
+    min-height: 40px;
+    font-size: 0.86rem;
+  }
+}

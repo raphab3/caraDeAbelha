@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
 
+import styles from "./AdminLayout.module.css";
+
 interface AdminLayoutProps {
   children: ReactNode;
   title: string;
@@ -39,28 +41,18 @@ const ADMIN_NAV_ITEMS: AdminNavItem[] = [
 ];
 
 function resolveNavItemClassName(isActive: boolean): string {
-  return [
-    "flex items-start justify-between gap-4 rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors duration-150",
-    isActive
-      ? "border-amber-300/40 bg-amber-300/12 text-amber-100 shadow-[0_18px_36px_rgba(15,23,42,0.24)]"
-      : "border-white/10 bg-white/5 text-slate-200 hover:border-amber-200/20 hover:bg-white/10 hover:text-white",
-  ].join(" ");
+  return [styles.navItem, isActive ? styles.navItemActive : ""].filter(Boolean).join(" ");
 }
 
 function resolveNavBadgeClassName(isActive: boolean): string {
-  return [
-    "inline-flex min-h-8 items-center rounded-full border px-3 text-[11px] font-semibold uppercase tracking-[0.2em]",
-    isActive
-      ? "border-amber-200/30 bg-amber-200/14 text-amber-100"
-      : "border-white/10 bg-white/5 text-slate-400",
-  ].join(" ");
+  return [styles.navBadge, isActive ? styles.navBadgeActive : ""].filter(Boolean).join(" ");
 }
 
 export function AdminLayout({ children, title, description, headerMode = "default" }: AdminLayoutProps) {
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(251,191,36,0.18),_transparent_26%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] text-slate-100">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1720px] flex-col gap-4 px-2 py-2 md:px-4 lg:flex-row lg:px-4 lg:py-3">
-        <aside className="w-full rounded-[22px] border border-white/10 bg-slate-950/70 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.45)] backdrop-blur lg:max-w-[268px] lg:self-stretch">
+    <div className={styles.shell}>
+      <div className={styles.frame}>
+        <aside className={styles.sidebar}>
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/70">Admin</p>
           <h1 className="mt-3 text-2xl font-semibold text-white">Ferramentas internas</h1>
           <p className="mt-2 text-sm leading-6 text-slate-300">Monitoramento e operacao sem misturar com a rota do jogador.</p>
@@ -86,10 +78,10 @@ export function AdminLayout({ children, title, description, headerMode = "defaul
             ))}
           </nav>
 
-          <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <div className={styles.quickAccess}>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Acesso rapido</p>
             <Link
-              className="mt-4 inline-flex min-h-11 items-center rounded-full border border-white/10 bg-white/10 px-4 text-sm font-semibold text-white transition-colors hover:border-amber-200/30 hover:bg-white/15"
+              className={styles.quickLink}
               to="/"
             >
               Voltar para o login do jogador
@@ -97,16 +89,16 @@ export function AdminLayout({ children, title, description, headerMode = "defaul
           </div>
         </aside>
 
-        <main className="min-w-0 flex flex-1 flex-col rounded-[24px] border border-white/10 bg-slate-900/60 p-3 shadow-[0_24px_60px_rgba(2,6,23,0.38)] backdrop-blur md:p-4">
+        <main className={styles.main}>
           {headerMode === "default" ? (
-            <header className="rounded-[28px] border border-white/8 bg-black/20 px-5 py-5 md:px-6">
+            <header className={styles.header}>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-200/70">Painel operacional</p>
               <h2 className="mt-3 text-2xl font-semibold text-white">{title}</h2>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-300">{description}</p>
             </header>
           ) : null}
 
-          <section className={["min-w-0 flex-1", headerMode === "default" ? "mt-6" : ""].join(" ").trim()}>{children}</section>
+          <section className={[styles.content, headerMode === "default" ? styles.contentWithHeader : ""].filter(Boolean).join(" ")}>{children}</section>
         </main>
       </div>
     </div>
