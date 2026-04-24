@@ -4,6 +4,9 @@ import (
 	"math"
 	"testing"
 	"time"
+
+	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/loopbase"
+	"github.com/raphab33/cara-de-abelha/server/internal/gameplay/zones"
 )
 
 func addCombatTestPlayer(hub *gameHub, playerID string, x float64, y float64, now time.Time) *playerState {
@@ -137,5 +140,61 @@ func TestCombatDeathAndAutomaticRespawn(t *testing.T) {
 	}
 	if !progress.SpawnProtectionUntil.After(progress.RespawnAt) {
 		t.Fatalf("expected spawn protection after respawn")
+	}
+}
+
+func TestCombatReconnectPreservesRespawnWindow(t *testing.T) {
+	now := time.Date(2026, time.April, 24, 13, 20, 0, 0, time.UTC)
+	hub := newRuntimeTestHub(now)
+	player := &playerState{
+		ID:         buildPlayerID("beekeeper"),
+		Username:   "beekeeper",
+		StageID:    hub.world.stageID,
+		X:          1,
+		Y:          1,
+		Speed:      defaultPlayerSpeed,
+		FacingX:    1,
+		FacingY:    0,
+		UpdatedAt:  now,
+		LastSeenAt: now,
+	}
+	hub.profiles["beekeeper"] = player
+	hub.players[player.ID] = player
+	hub.clients[player.ID] = &clientSession{id: player.ID, profileKey: "beekeeper"}
+	hub.playerProgress[player.ID] = &loopbase.PlayerProgress{
+		PlayerID:        player.ID,
+		PollenCapacity:  40,
+		CurrentZoneID:   zones.DefaultCurrentZoneID(),
+		UnlockedZoneIDs: zones.DefaultUnlockedZoneIDs(),
+		CurrentLife:     0,
+		MaxLife:         defaultMaxPlayerLife,
+		IsDead:          true,
+		RespawnAt:       now.Add(2 * time.Second),
+	}
+
+	if ok := hub.unregister(hub.clients[player.ID]); !ok {
+		t.Fatalf("expected unregister to succeed before reconnect")
+	}
+
+	client, _, err := hub.register(nil, "beekeeper", "beekeeper")
+	if err != nil {
+		t.Fatalf("expected reconnect register to succeed: %v", err)
+	}
+	if client == nil {
+		t.Fatalf("expected client session on reconnect")
+	}
+
+	progress := hub.ensurePlayerProgressLocked(player.ID)
+	if !progress.IsDead {
+		t.Fatalf("expected death state to persist across reconnect")
+	}
+	if progress.RespawnAt.IsZero() || !progress.RespawnAt.After(now) {
+		t.Fatalf("expected respawn window to remain scheduled after reconnect")
+	}
+	if !hub.players[player.ID].IsDead {
+		t.Fatalf("expected public player state to reflect reconnecting dead player")
+	}
+	if newPlayerStatusMessage(progress).RespawnEndsAt == 0 {
+		t.Fatalf("expected player_status to expose respawn countdown after reconnect")
 	}
 }

@@ -843,6 +843,12 @@ func TestUnregisterRemovesActivePlayerButKeepsProfile(t *testing.T) {
 		profiles: map[string]*playerState{
 			"beekeeper": player,
 		},
+		activeCollections: map[string]*collectionState{
+			player.ID: {FlowerID: "flower:test"},
+		},
+		activeCombatAreas: map[string]skillEffectMessage{
+			"effect:test": {ID: "effect:test", OwnerPlayerID: player.ID},
+		},
 	}
 
 	if ok := hub.unregister(client); !ok {
@@ -855,6 +861,14 @@ func TestUnregisterRemovesActivePlayerButKeepsProfile(t *testing.T) {
 
 	if _, ok := hub.players[player.ID]; ok {
 		t.Fatalf("expected player to be removed from active players")
+	}
+
+	if _, ok := hub.activeCollections[player.ID]; ok {
+		t.Fatalf("expected player collection state to be removed on disconnect")
+	}
+
+	if len(hub.activeCombatAreas) != 0 {
+		t.Fatalf("expected player combat areas to be removed on disconnect")
 	}
 
 	if profile := hub.profiles[client.profileKey]; profile != player {

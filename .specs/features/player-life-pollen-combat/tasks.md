@@ -26,8 +26,8 @@ Spec: `.specs/features/player-life-pollen-combat/spec.md`
 - [x] `TASK-PLPC-08` Implementar cura autoritativa de `Flor de Néctar`.
 - [x] `TASK-PLPC-09` Implementar regeneracao natural de life e tag de combate.
 - [x] `TASK-PLPC-10` Implementar morte, bloqueio de acoes e respawn automatico.
-- [ ] `TASK-PLPC-11` Garantir reconnect, limpeza de efeitos e consistencia de estados extremos.
-- [ ] `TASK-PLPC-12` Documentar tuning inicial, riscos e limites de performance do combate.
+- [x] `TASK-PLPC-11` Garantir reconnect, limpeza de efeitos e consistencia de estados extremos.
+- [x] `TASK-PLPC-12` Documentar tuning inicial, riscos e limites de performance do combate.
 
 ## Detalhamento
 

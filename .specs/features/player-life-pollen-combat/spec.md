@@ -579,6 +579,41 @@ Objetivo:
 - avaliar `Slime de Mel` sem dano por tick na V1;
 - manter verificacoes de colisao por stage/visibilidade/range, nao por varredura global desnecessaria.
 
+## Notas de Tuning da V1
+
+Valores atualmente implementados na camada de combate:
+
+- `maxLife`: `100`
+- regen natural: `4 life/s`
+- atraso da regen natural: `5s` apos o ultimo dano
+- tag de combate: `5s`
+- respawn automatico: `3s`
+- protecao apos respawn: `2s`
+- dano base de `Atirar Ferrão`: `18`
+- custo de energia em polen: `10` `Impulso`, `18` `Atirar Ferrão`, `26` `Slime de Mel`, `24` `Flor de Néctar`
+- `Slime de Mel`: slow de `30%` com persistencia curta de `0.8s` apos contato
+- `Flor de Néctar`: cura base de `8 life/s`
+
+Decisoes operacionais da V1:
+
+- `Impulso` consome energia, mas nao causa dano direto;
+- `Atirar Ferrão` acerta o primeiro alvo valido no trajeto e nao acerta o proprio dono;
+- `Slime de Mel` atua como controle, sem dano por tick nesta fase;
+- `Flor de Néctar` cura apenas o proprio dono nesta fase;
+- morrer zera o polen carregado para evitar cadeia imediata de cast no respawn.
+
+Notas de consistencia e extremos:
+
+- ao desconectar, o servidor limpa `activeCollections` e `activeCombatAreas` do jogador para evitar runtime zumbi;
+- ao reconectar durante o estado morto, o progresso preserva `isDead` e `respawnEndsAt`, permitindo o HUD convergir para a contagem restante;
+- no cliente, timeouts de feedback de interacao/combate sao limpos ao desconectar para nao vazar estado antigo para uma sessao nova.
+
+Limites conhecidos desta iteracao:
+
+- a reconexao preserva o estado de combate do jogador, mas ainda nao existe um fluxo visual dedicado de rejoin alem do `player_status` e `combat_event`;
+- barras remotas de life estao sempre visiveis nesta fase e podem ser refinadas por proximidade ou contexto de combate em iteracao futura;
+- observabilidade ainda esta apoiada principalmente em testes e leitura de protocolo, nao em metricas dedicadas.
+
 ## Perguntas em Aberto
 
 - `Flor de Néctar` cura so o dono na V1 ou qualquer jogador dentro da area?

@@ -286,6 +286,7 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
   const [gameSession, setGameSession] = useState<GameSessionState>(createInitialState("idle"));
   const clientRef = useRef<WSClient | null>(null);
   const skillEffectTimeoutsRef = useRef<Map<string, number>>(new Map());
+  const interactionTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!username) {
@@ -319,9 +320,28 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
       skillEffectTimeoutsRef.current.set(effect.id, timeoutId);
     };
 
+    const scheduleInteractionClear = (delayMs: number) => {
+      if (interactionTimeoutRef.current !== null) {
+        window.clearTimeout(interactionTimeoutRef.current);
+      }
+
+      interactionTimeoutRef.current = window.setTimeout(() => {
+        interactionTimeoutRef.current = null;
+        setGameSession((current) => ({
+          ...current,
+          lastInteraction: undefined,
+        }));
+      }, delayMs);
+    };
+
     const disconnectSession = (reason?: string) => {
       if (!active) {
         return;
+      }
+
+      if (interactionTimeoutRef.current !== null) {
+        window.clearTimeout(interactionTimeoutRef.current);
+        interactionTimeoutRef.current = null;
       }
 
       setGameSession((current) => {
@@ -398,16 +418,8 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
             lastInteraction: message,
           }));
 
-          const timeoutId = window.setTimeout(() => {
-            setGameSession((current) => ({
-              ...current,
-              lastInteraction: undefined,
-            }));
-          }, 3000);
-
-          return () => {
-            window.clearTimeout(timeoutId);
-          };
+          scheduleInteractionClear(3000);
+          return;
         }
 
         if (isSkillEffectsMessage(message)) {
@@ -439,12 +451,7 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
               timestamp: message.timestamp,
             },
           }));
-          window.setTimeout(() => {
-            setGameSession((current) => ({
-              ...current,
-              lastInteraction: undefined,
-            }));
-          }, 2200);
+          scheduleInteractionClear(2200);
           return;
         }
 
@@ -523,6 +530,10 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
         window.clearTimeout(timeoutId);
       }
       skillEffectTimeoutsRef.current.clear();
+      if (interactionTimeoutRef.current !== null) {
+        window.clearTimeout(interactionTimeoutRef.current);
+        interactionTimeoutRef.current = null;
+      }
 
       if (clientRef.current === client) {
         clientRef.current = null;

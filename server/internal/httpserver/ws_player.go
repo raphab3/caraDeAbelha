@@ -193,6 +193,8 @@ func (hub *gameHub) unregister(client *clientSession) bool {
 		return false
 	}
 
+	delete(hub.activeCollections, client.id)
+	hub.clearPlayerCombatAreasLocked(client.id)
 	delete(hub.clients, client.id)
 	delete(hub.players, client.id)
 	hub.tick++
