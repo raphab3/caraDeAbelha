@@ -1,4 +1,5 @@
 import { getMapBuilderCatalogItem } from "./catalog";
+import styles from "./MapBuilderPanels.module.css";
 import type { HoveredGridCell, MapBuilderTool, MapStats, PlacedItem } from "./types";
 
 interface SelectionInspectorProps {
@@ -7,11 +8,14 @@ interface SelectionInspectorProps {
   hoveredCell: HoveredGridCell | null;
   mapName: string;
   onDeleteSelectedItem: () => void;
+  onRotatePlacement: (deltaDegrees: number) => void;
   onRotateQuarterTurn: (deltaDegrees: number) => void;
   onScaleChange: (scale: number) => void;
   onTagChange: (tag: string) => void;
   onZoneIdChange: (zoneId: string) => void;
   placedItemsCount: number;
+  placementRotationY: number;
+  selectedItemCount: number;
   selectedAssetLabel: string | null;
   selectedItem: PlacedItem | null;
   selectedItemId: string | null;
@@ -33,11 +37,14 @@ export function SelectionInspector({
   hoveredCell,
   mapName,
   onDeleteSelectedItem,
+  onRotatePlacement,
   onRotateQuarterTurn,
   onScaleChange,
   onTagChange,
   onZoneIdChange,
   placedItemsCount,
+  placementRotationY,
+  selectedItemCount,
   selectedAssetLabel,
   selectedItem,
   selectedItemId,
@@ -49,13 +56,17 @@ export function SelectionInspector({
 
   return (
     <aside className="w-full max-w-[320px] overflow-hidden rounded-[24px] border border-white/10 bg-slate-950/84 shadow-[0_18px_44px_rgba(2,6,23,0.34)] backdrop-blur-xl">
-      <div className="max-h-[min(52vh,560px)] overflow-y-auto p-3.5">
+      <div className={`${styles.scrollArea} max-h-[min(52vh,560px)] overflow-y-auto p-3.5`}>
         <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-200/78">Detalhes</p>
-        <h4 className="mt-2 text-base font-semibold text-white">{selectedItemId ? "Item selecionado" : "Resumo do mapa"}</h4>
+        <h4 className="mt-2 text-base font-semibold text-white">
+          {selectedItemCount > 1 ? "Grupo selecionado" : selectedItemId ? "Item selecionado" : "Resumo do mapa"}
+        </h4>
         <p className="mt-1 text-xs leading-5 text-slate-300">
-          {selectedItemId
-            ? "Ajuste o item sem sair do mapa."
-            : "Escolha um item e clique no mapa para posicionar."}
+          {selectedItemCount > 1
+            ? "Use Ctrl+C, Ctrl+V, Delete ou arraste no mapa."
+            : selectedItemId
+              ? "Ajuste o item sem sair do mapa."
+              : "Escolha um item e clique no mapa para posicionar."}
         </p>
 
         <div className="mt-3 grid gap-2">
@@ -63,6 +74,8 @@ export function SelectionInspector({
           <MetricRow label="Ferramenta" value={currentTool} />
           <MetricRow label="Altura (Y)" value={defaultY.toString()} />
           <MetricRow label="Item ativo" value={selectedItem ? selectedCatalogItem?.label ?? selectedItem.prefabId : selectedAssetLabel ?? "Nenhum"} />
+          <MetricRow label="Rotacao previa" value={`${placementRotationY}°`} />
+          <MetricRow label="Selecao" value={selectedItemCount > 0 ? selectedItemCount.toString() : "Nenhuma"} />
           <MetricRow label="Itens" value={placedItemsCount.toString()} />
           <MetricRow
             label="Cursor"
@@ -70,9 +83,9 @@ export function SelectionInspector({
           />
         </div>
 
-        {selectedItem ? (
-          <div className="mt-3 rounded-[20px] border border-amber-300/18 bg-amber-300/8 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-100">Edicao fina</p>
+        {selectedItem && selectedItemCount <= 1 ? (
+          <div className="mt-3 rounded-[20px] border border-sky-300/20 bg-sky-500/10 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-100">Edicao fina</p>
             <div className="mt-3 grid gap-2">
               <MetricRow label="ID" value={selectedItem.prefabId} />
               <MetricRow label="X" value={selectedItem.x.toString()} />
@@ -146,6 +159,44 @@ export function SelectionInspector({
                 Remover item
               </button>
             </div>
+          </div>
+        ) : null}
+
+        {!selectedItem && selectedAssetLabel ? (
+          <div className="mt-3 rounded-[20px] border border-cyan-300/20 bg-cyan-500/10 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-100">Antes de posicionar</p>
+            <div className="mt-3 flex gap-2">
+              <button
+                className="inline-flex min-h-10 flex-1 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                onClick={() => onRotatePlacement(-90)}
+                type="button"
+              >
+                -90°
+              </button>
+              <button
+                className="inline-flex min-h-10 flex-1 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                onClick={() => onRotatePlacement(90)}
+                type="button"
+              >
+                +90°
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {selectedItemCount > 1 ? (
+          <div className="mt-3 rounded-[20px] border border-sky-300/20 bg-sky-500/10 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-100">Selecao em lote</p>
+            <p className="mt-2 text-xs leading-5 text-slate-300">
+              O grupo preserva a formacao ao arrastar, copiar ou colar.
+            </p>
+            <button
+              className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-2xl border border-rose-300/25 bg-rose-500/12 px-3 text-sm font-semibold text-rose-100 transition-colors hover:bg-rose-500/18"
+              onClick={onDeleteSelectedItem}
+              type="button"
+            >
+              Remover selecao
+            </button>
           </div>
         ) : null}
 

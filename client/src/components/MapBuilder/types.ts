@@ -44,7 +44,9 @@ export interface EditorState {
   selectedAssetType: string | null;
   isPainting: boolean;
   currentTool: MapBuilderTool;
+  placementRotationY: number;
   selectedItemId: string | null;
+  selectedItemIds: string[];
   hoveredCell: HoveredGridCell | null;
 }
 
@@ -152,13 +154,21 @@ export interface MapBuilderState {
   setProceduralSeed: (seed: string) => void;
   setSelectedAssetType: (prefabId: string | null) => void;
   setCurrentTool: (tool: MapBuilderTool) => void;
+  setPlacementRotationY: (rotationY: number) => void;
+  rotatePlacement: (deltaDegrees: number) => void;
   setIsPainting: (isPainting: boolean) => void;
   setHoveredCell: (cell: HoveredGridCell | null) => void;
   setSelectedItemId: (itemId: string | null) => void;
+  setSelectedItemIds: (itemIds: string[]) => void;
+  toggleSelectedItemId: (itemId: string) => void;
+  clearSelection: () => void;
   paintTerrainAt: (input: { x: number; z: number; prefabId: string; mode?: "paint" | "delete" }) => void;
   placeItem: (item: PlaceItemInput) => void;
+  placeItems: (items: PlaceItemInput[]) => PlacedItem[];
   removeItem: (id: string) => void;
+  removeSelectedItems: () => void;
   updateItem: (id: string, data: UpdatePlacedItemInput) => void;
+  moveSelectedItems: (input: { anchorItemId: string; x: number; z: number; origin: Record<string, Pick<PlacedItem, "x" | "z">> }) => void;
   clearMap: () => void;
   generateProceduralBase: (seed?: string) => void;
 }

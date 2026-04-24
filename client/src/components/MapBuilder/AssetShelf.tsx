@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import styles from "./MapBuilderPanels.module.css";
 import type { MapBuilderCatalogItem } from "./types";
 
 interface AssetShelfProps {
@@ -45,7 +46,7 @@ export function AssetShelf({ items, selectedPrefabId, onSelect }: AssetShelfProp
       </div>
 
       <div className="grid h-[calc(100%-3rem)] grid-cols-[92px_minmax(0,1fr)] gap-2">
-        <div className="space-y-1.5 overflow-y-auto pr-1">
+        <div className={`${styles.scrollArea} space-y-1.5 overflow-y-auto pr-1`}>
           {groupedItems.map(([category, categoryItems]) => {
             const isActive = activeCategory === category;
             return (
@@ -67,7 +68,7 @@ export function AssetShelf({ items, selectedPrefabId, onSelect }: AssetShelfProp
           })}
         </div>
 
-        <div className="grid auto-rows-min content-start gap-1.5 overflow-y-auto pr-1">
+        <div className={`${styles.scrollArea} grid auto-rows-min content-start gap-1.5 overflow-y-auto pr-1`}>
           {activeItems.map((item) => {
             const isSelected = item.prefabId === selectedPrefabId;
 
@@ -86,7 +87,7 @@ export function AssetShelf({ items, selectedPrefabId, onSelect }: AssetShelfProp
                 <span className="min-w-0">
                   <span className="block truncate">{item.label}</span>
                   <span className="mt-1 block text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">
-                    {item.category}
+                    {item.prefabId === "terrain/slope-wide" ? "subida jogavel" : item.category}
                   </span>
                 </span>
                 <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300">

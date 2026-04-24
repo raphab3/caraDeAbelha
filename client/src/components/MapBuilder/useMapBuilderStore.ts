@@ -39,7 +39,7 @@ function normalizeRotationY(rotationY: number | undefined): number {
     return 0;
   }
 
-  return rotationY ?? 0;
+  return (((rotationY ?? 0) % 360) + 360) % 360;
 }
 
 function normalizeScale(scale: number | undefined, fallback: number): number {
@@ -85,6 +85,23 @@ function normalizePlacedItemInput(item: PlaceItemInput): PlacedItem | null {
     tag: item.tag ?? catalogItem.defaultTag,
     zoneId: item.zoneId?.trim() || undefined,
   };
+}
+
+function normalizeSelection(itemIds: string[], items: PlacedItem[]): string[] {
+  const availableIds = new Set(items.map((item) => item.id));
+  const nextSelection: string[] = [];
+
+  for (const itemId of itemIds) {
+    if (availableIds.has(itemId) && !nextSelection.includes(itemId)) {
+      nextSelection.push(itemId);
+    }
+  }
+
+  return nextSelection;
+}
+
+function syncPrimarySelection(itemIds: string[]): string | null {
+  return itemIds[0] ?? null;
 }
 
 function normalizeHoveredCell(cell: HoveredGridCell | null): HoveredGridCell | null {
@@ -142,7 +159,9 @@ export const useMapBuilderStore = create<MapBuilderState>()((set, get) => ({
     selectedAssetType: null,
     isPainting: false,
     currentTool: DEFAULT_TOOL,
+    placementRotationY: 0,
     selectedItemId: null,
+    selectedItemIds: [],
     hoveredCell: null,
   },
   setMapName: (name) => {
@@ -162,7 +181,7 @@ export const useMapBuilderStore = create<MapBuilderState>()((set, get) => ({
         layoutStyle: state.proceduralBase.layoutStyle,
       });
       const nextPlacedItems = trimItemsOutsideBounds(state.placedItems, nextSize);
-      const selectedItemStillExists = nextPlacedItems.some((item) => item.id === state.editorState.selectedItemId);
+      const nextSelectedItemIds = normalizeSelection(state.editorState.selectedItemIds, nextPlacedItems);
 
       return {
         mapInfo: {
@@ -174,7 +193,8 @@ export const useMapBuilderStore = create<MapBuilderState>()((set, get) => ({
         editorState: {
           ...state.editorState,
           hoveredCell: null,
-          selectedItemId: selectedItemStillExists ? state.editorState.selectedItemId : null,
+          selectedItemId: syncPrimarySelection(nextSelectedItemIds),
+          selectedItemIds: nextSelectedItemIds,
         },
       };
     });
@@ -211,6 +231,22 @@ export const useMapBuilderStore = create<MapBuilderState>()((set, get) => ({
       },
     }));
   },
+  setPlacementRotationY: (rotationY) => {
+    set((state) => ({
+      editorState: {
+        ...state.editorState,
+        placementRotationY: normalizeRotationY(rotationY),
+      },
+    }));
+  },
+  rotatePlacement: (deltaDegrees) => {
+    set((state) => ({
+      editorState: {
+        ...state.editorState,
+        placementRotationY: normalizeRotationY(state.editorState.placementRotationY + deltaDegrees),
+      },
+    }));
+  },
   setIsPainting: (isPainting) => {
     set((state) => ({
       editorState: {
@@ -232,6 +268,47 @@ export const useMapBuilderStore = create<MapBuilderState>()((set, get) => ({
       editorState: {
         ...state.editorState,
         selectedItemId: itemId,
+        selectedItemIds: itemId ? normalizeSelection([itemId], state.placedItems) : [],
+      },
+    }));
+  },
+  setSelectedItemIds: (itemIds) => {
+    set((state) => {
+      const nextSelectedItemIds = normalizeSelection(itemIds, state.placedItems);
+      return {
+        editorState: {
+          ...state.editorState,
+          selectedItemId: syncPrimarySelection(nextSelectedItemIds),
+          selectedItemIds: nextSelectedItemIds,
+        },
+      };
+    });
+  },
+  toggleSelectedItemId: (itemId) => {
+    set((state) => {
+      const currentSelection = new Set(state.editorState.selectedItemIds);
+      if (currentSelection.has(itemId)) {
+        currentSelection.delete(itemId);
+      } else {
+        currentSelection.add(itemId);
+      }
+
+      const nextSelectedItemIds = normalizeSelection(Array.from(currentSelection), state.placedItems);
+      return {
+        editorState: {
+          ...state.editorState,
+          selectedItemId: syncPrimarySelection(nextSelectedItemIds),
+          selectedItemIds: nextSelectedItemIds,
+        },
+      };
+    });
+  },
+  clearSelection: () => {
+    set((state) => ({
+      editorState: {
+        ...state.editorState,
+        selectedItemId: null,
+        selectedItemIds: [],
       },
     }));
   },
@@ -293,9 +370,7 @@ export const useMapBuilderStore = create<MapBuilderState>()((set, get) => ({
           tiles: nextTiles,
           stats: countMapStats(nextTiles),
         },
-        placedItems: state.placedItems.filter(
-          (item) => !(item.tag === "terrain" && item.x === normalizedX && item.z === normalizedZ),
-        ),
+        placedItems: state.placedItems.filter((item) => !(item.tag === "terrain" && item.x === normalizedX && item.z === normalizedZ)),
       };
     });
   },
@@ -317,17 +392,91 @@ export const useMapBuilderStore = create<MapBuilderState>()((set, get) => ({
 
       return {
         placedItems: [...state.placedItems, normalizedItem],
+        editorState: {
+          ...state.editorState,
+          selectedItemId: normalizedItem.id,
+          selectedItemIds: [normalizedItem.id],
+        },
       };
     });
   },
+  placeItems: (items) => {
+    const normalizedItems = items
+      .map((item) => normalizePlacedItemInput(item))
+      .filter((item): item is PlacedItem => Boolean(item));
+
+    if (normalizedItems.length === 0) {
+      return [];
+    }
+
+    let addedItems: PlacedItem[] = [];
+    set((state) => {
+      const occupiedKeys = new Set(state.placedItems.map((item) => buildPlacedItemKey(item.x, item.y, item.z)));
+      const nextPlacedItems = [...state.placedItems];
+
+      addedItems = [];
+      for (const item of normalizedItems) {
+        if (!isWithinMapBounds(item.x, item.z, state.mapInfo.size)) {
+          continue;
+        }
+
+        const itemKey = buildPlacedItemKey(item.x, item.y, item.z);
+        if (occupiedKeys.has(itemKey)) {
+          continue;
+        }
+
+        occupiedKeys.add(itemKey);
+        nextPlacedItems.push(item);
+        addedItems.push(item);
+      }
+
+      if (addedItems.length === 0) {
+        return state;
+      }
+
+      const nextSelectedItemIds = addedItems.map((item) => item.id);
+      return {
+        placedItems: nextPlacedItems,
+        editorState: {
+          ...state.editorState,
+          selectedItemId: syncPrimarySelection(nextSelectedItemIds),
+          selectedItemIds: nextSelectedItemIds,
+        },
+      };
+    });
+
+    return addedItems;
+  },
   removeItem: (id) => {
-    set((state) => ({
-      placedItems: state.placedItems.filter((item) => item.id !== id),
-      editorState: {
-        ...state.editorState,
-        selectedItemId: state.editorState.selectedItemId === id ? null : state.editorState.selectedItemId,
-      },
-    }));
+    set((state) => {
+      const nextPlacedItems = state.placedItems.filter((item) => item.id !== id);
+      const nextSelectedItemIds = normalizeSelection(state.editorState.selectedItemIds.filter((itemId) => itemId !== id), nextPlacedItems);
+      return {
+        placedItems: nextPlacedItems,
+        editorState: {
+          ...state.editorState,
+          selectedItemId: syncPrimarySelection(nextSelectedItemIds),
+          selectedItemIds: nextSelectedItemIds,
+        },
+      };
+    });
+  },
+  removeSelectedItems: () => {
+    set((state) => {
+      const selectedIds = new Set(state.editorState.selectedItemIds);
+      if (selectedIds.size === 0) {
+        return state;
+      }
+
+      return {
+        placedItems: state.placedItems.filter((item) => !selectedIds.has(item.id)),
+        editorState: {
+          ...state.editorState,
+          selectedItemId: null,
+          selectedItemIds: [],
+        },
+      };
+    });
   },
   updateItem: (id, data) => {
     set((state) => {
@@ -378,12 +527,63 @@ export const useMapBuilderStore = create<MapBuilderState>()((set, get) => ({
       };
     });
   },
+  moveSelectedItems: ({ anchorItemId, x, z, origin }) => {
+    set((state) => {
+      const selectedIds = normalizeSelection(state.editorState.selectedItemIds, state.placedItems);
+      if (!selectedIds.includes(anchorItemId)) {
+        return state;
+      }
+
+      const anchorOrigin = origin[anchorItemId];
+      if (!anchorOrigin) {
+        return state;
+      }
+
+      const deltaX = normalizeCoordinate(x) - anchorOrigin.x;
+      const deltaZ = normalizeCoordinate(z) - anchorOrigin.z;
+      const selectedIdSet = new Set(selectedIds);
+      const nextPositions = new Map<string, Pick<PlacedItem, "x" | "z">>();
+
+      for (const itemId of selectedIds) {
+        const item = state.placedItems.find((currentItem) => currentItem.id === itemId);
+        const itemOrigin = origin[itemId];
+        if (!item || !itemOrigin) {
+          return state;
+        }
+
+        const nextX = normalizeCoordinate(itemOrigin.x + deltaX);
+        const nextZ = normalizeCoordinate(itemOrigin.z + deltaZ);
+        if (!isWithinMapBounds(nextX, nextZ, state.mapInfo.size)) {
+          return state;
+        }
+
+        const collidingItem = state.placedItems.find(
+          (currentItem) =>
+            !selectedIdSet.has(currentItem.id) &&
+            buildPlacedItemKey(currentItem.x, currentItem.y, currentItem.z) === buildPlacedItemKey(nextX, item.y, nextZ),
+        );
+        if (collidingItem) {
+          return state;
+        }
+
+        nextPositions.set(itemId, { x: nextX, z: nextZ });
+      }
+
+      return {
+        placedItems: state.placedItems.map((item) => {
+          const nextPosition = nextPositions.get(item.id);
+          return nextPosition ? { ...item, ...nextPosition } : item;
+        }),
+      };
+    });
+  },
   clearMap: () => {
     set((state) => ({
       placedItems: [],
       editorState: {
         ...state.editorState,
         selectedItemId: null,
+        selectedItemIds: [],
       },
     }));
   },

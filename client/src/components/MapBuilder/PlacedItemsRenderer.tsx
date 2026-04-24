@@ -12,9 +12,13 @@ import type { PlacedItem } from "./types";
 
 interface PlacedItemsRendererProps {
   currentTool: "paint" | "delete" | "select";
+  hoveredItemId: string | null;
   items: PlacedItem[];
   onItemPointerDown: (event: ThreeEvent<PointerEvent>, itemId: string) => void;
-  selectedItemId: string | null;
+  onItemPointerMove: (event: ThreeEvent<PointerEvent>, itemId: string) => void;
+  onItemPointerOut: () => void;
+  onItemPointerOver: (itemId: string) => void;
+  selectedItemIds: string[];
   tileElevationByCell: Map<string, number>;
 }
 
@@ -36,24 +40,47 @@ function resolvePlacedItemSceneY(item: PlacedItem, tileElevationByCell: Map<stri
 
 function SelectionHalo() {
   return (
-    <mesh position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[0.38, 0.58, 40]} />
-      <meshBasicMaterial color="#fde68a" depthWrite={false} opacity={0.95} transparent />
+    <group position={[0, 0.09, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh>
+        <ringGeometry args={[0.42, 0.62, 44]} />
+        <meshBasicMaterial color="#38bdf8" depthWrite={false} opacity={0.96} transparent />
+      </mesh>
+      <mesh>
+        <planeGeometry args={[0.92, 0.92]} />
+        <meshBasicMaterial color="#1d4ed8" depthWrite={false} opacity={0.14} transparent />
+      </mesh>
+    </group>
+  );
+}
+
+function HoverHalo() {
+  return (
+    <mesh position={[0, 0.1, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <ringGeometry args={[0.34, 0.48, 32]} />
+      <meshBasicMaterial color="#f8fafc" depthWrite={false} opacity={0.62} transparent />
     </mesh>
   );
 }
 
 function PlacedItemInstance({
   currentTool,
+  isHovered,
   isSelected,
   item,
   onItemPointerDown,
+  onItemPointerMove,
+  onItemPointerOut,
+  onItemPointerOver,
   tileElevationByCell,
 }: {
   currentTool: "paint" | "delete" | "select";
+  isHovered: boolean;
   isSelected: boolean;
   item: PlacedItem;
   onItemPointerDown: (event: ThreeEvent<PointerEvent>, itemId: string) => void;
+  onItemPointerMove: (event: ThreeEvent<PointerEvent>, itemId: string) => void;
+  onItemPointerOut: () => void;
+  onItemPointerOver: (itemId: string) => void;
   tileElevationByCell: Map<string, number>;
 }) {
   const catalogItem = getMapBuilderCatalogItem(item.prefabId);
@@ -70,6 +97,15 @@ function PlacedItemInstance({
         event.stopPropagation();
         onItemPointerDown(event, item.id);
       }}
+      onPointerMove={(event) => {
+        event.stopPropagation();
+        onItemPointerMove(event, item.id);
+      }}
+      onPointerOut={() => onItemPointerOut()}
+      onPointerOver={(event) => {
+        event.stopPropagation();
+        onItemPointerOver(item.id);
+      }}
       position={[
         toSceneAxis(item.x),
         resolvePlacedItemSceneY(item, tileElevationByCell) + groundOffsetY * item.scale,
@@ -80,6 +116,7 @@ function PlacedItemInstance({
     >
       <Clone object={gltf.scene} />
       {isSelected ? <SelectionHalo /> : null}
+      {isHovered && !isSelected && currentTool !== "delete" ? <HoverHalo /> : null}
       {currentTool === "delete" ? (
         <mesh position={[0, 1.2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[0.18, 0.28, 24]} />
@@ -92,20 +129,30 @@ function PlacedItemInstance({
 
 export function PlacedItemsRenderer({
   currentTool,
+  hoveredItemId,
   items,
   onItemPointerDown,
-  selectedItemId,
+  onItemPointerMove,
+  onItemPointerOut,
+  onItemPointerOver,
+  selectedItemIds,
   tileElevationByCell,
 }: PlacedItemsRendererProps) {
+  const selectedIdSet = useMemo(() => new Set(selectedItemIds), [selectedItemIds]);
+
   return (
     <group>
       {items.map((item) => (
         <PlacedItemInstance
           key={item.id}
           currentTool={currentTool}
-          isSelected={selectedItemId === item.id}
+          isHovered={hoveredItemId === item.id}
+          isSelected={selectedIdSet.has(item.id)}
           item={item}
           onItemPointerDown={onItemPointerDown}
+          onItemPointerMove={onItemPointerMove}
+          onItemPointerOut={onItemPointerOut}
+          onItemPointerOver={onItemPointerOver}
           tileElevationByCell={tileElevationByCell}
         />
       ))}

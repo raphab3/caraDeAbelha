@@ -16,12 +16,12 @@ Execution preference: `codebase + ui-ux-pro-max + Context7`
 
 ## Task list
 
-- [ ] `TASK-MBPU-01` Reestruturar o modelo de interacao do viewport para separar camera, acao primaria e navegacao por teclado.
-- [ ] `TASK-MBPU-02` Introduzir selecao multipla, copia/colagem em lote e movimentacao de conjunto no estado do editor.
-- [ ] `TASK-MBPU-03` Simplificar a toolbar e o modo sem UI, mantendo restauracao visivel e fluxo operacional por teclado.
-- [ ] `TASK-MBPU-04` Ajustar snapping, marcacoes visuais e linguagem de selecao para comunicar centro de celula e destaque azul.
-- [ ] `TASK-MBPU-05` Enxugar a biblioteca, remover itens invalidos e fechar coerencia funcional dos assets remanescentes.
-- [ ] `TASK-MBPU-06` Refinar layout responsivo de `Biblioteca` e `Detalhes`, eliminar scrolls visiveis e validar criterios principais do upgrade.
+- [x] `TASK-MBPU-01` Reestruturar o modelo de interacao do viewport para separar camera, acao primaria e navegacao por teclado.
+- [x] `TASK-MBPU-02` Introduzir selecao multipla, copia/colagem em lote e movimentacao de conjunto no estado do editor.
+- [x] `TASK-MBPU-03` Simplificar a toolbar e o modo sem UI, mantendo restauracao visivel e fluxo operacional por teclado.
+- [x] `TASK-MBPU-04` Ajustar snapping, marcacoes visuais e linguagem de selecao para comunicar centro de celula e destaque azul.
+- [x] `TASK-MBPU-05` Enxugar a biblioteca, remover itens invalidos e fechar coerencia funcional dos assets remanescentes.
+- [x] `TASK-MBPU-06` Refinar layout responsivo de `Biblioteca` e `Detalhes`, eliminar scrolls visiveis e validar criterios principais do upgrade.
 
 ## Detalhamento
 

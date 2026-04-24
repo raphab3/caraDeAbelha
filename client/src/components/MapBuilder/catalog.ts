@@ -12,17 +12,8 @@ export const MAP_BUILDER_CATALOG: readonly MapBuilderCatalogItem[] = [
   },
   {
     prefabId: "terrain/slope-wide",
-    label: "Rampa Larga",
+    label: "Rampa de Subida",
     assetPath: "kenney_platformer-kit/Models/GLB format/block-grass-large-slope.glb",
-    category: "terrain",
-    colliderType: "solid",
-    defaultScale: 1,
-    defaultTag: "terrain",
-  },
-  {
-    prefabId: "terrain/overhang-edge",
-    label: "Beiral de Penhasco",
-    assetPath: "kenney_platformer-kit/Models/GLB format/block-grass-overhang-edge.glb",
     category: "terrain",
     colliderType: "solid",
     defaultScale: 1,

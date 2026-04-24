@@ -1,7 +1,8 @@
 import { OrbitControls } from "@react-three/drei";
-import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { DoubleSide, MOUSE, type Mesh } from "three";
+import { Clone, useGLTF } from "@react-three/drei";
+import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState, type ElementRef, type RefObject } from "react";
+import { DoubleSide, MOUSE, Vector3, type Group } from "three";
 
 import { getMapBuilderCatalogItem } from "./catalog";
 import { useMapBuilderStore } from "./useMapBuilderStore";
@@ -13,7 +14,8 @@ import {
   toTerrainSurfaceY,
   toWorldAxis,
 } from "../GameViewport/worldSurface";
-import type { PlacedItem } from "./types";
+import { resolveModelGroundOffsetY } from "../GameViewport/modelAnchoring";
+import type { MapBuilderCatalogItem, PlacedItem } from "./types";
 
 const SKY_COLOR = "#1279e0";
 const FOG_COLOR = "#2286c9";
@@ -33,10 +35,14 @@ interface DragState {
   active: boolean;
   itemId: string | null;
   pointerId: number | null;
+  origin: Record<string, Pick<PlacedItem, "x" | "z">>;
 }
 
 interface ClipboardItem {
   prefabId: string;
+  offsetX: number;
+  offsetY: number;
+  offsetZ: number;
   rotationY: number;
   scale: number;
   tag?: string;
@@ -52,63 +58,197 @@ function buildSurfaceKey(x: number, z: number): string {
   return `${x}:${z}`;
 }
 
+function normalizeAssetPath(assetPath: string): string {
+  return assetPath.startsWith("/") ? assetPath : `/${assetPath}`;
+}
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
+}
+
 function resolveCameraDistance(size: number): number {
   return Math.min(CAMERA_MAX_DISTANCE, Math.max(CAMERA_BASE_DISTANCE, toSceneAxis(size) * 0.44));
 }
 
-function HoverMarker({ cell }: { cell: { x: number; y: number; z: number } }) {
-  const meshRef = useRef<Mesh>(null);
+function HoverMarker({ cell, mode }: { cell: { x: number; y: number; z: number }; mode: "paint" | "delete" | "select" }) {
+  const markerRef = useRef<Group>(null);
   const sceneX = toSceneAxis(cell.x);
   const sceneZ = toSceneAxis(cell.z);
+  const color = mode === "delete" ? "#fb7185" : mode === "select" ? "#60a5fa" : "#facc15";
 
   useFrame((state) => {
-    if (!meshRef.current) {
+    if (!markerRef.current) {
       return;
     }
 
-    meshRef.current.rotation.y = state.clock.elapsedTime * 1.5;
-    meshRef.current.position.y = toTerrainSurfaceY(cell.y) + 0.22 + Math.sin(state.clock.elapsedTime * 3.2) * 0.04;
+    markerRef.current.rotation.z = state.clock.elapsedTime * 1.5;
+    markerRef.current.position.y = toTerrainSurfaceY(cell.y) + 0.12 + Math.sin(state.clock.elapsedTime * 3.2) * 0.04;
   });
 
   return (
-    <mesh ref={meshRef} position={[sceneX, toTerrainSurfaceY(cell.y) + 0.22, sceneZ]} rotation={[-Math.PI / 2, 0, 0]}>
-      <ringGeometry args={[0.16, 0.28, 32]} />
-      <meshBasicMaterial color="#fde68a" depthWrite={false} opacity={0.9} side={DoubleSide} transparent />
-    </mesh>
+    <group ref={markerRef} position={[sceneX, toTerrainSurfaceY(cell.y) + 0.12, sceneZ]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh>
+        <planeGeometry args={[0.92, 0.92]} />
+        <meshBasicMaterial color={color} depthWrite={false} opacity={0.12} side={DoubleSide} transparent />
+      </mesh>
+      <mesh position={[0, 0, 0.004]}>
+        <ringGeometry args={[0.1, 0.18, 28]} />
+        <meshBasicMaterial color={color} depthWrite={false} opacity={0.92} side={DoubleSide} transparent />
+      </mesh>
+    </group>
   );
+}
+
+function PlacementPreview({
+  catalogItem,
+  cell,
+  rotationY,
+  tileElevationByCell,
+}: {
+  catalogItem: MapBuilderCatalogItem;
+  cell: { x: number; y: number; z: number };
+  rotationY: number;
+  tileElevationByCell: Map<string, number>;
+}) {
+  const gltf = useGLTF(normalizeAssetPath(catalogItem.assetPath));
+  const groundOffsetY = useMemo(() => resolveModelGroundOffsetY(gltf.scene), [gltf.scene]);
+  const sceneY =
+    catalogItem.category === "terrain"
+      ? toTerrainSurfaceY(tileElevationByCell.get(buildSurfaceKey(cell.x, cell.z)) ?? 0)
+      : toTerrainSurfaceY(cell.y);
+
+  return (
+    <group
+      position={[
+        toSceneAxis(cell.x),
+        sceneY + groundOffsetY * catalogItem.defaultScale,
+        toSceneAxis(cell.z),
+      ]}
+      rotation={[0, (rotationY * Math.PI) / 180, 0]}
+      scale={[catalogItem.defaultScale, catalogItem.defaultScale, catalogItem.defaultScale]}
+    >
+      <Clone object={gltf.scene} />
+      <mesh position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.58, 0.74, 44]} />
+        <meshBasicMaterial color="#22d3ee" depthWrite={false} opacity={0.82} transparent />
+      </mesh>
+      <mesh position={[0, 0.075, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[1, 1]} />
+        <meshBasicMaterial color="#38bdf8" depthWrite={false} opacity={0.18} side={DoubleSide} transparent />
+      </mesh>
+    </group>
+  );
+}
+
+type OrbitControlsHandle = ElementRef<typeof OrbitControls>;
+
+function KeyboardCameraNavigator({ controlsRef, mapSize }: { controlsRef: RefObject<OrbitControlsHandle | null>; mapSize: number }) {
+  const camera = useThree((state) => state.camera);
+
+  useEffect(() => {
+    const handleKeyboard = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      const isNavigationKey = ["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(key);
+      if (!isNavigationKey || isEditableTarget(event.target)) {
+        return;
+      }
+
+      const controls = controlsRef.current;
+      if (!controls) {
+        return;
+      }
+
+      event.preventDefault();
+      const step = Math.max(1, toSceneAxis(mapSize) / 14);
+      const forward = new Vector3();
+      camera.getWorldDirection(forward);
+      forward.y = 0;
+      forward.normalize();
+
+      const right = new Vector3().crossVectors(forward, camera.up).normalize();
+      const direction = new Vector3();
+
+      if (key === "arrowup" || key === "w") {
+        direction.add(forward);
+      }
+      if (key === "arrowdown" || key === "s") {
+        direction.sub(forward);
+      }
+      if (key === "arrowright" || key === "d") {
+        direction.add(right);
+      }
+      if (key === "arrowleft" || key === "a") {
+        direction.sub(right);
+      }
+
+      if (direction.lengthSq() === 0) {
+        return;
+      }
+
+      direction.normalize().multiplyScalar(step);
+
+      controls.target.x += direction.x;
+      controls.target.z += direction.z;
+      camera.position.x += direction.x;
+      camera.position.z += direction.z;
+      controls.update();
+    };
+
+    window.addEventListener("keydown", handleKeyboard);
+    return () => window.removeEventListener("keydown", handleKeyboard);
+  }, [camera, controlsRef, mapSize]);
+
+  return null;
 }
 
 function SceneContent({
   cameraDistance,
   hoveredCell,
-  isPanning,
   interactionPlaneSize,
   mapSize,
+  currentTool,
   onHoverCell,
   onItemPointerDown,
+  onItemPointerMove,
+  onItemPointerOut,
+  onItemPointerOver,
   onPaintCell,
   onPointerEnd,
   onPointerStart,
   placedItems,
-  selectedItemId,
+  previewAsset,
+  previewRotationY,
+  selectedItemIds,
   tileElevationByCell,
   tiles,
 }: {
   cameraDistance: number;
   hoveredCell: { x: number; y: number; z: number } | null;
-  isPanning: boolean;
   interactionPlaneSize: number;
   mapSize: number;
+  currentTool: "paint" | "delete" | "select";
   onHoverCell: (pointX: number, pointZ: number) => void;
   onItemPointerDown: (event: ThreeEvent<PointerEvent>, itemId: string) => void;
+  onItemPointerMove: (event: ThreeEvent<PointerEvent>, itemId: string) => void;
+  onItemPointerOut: () => void;
+  onItemPointerOver: (itemId: string) => void;
   onPaintCell: (pointX: number, pointZ: number) => void;
   onPointerEnd: (eventTarget: EventTarget | null, pointerId: number) => void;
   onPointerStart: (eventTarget: EventTarget | null, pointerId: number, pointX: number, pointZ: number) => void;
   placedItems: PlacedItem[];
-  selectedItemId: string | null;
+  previewAsset: MapBuilderCatalogItem | null;
+  previewRotationY: number;
+  selectedItemIds: string[];
   tileElevationByCell: Map<string, number>;
   tiles: ReturnType<typeof useMapBuilderStore.getState>["proceduralBase"]["tiles"];
 }) {
+  const controlsRef = useRef<OrbitControlsHandle | null>(null);
+  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+
   return (
     <>
       <color attach="background" args={[SKY_COLOR]} />
@@ -162,15 +302,34 @@ function SceneContent({
       </mesh>
 
       <PlacedItemsRenderer
-        currentTool={useMapBuilderStore.getState().editorState.currentTool}
+        currentTool={currentTool}
+        hoveredItemId={hoveredItemId}
         items={placedItems}
         onItemPointerDown={onItemPointerDown}
-        selectedItemId={selectedItemId}
+        onItemPointerMove={onItemPointerMove}
+        onItemPointerOut={() => {
+          setHoveredItemId(null);
+          onItemPointerOut();
+        }}
+        onItemPointerOver={(itemId) => {
+          setHoveredItemId(itemId);
+          onItemPointerOver(itemId);
+        }}
+        selectedItemIds={selectedItemIds}
         tileElevationByCell={tileElevationByCell}
       />
-      {hoveredCell ? <HoverMarker cell={hoveredCell} /> : null}
+      {hoveredCell ? <HoverMarker cell={hoveredCell} mode={currentTool} /> : null}
+      {hoveredCell && previewAsset ? (
+        <PlacementPreview
+          catalogItem={previewAsset}
+          cell={hoveredCell}
+          rotationY={previewRotationY}
+          tileElevationByCell={tileElevationByCell}
+        />
+      ) : null}
 
       <OrbitControls
+        ref={controlsRef}
         dampingFactor={0.08}
         enableDamping
         enablePan={false}
@@ -180,14 +339,15 @@ function SceneContent({
         minDistance={CAMERA_MIN_DISTANCE}
         minPolarAngle={0.32}
         mouseButtons={{
-          LEFT: isPanning ? MOUSE.PAN : MOUSE.ROTATE,
+          LEFT: undefined,
           MIDDLE: MOUSE.DOLLY,
-          RIGHT: isPanning ? MOUSE.ROTATE : MOUSE.PAN,
+          RIGHT: MOUSE.ROTATE,
         }}
         rotateSpeed={CAMERA_ROTATE_SPEED}
         target={[0, toTerrainSurfaceY(0), 0]}
         zoomSpeed={CAMERA_ZOOM_SPEED}
       />
+      <KeyboardCameraNavigator controlsRef={controlsRef} mapSize={mapSize} />
     </>
   );
 }
@@ -200,10 +360,16 @@ export function BuilderCanvas() {
   const placeItem = useMapBuilderStore((state) => state.placeItem);
   const paintTerrainAt = useMapBuilderStore((state) => state.paintTerrainAt);
   const removeItem = useMapBuilderStore((state) => state.removeItem);
-  const updateItem = useMapBuilderStore((state) => state.updateItem);
+  const removeSelectedItems = useMapBuilderStore((state) => state.removeSelectedItems);
+  const moveSelectedItems = useMapBuilderStore((state) => state.moveSelectedItems);
+  const placeItems = useMapBuilderStore((state) => state.placeItems);
   const setHoveredCell = useMapBuilderStore((state) => state.setHoveredCell);
   const setIsPainting = useMapBuilderStore((state) => state.setIsPainting);
   const setSelectedItemId = useMapBuilderStore((state) => state.setSelectedItemId);
+  const setSelectedItemIds = useMapBuilderStore((state) => state.setSelectedItemIds);
+  const clearSelection = useMapBuilderStore((state) => state.clearSelection);
+  const setCurrentTool = useMapBuilderStore((state) => state.setCurrentTool);
+  const rotatePlacement = useMapBuilderStore((state) => state.rotatePlacement);
 
   const cameraDistance = useMemo(() => resolveCameraDistance(mapInfo.size), [mapInfo.size]);
   const interactionPlaneSize = useMemo(() => Math.max(toSceneAxis(mapInfo.size + 4), 120), [mapInfo.size]);
@@ -215,10 +381,10 @@ export function BuilderCanvas() {
     () => new Map(proceduralBase.tiles.map((tile) => [buildSurfaceKey(tile.x, tile.z), tile.y] as const)),
     [proceduralBase.tiles],
   );
+  const selectedAsset = editorState.selectedAssetType ? getMapBuilderCatalogItem(editorState.selectedAssetType) ?? null : null;
   const paintStrokeRef = useRef<PaintStrokeState>({ active: false, lastCellKey: null, visitedCellKeys: new Set() });
-  const dragStateRef = useRef<DragState>({ active: false, itemId: null, pointerId: null });
-  const clipboardRef = useRef<ClipboardItem | null>(null);
-  const [isSpacePanning, setIsSpacePanning] = useState(false);
+  const dragStateRef = useRef<DragState>({ active: false, itemId: null, pointerId: null, origin: {} });
+  const clipboardRef = useRef<ClipboardItem[]>([]);
 
   const updateHoveredCell = (sceneX: number, sceneZ: number) => {
     if (!Number.isFinite(sceneX) || !Number.isFinite(sceneZ)) {
@@ -234,9 +400,6 @@ export function BuilderCanvas() {
   };
 
   const tryPaintCell = (sceneX: number, sceneZ: number) => {
-    if (isSpacePanning) {
-      return;
-    }
     if (dragStateRef.current.active) {
       return;
     }
@@ -259,6 +422,17 @@ export function BuilderCanvas() {
     const selectedAsset = getMapBuilderCatalogItem(editorState.selectedAssetType);
     if (selectedAsset?.category === "terrain") {
       paintTerrainAt({ x, z, prefabId: selectedAsset.prefabId, mode: "paint" });
+      if (selectedAsset.prefabId === "terrain/slope-wide") {
+        placeItem({
+          prefabId: selectedAsset.prefabId,
+          x,
+          y,
+          z,
+          rotationY: editorState.placementRotationY,
+          meta: { role: "walkable-ramp" },
+          tag: "terrain",
+        });
+      }
       return;
     }
 
@@ -268,6 +442,7 @@ export function BuilderCanvas() {
         x,
         y,
         z,
+        rotationY: editorState.placementRotationY,
         meta: {},
       });
     }
@@ -285,19 +460,11 @@ export function BuilderCanvas() {
 
     const x = Math.round(toWorldAxis(sceneX));
     const z = Math.round(toWorldAxis(sceneZ));
-    const cellKey = buildPlacedItemKey(x, draggedItem.y, z);
-    const hasCollision = placedItems.some(
-      (item) => item.id !== draggedItem.id && buildPlacedItemKey(item.x, item.y, item.z) === cellKey,
-    );
-    if (hasCollision) {
-      return;
-    }
-
-    updateItem(draggedItem.id, { x, z });
+    moveSelectedItems({ anchorItemId: draggedItem.id, x, z, origin: dragStateRef.current.origin });
   };
 
   const tryDeleteCell = (sceneX: number, sceneZ: number) => {
-    if (isSpacePanning || editorState.currentTool !== "delete" || !editorState.selectedAssetType) {
+    if (editorState.currentTool !== "delete" || !editorState.selectedAssetType) {
       return;
     }
 
@@ -324,7 +491,7 @@ export function BuilderCanvas() {
   };
 
   const handlePointerStart = (eventTarget: EventTarget | null, pointerId: number, sceneX: number, sceneZ: number) => {
-    const isPaintTool = (editorState.currentTool === "paint" || editorState.currentTool === "delete") && !isSpacePanning;
+    const isPaintTool = editorState.currentTool === "paint" || editorState.currentTool === "delete";
 
     paintStrokeRef.current.active = isPaintTool;
     paintStrokeRef.current.lastCellKey = null;
@@ -340,11 +507,9 @@ export function BuilderCanvas() {
 
     updateHoveredCell(sceneX, sceneZ);
     if (editorState.currentTool === "select") {
-      setSelectedItemId(null);
+      clearSelection();
     }
-    if (!isSpacePanning) {
-      handleStrokeCell(sceneX, sceneZ);
-    }
+    handleStrokeCell(sceneX, sceneZ);
     moveDraggedItem(sceneX, sceneZ);
   };
 
@@ -361,6 +526,7 @@ export function BuilderCanvas() {
     dragStateRef.current.active = false;
     dragStateRef.current.itemId = null;
     dragStateRef.current.pointerId = null;
+    dragStateRef.current.origin = {};
   };
 
   const handleItemPointerDown = (event: ThreeEvent<PointerEvent>, itemId: string) => {
@@ -381,7 +547,14 @@ export function BuilderCanvas() {
       return;
     }
 
-    setSelectedItemId(itemId);
+    if (editorState.currentTool === "select") {
+      if (!editorState.selectedItemIds.includes(itemId)) {
+        setSelectedItemIds([...editorState.selectedItemIds, itemId]);
+      }
+    } else {
+      setSelectedItemId(itemId);
+    }
+
     if (editorState.currentTool !== "select") {
       return;
     }
@@ -389,6 +562,12 @@ export function BuilderCanvas() {
     dragStateRef.current.active = true;
     dragStateRef.current.itemId = itemId;
     dragStateRef.current.pointerId = event.pointerId;
+    const selectedIds = new Set(
+      editorState.selectedItemIds.includes(itemId) ? editorState.selectedItemIds : [...editorState.selectedItemIds, itemId],
+    );
+    dragStateRef.current.origin = Object.fromEntries(
+      placedItems.filter((item) => selectedIds.has(item.id)).map((item) => [item.id, { x: item.x, z: item.z }]),
+    );
 
     const pointerTarget = event.target as Element & {
       setPointerCapture?: (nextPointerId: number) => void;
@@ -396,72 +575,110 @@ export function BuilderCanvas() {
     pointerTarget.setPointerCapture?.(event.pointerId);
   };
 
+  const handleItemPointerMove = (event: ThreeEvent<PointerEvent>) => {
+    if (!dragStateRef.current.active) {
+      return;
+    }
+
+    moveDraggedItem(event.point.x, event.point.z);
+  };
+
   useEffect(() => {
     const handleKeyboard = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
       if (event.code === "Space") {
         event.preventDefault();
-        setIsSpacePanning(true);
+        setCurrentTool("select");
+        return;
+      }
+      if (
+        !(event.ctrlKey || event.metaKey || event.altKey) &&
+        (event.key === "r" || event.key === "R" || event.key === "e" || event.key === "E")
+      ) {
+        event.preventDefault();
+        rotatePlacement(90);
+        return;
+      }
+      if (!(event.ctrlKey || event.metaKey || event.altKey) && (event.key === "q" || event.key === "Q")) {
+        event.preventDefault();
+        rotatePlacement(-90);
+        return;
+      }
+      if (event.key === "Delete" || event.key === "Backspace") {
+        if (editorState.selectedItemIds.length > 0) {
+          event.preventDefault();
+          removeSelectedItems();
+        }
+        return;
       }
       if (!(event.ctrlKey || event.metaKey)) {
         return;
       }
 
-      const selectedItem = placedItems.find((item) => item.id === editorState.selectedItemId);
-      if ((event.key === "c" || event.key === "C") && selectedItem) {
+      const selectedItems = placedItems.filter((item) => editorState.selectedItemIds.includes(item.id));
+      if ((event.key === "c" || event.key === "C") && selectedItems.length > 0) {
         event.preventDefault();
-        clipboardRef.current = {
-          prefabId: selectedItem.prefabId,
-          rotationY: selectedItem.rotationY,
-          scale: selectedItem.scale,
-          tag: selectedItem.tag,
-          zoneId: selectedItem.zoneId,
-          meta: selectedItem.meta,
-        };
+        const anchorX = Math.min(...selectedItems.map((item) => item.x));
+        const anchorY = Math.min(...selectedItems.map((item) => item.y));
+        const anchorZ = Math.min(...selectedItems.map((item) => item.z));
+        clipboardRef.current = selectedItems.map((item) => ({
+          prefabId: item.prefabId,
+          offsetX: item.x - anchorX,
+          offsetY: item.y - anchorY,
+          offsetZ: item.z - anchorZ,
+          rotationY: item.rotationY,
+          scale: item.scale,
+          tag: item.tag,
+          zoneId: item.zoneId,
+          meta: { ...item.meta },
+        }));
       }
 
       if (event.key === "v" || event.key === "V") {
         const copy = clipboardRef.current;
-        if (!copy) {
+        if (copy.length === 0) {
           return;
         }
         event.preventDefault();
 
-        const fallbackX = selectedItem ? selectedItem.x + 1 : 0;
-        const fallbackY = selectedItem ? selectedItem.y : mapInfo.defaultY;
-        const fallbackZ = selectedItem ? selectedItem.z + 1 : 0;
+        const fallbackItem = selectedItems[0];
+        const pasteX = editorState.hoveredCell?.x ?? (fallbackItem ? fallbackItem.x + 1 : 0);
+        const pasteY = editorState.hoveredCell?.y ?? (fallbackItem ? fallbackItem.y : mapInfo.defaultY);
+        const pasteZ = editorState.hoveredCell?.z ?? (fallbackItem ? fallbackItem.z + 1 : 0);
 
-        placeItem({
-          prefabId: copy.prefabId,
-          rotationY: copy.rotationY,
-          scale: copy.scale,
-          tag: copy.tag,
-          zoneId: copy.zoneId,
-          meta: copy.meta,
-          x: editorState.hoveredCell?.x ?? fallbackX,
-          y: editorState.hoveredCell?.y ?? fallbackY,
-          z: editorState.hoveredCell?.z ?? fallbackZ,
-        });
+        placeItems(
+          copy.map((item) => ({
+            prefabId: item.prefabId,
+            rotationY: item.rotationY,
+            scale: item.scale,
+            tag: item.tag,
+            zoneId: item.zoneId,
+            meta: item.meta,
+            x: pasteX + item.offsetX,
+            y: pasteY + item.offsetY,
+            z: pasteZ + item.offsetZ,
+          })),
+        );
       }
-    };
-    const handleKeyboardUp = (event: KeyboardEvent) => {
-      if (event.code === "Space") {
-        event.preventDefault();
-        setIsSpacePanning(false);
-      }
-    };
-    const handleWindowBlur = () => {
-      setIsSpacePanning(false);
     };
 
     window.addEventListener("keydown", handleKeyboard);
-    window.addEventListener("keyup", handleKeyboardUp);
-    window.addEventListener("blur", handleWindowBlur);
     return () => {
       window.removeEventListener("keydown", handleKeyboard);
-      window.removeEventListener("keyup", handleKeyboardUp);
-      window.removeEventListener("blur", handleWindowBlur);
     };
-  }, [editorState.hoveredCell, editorState.selectedAssetType, editorState.selectedItemId, mapInfo.defaultY, paintTerrainAt, placeItem, placedItems]);
+  }, [
+    editorState.hoveredCell,
+    editorState.selectedItemIds,
+    mapInfo.defaultY,
+    placeItems,
+    placedItems,
+    removeSelectedItems,
+    rotatePlacement,
+    setCurrentTool,
+  ]);
 
   useEffect(() => {
     const handleContextMenu = (event: MouseEvent) => event.preventDefault();
@@ -470,7 +687,7 @@ export function BuilderCanvas() {
   }, []);
 
   return (
-    <div className={`relative h-full min-h-[72vh] overflow-hidden lg:min-h-[calc(100vh-3.5rem)] ${isSpacePanning ? "cursor-grab" : "cursor-default"}`}>
+    <div className="relative h-full min-h-[72vh] overflow-hidden lg:min-h-[calc(100vh-3.5rem)]">
       <Canvas
         camera={{ position: [cameraDistance, cameraDistance * 0.52, cameraDistance], fov: 52 }}
         dpr={[1, 1.8]}
@@ -479,17 +696,22 @@ export function BuilderCanvas() {
       >
         <SceneContent
           cameraDistance={cameraDistance}
+          currentTool={editorState.currentTool}
           hoveredCell={editorState.hoveredCell}
-          isPanning={isSpacePanning}
           interactionPlaneSize={interactionPlaneSize}
           mapSize={mapInfo.size}
           onHoverCell={updateHoveredCell}
           onItemPointerDown={handleItemPointerDown}
+          onItemPointerMove={handleItemPointerMove}
+          onItemPointerOut={() => undefined}
+          onItemPointerOver={() => undefined}
           onPaintCell={handleStrokeCell}
           onPointerEnd={handlePointerEnd}
           onPointerStart={handlePointerStart}
           placedItems={placedItems}
-          selectedItemId={editorState.selectedItemId}
+          previewAsset={editorState.currentTool === "paint" ? selectedAsset : null}
+          previewRotationY={editorState.placementRotationY}
+          selectedItemIds={editorState.selectedItemIds}
           tileElevationByCell={tileElevationByCell}
           tiles={proceduralBase.tiles}
         />

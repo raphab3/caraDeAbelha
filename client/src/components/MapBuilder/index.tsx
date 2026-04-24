@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { MAP_BUILDER_CATALOG, getMapBuilderCatalogItem } from "./catalog";
+import { getMapBuilderCatalogItem, MAP_BUILDER_CATALOG } from "./catalog";
 import { AssetShelf } from "./AssetShelf";
 import { BuilderCanvas } from "./BuilderCanvas";
 import { buildStageExport, buildStageExportFileName, downloadStageExport } from "./exportStage";
@@ -28,14 +28,19 @@ export default function MapBuilder() {
   const setProceduralSeed = useMapBuilderStore((state) => state.setProceduralSeed);
   const setSelectedAssetType = useMapBuilderStore((state) => state.setSelectedAssetType);
   const setCurrentTool = useMapBuilderStore((state) => state.setCurrentTool);
+  const rotatePlacement = useMapBuilderStore((state) => state.rotatePlacement);
   const removeItem = useMapBuilderStore((state) => state.removeItem);
+  const removeSelectedItems = useMapBuilderStore((state) => state.removeSelectedItems);
   const updateItem = useMapBuilderStore((state) => state.updateItem);
   const generateProceduralBase = useMapBuilderStore((state) => state.generateProceduralBase);
-  const placeItem = useMapBuilderStore((state) => state.placeItem);
 
   const selectedItem = useMemo(
     () => placedItems.find((item) => item.id === editorState.selectedItemId) ?? null,
     [editorState.selectedItemId, placedItems],
+  );
+  const selectedItems = useMemo(
+    () => placedItems.filter((item) => editorState.selectedItemIds.includes(item.id)),
+    [editorState.selectedItemIds, placedItems],
   );
 
   const selectedAssetLabel = useMemo(() => {
@@ -120,6 +125,11 @@ export default function MapBuilder() {
   };
 
   const handleDeleteSelectedItem = () => {
+    if (selectedItems.length > 1) {
+      removeSelectedItems();
+      return;
+    }
+
     if (!selectedItem) {
       return;
     }
@@ -128,7 +138,7 @@ export default function MapBuilder() {
   };
 
   const handleCopySelected = () => {
-    if (!selectedItem) {
+    if (selectedItems.length === 0) {
       return;
     }
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "c", ctrlKey: true }));
@@ -152,27 +162,20 @@ export default function MapBuilder() {
     return () => window.removeEventListener("keydown", handleKeyboard);
   }, []);
 
-  const handleNewItem = () => {
-    const firstItem = MAP_BUILDER_CATALOG[0];
-    if (!firstItem) {
-      return;
-    }
-
-    setCurrentTool("paint");
-    setSelectedAssetType(firstItem.prefabId);
-    placeItem({
-      prefabId: firstItem.prefabId,
-      x: 0,
-      y: mapInfo.defaultY,
-      z: 0,
-      meta: {},
-    });
-  };
-
   return (
     <div ref={targetRef} className="min-h-0 min-w-0 h-full">
       <MapBuilderLayout
         isUiHidden={isUiHidden}
+        restoreControl={
+          <button
+            aria-label="Restaurar interface"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/12 bg-slate-950/88 text-lg font-semibold text-sky-100 shadow-[0_14px_30px_rgba(2,6,23,0.34)] backdrop-blur-xl transition hover:border-sky-300/45 hover:bg-sky-500/12"
+            onClick={() => setIsUiHidden(false)}
+            type="button"
+          >
+            /
+          </button>
+        }
         header={
           <HeaderControls
             defaultY={mapInfo.defaultY}
@@ -203,11 +206,14 @@ export default function MapBuilder() {
             hoveredCell={editorState.hoveredCell}
             mapName={mapInfo.name}
             onDeleteSelectedItem={handleDeleteSelectedItem}
+            onRotatePlacement={rotatePlacement}
             onRotateQuarterTurn={handleRotateQuarterTurn}
             onScaleChange={handleScaleChange}
             onTagChange={handleTagChange}
             onZoneIdChange={handleZoneIdChange}
             placedItemsCount={placedItemsCount}
+            placementRotationY={editorState.placementRotationY}
+            selectedItemCount={selectedItems.length}
             selectedAssetLabel={selectedAssetLabel}
             selectedItem={selectedItem}
             selectedItemId={editorState.selectedItemId}
@@ -224,9 +230,8 @@ export default function MapBuilder() {
         toolbar={
           <FooterToolbar
             currentTool={editorState.currentTool}
-            hasSelection={Boolean(selectedItem)}
+            hasSelection={selectedItems.length > 0}
             onCopySelected={handleCopySelected}
-            onNewItem={handleNewItem}
             onPaste={handlePasteSelected}
             onToolChange={setCurrentTool}
           />

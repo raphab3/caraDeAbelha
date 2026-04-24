@@ -55,6 +55,11 @@
   max-width: 320px;
 }
 
+.restoreSlot {
+  right: 1rem;
+  top: 1rem;
+}
+
 .inspectorMobile {
   inset-inline: 0.75rem;
   bottom: 17.5rem;

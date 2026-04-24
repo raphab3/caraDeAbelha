@@ -7,17 +7,22 @@ interface MapBuilderLayoutProps {
   canvas: ReactNode;
   inspector: ReactNode;
   isUiHidden: boolean;
+  restoreControl: ReactNode;
   shelf: ReactNode;
   toolbar: ReactNode;
 }
 
-export function MapBuilderLayout({ header, canvas, inspector, isUiHidden, shelf, toolbar }: MapBuilderLayoutProps) {
+export function MapBuilderLayout({ header, canvas, inspector, isUiHidden, restoreControl, shelf, toolbar }: MapBuilderLayoutProps) {
   return (
     <div className={styles.root}>
       <section className={styles.workbench}>
         <div className={styles.canvas}>{canvas}</div>
 
-        {isUiHidden ? null : (
+        {isUiHidden ? (
+          <div className={[styles.slot, styles.restoreSlot].join(" ")}>
+            <div>{restoreControl}</div>
+          </div>
+        ) : (
           <>
             <div className={[styles.slot, styles.headerSlot].join(" ")}>
               <div>{header}</div>
