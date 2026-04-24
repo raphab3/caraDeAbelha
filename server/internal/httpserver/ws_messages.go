@@ -30,16 +30,19 @@ type unlockZoneAction struct {
 }
 
 type playerState struct {
-	ID         string    `json:"id"`
-	Username   string    `json:"username"`
-	StageID    string    `json:"stageId,omitempty"`
-	X          float64   `json:"x"`
-	Y          float64   `json:"y"`
-	TargetX    *float64  `json:"targetX,omitempty"`
-	TargetY    *float64  `json:"targetY,omitempty"`
-	Speed      float64   `json:"speed"`
-	UpdatedAt  time.Time `json:"-"`
-	LastSeenAt time.Time `json:"-"`
+	ID           string             `json:"id"`
+	Username     string             `json:"username"`
+	StageID      string             `json:"stageId,omitempty"`
+	X            float64            `json:"x"`
+	Y            float64            `json:"y"`
+	TargetX      *float64           `json:"targetX,omitempty"`
+	TargetY      *float64           `json:"targetY,omitempty"`
+	DestinationX *float64           `json:"destinationX,omitempty"`
+	DestinationY *float64           `json:"destinationY,omitempty"`
+	Speed        float64            `json:"speed"`
+	Route        []movementWaypoint `json:"-"`
+	UpdatedAt    time.Time          `json:"-"`
+	LastSeenAt   time.Time          `json:"-"`
 }
 
 type sessionMessage struct {

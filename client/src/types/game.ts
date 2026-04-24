@@ -115,6 +115,8 @@ export interface WorldPlayerState {
   y: number;
   targetX?: number;
   targetY?: number;
+  destinationX?: number;
+  destinationY?: number;
   speed: number;
 }
 

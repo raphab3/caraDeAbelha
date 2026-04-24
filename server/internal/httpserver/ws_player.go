@@ -140,8 +140,7 @@ func (hub *gameHub) resetPlayerToAccessibleSpawnLocked(player *playerState, now 
 
 	player.X = spawnX
 	player.Y = spawnY
-	player.TargetX = nil
-	player.TargetY = nil
+	hub.clearPlayerMovementLocked(player)
 	player.UpdatedAt = now
 	hub.updatePlayerZoneLocked(player, progress)
 	return true
@@ -194,6 +193,7 @@ func (hub *gameHub) movePlayer(clientID string, direction string) bool {
 		return false
 	}
 
+	hub.clearPlayerMovementLocked(player)
 	nextX, nextY = hub.clampWorldPosition(nextX, nextY)
 	currentX, currentY, remappedTargetX, remappedTargetY, remapped := hub.world.remapReturnMovement(player.X, player.Y, nextX, nextY)
 	if remapped {
@@ -224,18 +224,29 @@ func (hub *gameHub) movePlayerTo(clientID string, x float64, z float64) bool {
 
 	now := hub.now()
 	hub.advanceActivePlayersLocked(now)
-	clampedX, clampedY := hub.clampWorldPosition(x, z)
-	currentX, currentY, remappedTargetX, remappedTargetY, remapped := hub.world.remapReturnMovement(player.X, player.Y, clampedX, clampedY)
+	targetX, targetY := x, z
+	if !hub.world.containsMovementPosition(targetX, targetY) {
+		hub.clearPlayerMovementLocked(player)
+		hub.rejectMoveToLocked(clientID, "Destino invalido")
+		return false
+	}
+
+	currentX, currentY, remappedTargetX, remappedTargetY, remapped := hub.world.remapReturnMovement(player.X, player.Y, targetX, targetY)
 	if remapped {
 		player.X = currentX
 		player.Y = currentY
-		clampedX = remappedTargetX
-		clampedY = remappedTargetY
+		targetX = remappedTargetX
+		targetY = remappedTargetY
 	}
-	if !hub.world.isTraversablePosition(clampedX, clampedY) || !hub.canPlayerAccessPositionLocked(player, clampedX, clampedY) {
+
+	route := hub.resolveMovementRouteLocked(player, targetX, targetY)
+	if len(route.waypoints) == 0 {
+		hub.clearPlayerMovementLocked(player)
+		hub.rejectMoveToLocked(clientID, route.reason)
 		return false
 	}
-	hub.setPlayerTargetLocked(player, clampedX, clampedY, now)
+
+	hub.setPlayerRouteLocked(player, route.waypoints, targetX, targetY, now)
 	hub.tick++
 
 	return true
@@ -262,8 +273,7 @@ func (hub *gameHub) respawnPlayer(clientID string) bool {
 	spawnX, spawnY = hub.clampWorldPosition(spawnX, spawnY)
 	player.X = spawnX
 	player.Y = spawnY
-	player.TargetX = nil
-	player.TargetY = nil
+	hub.clearPlayerMovementLocked(player)
 	player.UpdatedAt = now
 	hub.tick++
 
@@ -331,6 +341,7 @@ func (hub *gameHub) advancePlayerLocked(player *playerState, now time.Time) bool
 	}
 
 	if player.TargetX == nil || player.TargetY == nil {
+		hub.clearPlayerRouteLocked(player)
 		player.UpdatedAt = now
 		return false
 	}
@@ -346,34 +357,30 @@ func (hub *gameHub) advancePlayerLocked(player *playerState, now time.Time) bool
 
 	if distance <= movementStopDistance {
 		if !hub.world.isTraversablePosition(*player.TargetX, *player.TargetY) || !hub.canPlayerAccessPositionLocked(player, *player.TargetX, *player.TargetY) {
-			player.TargetX = nil
-			player.TargetY = nil
+			hub.clearPlayerMovementLocked(player)
 			player.UpdatedAt = now
 			return true
 		}
 
 		player.X = *player.TargetX
 		player.Y = *player.TargetY
-		player.TargetX = nil
-		player.TargetY = nil
 		player.UpdatedAt = now
+		hub.advancePlayerRouteTargetLocked(player, now)
 		return true
 	}
 
 	stepDistance := player.Speed * elapsed
 	if stepDistance >= distance {
 		if !hub.world.isTraversablePosition(*player.TargetX, *player.TargetY) || !hub.canPlayerAccessPositionLocked(player, *player.TargetX, *player.TargetY) {
-			player.TargetX = nil
-			player.TargetY = nil
+			hub.clearPlayerMovementLocked(player)
 			player.UpdatedAt = now
 			return true
 		}
 
 		player.X = *player.TargetX
 		player.Y = *player.TargetY
-		player.TargetX = nil
-		player.TargetY = nil
 		player.UpdatedAt = now
+		hub.advancePlayerRouteTargetLocked(player, now)
 		return true
 	}
 
@@ -381,8 +388,7 @@ func (hub *gameHub) advancePlayerLocked(player *playerState, now time.Time) bool
 	nextX := player.X + deltaX*ratio
 	nextY := player.Y + deltaY*ratio
 	if !hub.world.isTraversablePosition(nextX, nextY) || !hub.canPlayerAccessPositionLocked(player, nextX, nextY) {
-		player.TargetX = nil
-		player.TargetY = nil
+		hub.clearPlayerMovementLocked(player)
 		player.UpdatedAt = now
 		return true
 	}
@@ -398,11 +404,11 @@ func (hub *gameHub) setPlayerTargetLocked(player *playerState, x float64, y floa
 		return
 	}
 
+	hub.clearPlayerRouteLocked(player)
 	if math.Abs(player.X-x) <= movementStopDistance && math.Abs(player.Y-y) <= movementStopDistance {
 		player.X = x
 		player.Y = y
-		player.TargetX = nil
-		player.TargetY = nil
+		hub.clearPlayerMovementLocked(player)
 		player.UpdatedAt = now
 		return
 	}
@@ -410,6 +416,78 @@ func (hub *gameHub) setPlayerTargetLocked(player *playerState, x float64, y floa
 	player.TargetX = &x
 	player.TargetY = &y
 	player.UpdatedAt = now
+}
+
+func (hub *gameHub) setPlayerRouteLocked(player *playerState, waypoints []movementWaypoint, destinationX float64, destinationY float64, now time.Time) {
+	if player == nil {
+		return
+	}
+
+	hub.clearPlayerMovementLocked(player)
+	if len(waypoints) == 0 {
+		player.UpdatedAt = now
+		return
+	}
+
+	first := waypoints[0]
+	player.TargetX = &first.X
+	player.TargetY = &first.Y
+	if len(waypoints) > 1 {
+		player.Route = append([]movementWaypoint{}, waypoints[1:]...)
+		player.DestinationX = &destinationX
+		player.DestinationY = &destinationY
+	}
+	player.UpdatedAt = now
+}
+
+func (hub *gameHub) advancePlayerRouteTargetLocked(player *playerState, now time.Time) {
+	if player == nil {
+		return
+	}
+
+	if len(player.Route) == 0 {
+		hub.clearPlayerMovementLocked(player)
+		return
+	}
+
+	next := player.Route[0]
+	if !hub.world.isTraversablePosition(next.X, next.Y) || !hub.canPlayerAccessPositionLocked(player, next.X, next.Y) {
+		hub.clearPlayerMovementLocked(player)
+		return
+	}
+
+	player.Route = append([]movementWaypoint{}, player.Route[1:]...)
+	player.TargetX = &next.X
+	player.TargetY = &next.Y
+	player.UpdatedAt = now
+}
+
+func (hub *gameHub) clearPlayerRouteLocked(player *playerState) {
+	if player == nil {
+		return
+	}
+
+	player.Route = nil
+	player.DestinationX = nil
+	player.DestinationY = nil
+}
+
+func (hub *gameHub) clearPlayerMovementLocked(player *playerState) {
+	if player == nil {
+		return
+	}
+
+	player.TargetX = nil
+	player.TargetY = nil
+	hub.clearPlayerRouteLocked(player)
+}
+
+func (hub *gameHub) rejectMoveToLocked(clientID string, reason string) {
+	if strings.TrimSpace(reason) == "" {
+		reason = "Nao existe rota disponivel"
+	}
+
+	hub.sendInteractionResult(hub.clients[clientID], "move_to", false, 0, reason)
 }
 
 func (hub *gameHub) clampWorldPosition(x float64, y float64) (float64, float64) {

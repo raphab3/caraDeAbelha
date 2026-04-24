@@ -2,10 +2,12 @@ package httpserver
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -72,6 +74,56 @@ func buildTraversableTestWorld() worldLayout {
 		minY:      0.5,
 		maxY:      1.5,
 	}
+}
+
+func buildRoutingTestWorld(blocked map[[2]int]bool, width int, height int) worldLayout {
+	tilesByChunk := make(map[string][]worldTileState)
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			tileType := "grass"
+			if blocked[[2]int{x, y}] {
+				tileType = "stone"
+			}
+			chunkKey := buildChunkKey(worldAxisToChunk(float64(x)+0.5), worldAxisToChunk(float64(y)+0.5))
+			tilesByChunk[chunkKey] = append(tilesByChunk[chunkKey], worldTileState{
+				ID:   fmt.Sprintf("tile:%d:%d", x, y),
+				X:    float64(x) + 0.5,
+				Y:    0,
+				Z:    float64(y) + 0.5,
+				Type: tileType,
+			})
+		}
+	}
+
+	chunks := make(map[string]worldChunkState, len(tilesByChunk))
+	for key, tiles := range tilesByChunk {
+		chunkX, chunkY := parseChunkKeyForTest(key)
+		chunks[key] = worldChunkState{
+			Key:   key,
+			X:     chunkX,
+			Y:     chunkY,
+			Tiles: tiles,
+		}
+	}
+
+	return worldLayout{
+		chunks:    chunks,
+		hasBounds: true,
+		minX:      0.5,
+		maxX:      float64(width) - 0.5,
+		minY:      0.5,
+		maxY:      float64(height) - 0.5,
+	}
+}
+
+func parseChunkKeyForTest(key string) (int, int) {
+	parts := strings.Split(key, ":")
+	if len(parts) != 3 {
+		return 0, 0
+	}
+	x, _ := strconv.Atoi(parts[1])
+	y, _ := strconv.Atoi(parts[2])
+	return x, y
 }
 
 func TestMovePlayerToCompressesReturnFromOutlands(t *testing.T) {
@@ -215,6 +267,161 @@ func TestMovePlayerToRejectsLockedZoneTarget(t *testing.T) {
 
 	if player.TargetX != nil || player.TargetY != nil {
 		t.Fatalf("expected locked zone rejection to leave no active target")
+	}
+}
+
+func TestMovePlayerToRoutesAroundBlockedDirectPath(t *testing.T) {
+	baseTime := time.Date(2026, time.April, 24, 9, 0, 0, 0, time.UTC)
+	currentTime := baseTime
+	hub := newRuntimeTestHub(baseTime)
+	hub.now = func() time.Time {
+		return currentTime
+	}
+	hub.world = buildRoutingTestWorld(map[[2]int]bool{{1, 1}: true}, 3, 3)
+
+	player := &playerState{ID: "player:test", Username: "test", X: 0.5, Y: 1.5, Speed: 20}
+	hub.players[player.ID] = player
+
+	if ok := hub.movePlayerTo(player.ID, 2.5, 1.5); !ok {
+		t.Fatalf("expected movePlayerTo to resolve a route around the blocked direct path")
+	}
+
+	if player.DestinationX == nil || player.DestinationY == nil {
+		t.Fatalf("expected routed movement to retain the clicked final destination")
+	}
+	if math.Abs(*player.DestinationX-2.5) > 0.001 || math.Abs(*player.DestinationY-1.5) > 0.001 {
+		t.Fatalf("expected final destination 2.5,1.5, got %.2f,%.2f", *player.DestinationX, *player.DestinationY)
+	}
+	if player.TargetX == nil || player.TargetY == nil {
+		t.Fatalf("expected routed movement to set an active waypoint")
+	}
+	if math.Abs(*player.TargetX-2.5) <= 0.001 && math.Abs(*player.TargetY-1.5) <= 0.001 {
+		t.Fatalf("expected first active target to be a waypoint instead of the blocked straight destination")
+	}
+
+	for step := 1; step <= 4; step++ {
+		currentTime = baseTime.Add(time.Duration(step) * 500 * time.Millisecond)
+		hub.advancePlayerLocked(player, currentTime)
+	}
+
+	if math.Abs(player.X-2.5) > 0.001 || math.Abs(player.Y-1.5) > 0.001 {
+		t.Fatalf("expected player to arrive at routed destination, got %.2f,%.2f", player.X, player.Y)
+	}
+	if player.TargetX != nil || player.TargetY != nil || player.DestinationX != nil || player.DestinationY != nil || len(player.Route) > 0 {
+		t.Fatalf("expected route state to clear after arrival")
+	}
+}
+
+func TestMovePlayerToRejectsUnreachableRouteWithoutPartialMovement(t *testing.T) {
+	hub := newRuntimeTestHub(time.Date(2026, time.April, 24, 9, 30, 0, 0, time.UTC))
+	hub.world = buildRoutingTestWorld(map[[2]int]bool{
+		{1, 0}: true,
+		{1, 1}: true,
+		{1, 2}: true,
+	}, 3, 3)
+
+	player := &playerState{ID: "player:test", Username: "test", X: 0.5, Y: 1.5, Speed: defaultPlayerSpeed}
+	hub.players[player.ID] = player
+
+	if ok := hub.movePlayerTo(player.ID, 2.5, 1.5); ok {
+		t.Fatalf("expected movePlayerTo to reject an isolated destination")
+	}
+	if player.TargetX != nil || player.TargetY != nil || len(player.Route) > 0 {
+		t.Fatalf("expected unreachable destination to leave no active movement")
+	}
+	if math.Abs(player.X-0.5) > 0.001 || math.Abs(player.Y-1.5) > 0.001 {
+		t.Fatalf("expected player to remain still after unreachable click, got %.2f,%.2f", player.X, player.Y)
+	}
+}
+
+func TestMovePlayerToRejectsExcessiveDetour(t *testing.T) {
+	hub := newRuntimeTestHub(time.Date(2026, time.April, 24, 9, 45, 0, 0, time.UTC))
+	blocked := make(map[[2]int]bool)
+	for y := 0; y < 10; y++ {
+		blocked[[2]int{1, y}] = true
+	}
+	hub.world = buildRoutingTestWorld(blocked, 3, 11)
+
+	player := &playerState{ID: "player:test", Username: "test", X: 0.5, Y: 0.5, Speed: defaultPlayerSpeed}
+	hub.players[player.ID] = player
+
+	if ok := hub.movePlayerTo(player.ID, 2.5, 0.5); ok {
+		t.Fatalf("expected movePlayerTo to reject an excessive detour")
+	}
+	if player.TargetX != nil || player.TargetY != nil || len(player.Route) > 0 {
+		t.Fatalf("expected excessive detour rejection to leave no active movement")
+	}
+	if math.Abs(player.X-0.5) > 0.001 || math.Abs(player.Y-0.5) > 0.001 {
+		t.Fatalf("expected player to remain still after excessive detour, got %.2f,%.2f", player.X, player.Y)
+	}
+}
+
+func TestMovePlayerToReplacesActiveRoute(t *testing.T) {
+	hub := newRuntimeTestHub(time.Date(2026, time.April, 24, 10, 0, 0, 0, time.UTC))
+	hub.world = buildRoutingTestWorld(map[[2]int]bool{{1, 1}: true}, 3, 3)
+
+	player := &playerState{ID: "player:test", Username: "test", X: 0.5, Y: 1.5, Speed: defaultPlayerSpeed}
+	hub.players[player.ID] = player
+
+	if ok := hub.movePlayerTo(player.ID, 2.5, 1.5); !ok {
+		t.Fatalf("expected first click to create a route")
+	}
+	if len(player.Route) == 0 {
+		t.Fatalf("expected first click to have queued route waypoints")
+	}
+
+	if ok := hub.movePlayerTo(player.ID, 0.5, 2.5); !ok {
+		t.Fatalf("expected second click to replace active route")
+	}
+	if player.DestinationX != nil || player.DestinationY != nil || len(player.Route) != 0 {
+		t.Fatalf("expected direct replacement click to discard old queued route")
+	}
+	if player.TargetX == nil || player.TargetY == nil || math.Abs(*player.TargetX-0.5) > 0.001 || math.Abs(*player.TargetY-2.5) > 0.001 {
+		t.Fatalf("expected active target to be the new click, got %v,%v", player.TargetX, player.TargetY)
+	}
+}
+
+func TestAdvancePlayerStopsWhenQueuedRouteWaypointBecomesInvalid(t *testing.T) {
+	baseTime := time.Date(2026, time.April, 24, 10, 30, 0, 0, time.UTC)
+	currentTime := baseTime
+	hub := newRuntimeTestHub(baseTime)
+	hub.now = func() time.Time {
+		return currentTime
+	}
+	hub.world = buildRoutingTestWorld(map[[2]int]bool{{1, 1}: true}, 3, 3)
+
+	player := &playerState{ID: "player:test", Username: "test", X: 0.5, Y: 1.5, Speed: 20}
+	hub.players[player.ID] = player
+
+	if ok := hub.movePlayerTo(player.ID, 2.5, 1.5); !ok {
+		t.Fatalf("expected movePlayerTo to create a route")
+	}
+	if len(player.Route) == 0 {
+		t.Fatalf("expected queued waypoints for routed movement")
+	}
+
+	nextBlocked := player.Route[0]
+	tile, ok := hub.world.tileAtPosition(nextBlocked.X, nextBlocked.Y)
+	if !ok {
+		t.Fatalf("expected next queued waypoint to map to a tile")
+	}
+	tile.Type = "stone"
+	chunkKey := buildChunkKey(worldAxisToChunk(nextBlocked.X), worldAxisToChunk(nextBlocked.Y))
+	chunk := hub.world.chunks[chunkKey]
+	for index := range chunk.Tiles {
+		if chunk.Tiles[index].ID == tile.ID {
+			chunk.Tiles[index].Type = "stone"
+		}
+	}
+	hub.world.chunks[chunkKey] = chunk
+
+	currentTime = baseTime.Add(500 * time.Millisecond)
+	if changed := hub.advancePlayerLocked(player, currentTime); !changed {
+		t.Fatalf("expected arrival at the first waypoint to update movement state")
+	}
+
+	if player.TargetX != nil || player.TargetY != nil || player.DestinationX != nil || player.DestinationY != nil || len(player.Route) > 0 {
+		t.Fatalf("expected invalid queued waypoint to stop the route without recalculation")
 	}
 }
 
@@ -548,8 +755,14 @@ func TestWebSocketMoveToBroadcastsState(t *testing.T) {
 		t.Fatalf("expected move_to target to be present in world state")
 	}
 
-	if math.Abs(*updatedState.Players[0].TargetX-2.5) > 0.001 || math.Abs(*updatedState.Players[0].TargetY+1.5) > 0.001 {
-		t.Fatalf("expected move_to target 2.5,-1.5, got %.1f,%.1f", *updatedState.Players[0].TargetX, *updatedState.Players[0].TargetY)
+	finalX := updatedState.Players[0].TargetX
+	finalY := updatedState.Players[0].TargetY
+	if updatedState.Players[0].DestinationX != nil && updatedState.Players[0].DestinationY != nil {
+		finalX = updatedState.Players[0].DestinationX
+		finalY = updatedState.Players[0].DestinationY
+	}
+	if math.Abs(*finalX-2.5) > 0.001 || math.Abs(*finalY+1.5) > 0.001 {
+		t.Fatalf("expected move_to destination 2.5,-1.5, got %.1f,%.1f", *finalX, *finalY)
 	}
 
 	if updatedState.Players[0].Speed != defaultPlayerSpeed {

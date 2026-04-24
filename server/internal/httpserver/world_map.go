@@ -587,6 +587,15 @@ func (layout worldLayout) clampPosition(x float64, y float64) (float64, float64)
 	return clampWorldAxisToBounds(x, bounds.X1, bounds.X2), clampWorldAxisToBounds(y, bounds.Z1, bounds.Z2)
 }
 
+func (layout worldLayout) containsMovementPosition(x float64, y float64) bool {
+	bounds := layout.activeMovementBounds()
+	if !bounds.isValid() {
+		return true
+	}
+
+	return x >= bounds.X1 && x <= bounds.X2 && y >= bounds.Z1 && y <= bounds.Z2
+}
+
 func (layout worldLayout) tileAtPosition(x float64, y float64) (worldTileState, bool) {
 	if len(layout.chunks) == 0 {
 		return worldTileState{}, false

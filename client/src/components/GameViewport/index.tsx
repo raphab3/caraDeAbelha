@@ -69,7 +69,6 @@ const BEE_TURN_RESPONSE = 18;
 const KEYBOARD_MOVE_SEND_INTERVAL_MS = 100;
 const KEYBOARD_MOVE_LOOKAHEAD_SECONDS = 0.18;
 const KEYBOARD_MOVE_MIN_LOOKAHEAD_DISTANCE = 0.48;
-const LOCAL_PLAYER_ROTATION_STOP_DISTANCE = 0.14;
 const MOVEMENT_VECTOR_EPSILON = 0.0001;
 // Important: the black rear piece is the stinger, not the head.
 // The bee visually faces local -X, so movement yaw must treat local +X as the tail.
@@ -235,6 +234,18 @@ function hasMoveTarget(player: WorldPlayerState): player is WorldPlayerState & {
   return player.targetX !== undefined && player.targetY !== undefined;
 }
 
+function resolveMoveDestination(player: WorldPlayerState & { targetX: number; targetY: number }) {
+  return {
+    x: player.destinationX ?? player.targetX,
+    y: player.destinationY ?? player.targetY,
+  };
+}
+
+function setMoveDestinationVector(target: Vector3, player: WorldPlayerState & { targetX: number; targetY: number }, sceneY: number) {
+  const destination = resolveMoveDestination(player);
+  target.set(toSceneAxis(destination.x), sceneY, toSceneAxis(destination.y));
+}
+
 function moveTowards(currentPosition: Vector3, targetPosition: Vector3, maxStep: number): number {
   const deltaX = targetPosition.x - currentPosition.x;
   const deltaZ = targetPosition.z - currentPosition.z;
@@ -298,7 +309,6 @@ interface BeeActorProps {
   drift: number;
   accentColor: string;
   isLocal: boolean;
-  localMovementSourceRef?: MutableRefObject<LocalMovementSource>;
   inputPreviewTargetRef?: MutableRefObject<Vector3 | null>;
   surfaceIndex: WorldSurfaceIndex;
   trackedPositionRef?: MutableRefObject<Vector3>;
@@ -319,7 +329,6 @@ function BeeActor({
   drift,
   accentColor,
   isLocal,
-  localMovementSourceRef,
   inputPreviewTargetRef,
   surfaceIndex,
   trackedPositionRef,
@@ -397,28 +406,15 @@ function BeeActor({
 
     const inputPreviewTarget = inputPreviewTargetRef?.current ?? null;
     const hasInputPreviewTarget = inputPreviewTarget !== null;
-    const localMovementSource = localMovementSourceRef?.current ?? "idle";
-    const lookTarget = hasInputPreviewTarget
-      ? inputPreviewTarget
-      : isLocal && localMovementSource !== "pointer"
-        ? null
-      : hasMoveTarget(player)
-        ? desiredTargetPositionRef.current
-        : authoritativePositionRef.current;
-    if (lookTarget === null) {
-      trackedPositionRef?.current.copy(groupRef.current.position);
-      leftWingRef.current.rotation.z = Math.sin((elapsedTime + drift) * 18) * 0.3;
-      rightWingRef.current.rotation.z = -Math.sin((elapsedTime + drift) * 18) * 0.3;
-      return;
+    const lookTargetRef = hasInputPreviewTarget ? inputPreviewTarget : desiredTargetPositionRef.current;
+    if (!hasInputPreviewTarget && hasMoveTarget(player)) {
+      setMoveDestinationVector(lookTargetRef, player, currentPosition.y);
     }
+    const lookTarget = hasInputPreviewTarget || hasMoveTarget(player) ? lookTargetRef : authoritativePositionRef.current;
 
     const lookDeltaX = lookTarget.x - currentPosition.x;
     const lookDeltaZ = lookTarget.z - currentPosition.z;
-    const shouldFreezeLocalYaw =
-      isLocal &&
-      !hasInputPreviewTarget &&
-      (!hasMoveTarget(player) || currentPosition.distanceTo(desiredTargetPositionRef.current) <= LOCAL_PLAYER_ROTATION_STOP_DISTANCE);
-    const targetYaw = shouldFreezeLocalYaw ? null : resolveTargetYaw(lookDeltaX, lookDeltaZ);
+    const targetYaw = resolveTargetYaw(lookDeltaX, lookDeltaZ);
 
     if (targetYaw !== null) {
       groupRef.current.rotation.y = smoothYawRotation(groupRef.current.rotation.y, targetYaw, delta);
@@ -519,8 +515,9 @@ function RemoteBeesInstanced({ players, surfaceIndex }: { players: WorldPlayerSt
       const previous = previousById.get(player.id);
       const authoritativeX = toSceneAxis(player.x);
       const authoritativeZ = toSceneAxis(player.y);
-      const desiredX = hasMoveTarget(player) ? toSceneAxis(player.targetX) : authoritativeX;
-      const desiredZ = hasMoveTarget(player) ? toSceneAxis(player.targetY) : authoritativeZ;
+      const destination = hasMoveTarget(player) ? resolveMoveDestination(player) : null;
+      const desiredX = destination ? toSceneAxis(destination.x) : authoritativeX;
+      const desiredZ = destination ? toSceneAxis(destination.y) : authoritativeZ;
       const initialYaw = resolveTargetYaw(desiredX - authoritativeX, desiredZ - authoritativeZ) ?? BEE_IDLE_YAW;
       const initialHeight = resolveBeeSceneHeight(surfaceIndex, player.x, player.y, 0, index * 0.9);
 
@@ -610,6 +607,9 @@ function RemoteBeesInstanced({ players, surfaceIndex }: { players: WorldPlayerSt
           : MathUtils.lerp(currentPosition.y, nextFlightHeight, 0.18);
 
       const lookTarget = hasMoveTarget(player) ? desiredTargetPosition : authoritativePosition;
+      if (hasMoveTarget(player)) {
+        setMoveDestinationVector(lookTarget, player, currentPosition.y);
+      }
       const lookDeltaX = lookTarget.x - currentPosition.x;
       const lookDeltaZ = lookTarget.z - currentPosition.z;
       const targetYaw = resolveTargetYaw(lookDeltaX, lookDeltaZ);
@@ -1192,16 +1192,17 @@ function HiveCore({
     }
 
     if (hasMoveTarget(localPlayer)) {
+      const destination = resolveMoveDestination(localPlayer);
       setMoveTargetMarker({
-        sceneX: toSceneAxis(localPlayer.targetX),
-        sceneY: resolveTargetMarkerSceneY(surfaceIndex, localPlayer.targetX, localPlayer.targetY),
-        sceneZ: toSceneAxis(localPlayer.targetY),
+        sceneX: toSceneAxis(destination.x),
+        sceneY: resolveTargetMarkerSceneY(surfaceIndex, destination.x, destination.y),
+        sceneZ: toSceneAxis(destination.y),
       });
       if (localMovementSourceRef.current === "pointer") {
         localInputPreviewTargetRef.current = new Vector3(
-          toSceneAxis(localPlayer.targetX),
+          toSceneAxis(destination.x),
           0,
-          toSceneAxis(localPlayer.targetY),
+          toSceneAxis(destination.y),
         );
       }
       return;
@@ -1290,7 +1291,6 @@ function HiveCore({
           drift={0}
           isCollecting={flowerInteraction?.phase === "collecting"}
           isLocal
-          localMovementSourceRef={localMovementSourceRef}
           inputPreviewTargetRef={localInputPreviewTargetRef}
           player={localPlayer}
           surfaceIndex={surfaceIndex}
