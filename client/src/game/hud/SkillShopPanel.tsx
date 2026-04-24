@@ -106,8 +106,8 @@ export const SkillShopPanel = ({
           <h2 className={styles.title}>Skills da colmeia</h2>
           <p className={styles.subtitle}>
             {isEditingSkills
-              ? "Modo edicao ativo. Escolha uma skill e ajuste os atalhos dos slots."
-              : "Abra a edicao para trocar skills e configurar atalhos."}
+              ? "Modo edicao ativo. Escolha uma skill e ajuste atalhos numericos para os slots."
+              : "Abra a edicao para trocar skills e configurar atalhos numericos."}
           </p>
         </div>
 
@@ -146,7 +146,7 @@ export const SkillShopPanel = ({
                 }}
                 type="button"
               >
-                {isRecordingHotkeyForSlot === slotIndex ? "Pressione uma tecla" : `Atalho ${slotHotkeys[slotIndex] ?? "-"}`}
+                {isRecordingHotkeyForSlot === slotIndex ? "Pressione um numero" : `Atalho ${slotHotkeys[slotIndex] ?? `${slotIndex + 1}`}`}
               </button>
             </div>
           ))}

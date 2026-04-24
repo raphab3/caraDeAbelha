@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
 import type { FlowerInteractionState, GameSessionController, InteractionResult, PlayerProgressState } from "../../types/game";
 import { ResourceRibbon } from "./ResourceRibbon";
 import { ObjectivePanel } from "./ObjectivePanel";
@@ -23,30 +23,16 @@ function normalizeHotkey(value: string | undefined): string | undefined {
     return undefined;
   }
 
-  if (value === " ") {
-    return "SPACE";
-  }
-
   const trimmed = value.trim();
   if (!trimmed) {
     return undefined;
   }
 
-  if (/^[a-z0-9]$/i.test(trimmed)) {
-    return trimmed.toUpperCase();
+  if (/^\d$/.test(trimmed)) {
+    return trimmed;
   }
 
-  if (/^F\d{1,2}$/i.test(trimmed)) {
-    return trimmed.toUpperCase();
-  }
-
-  const aliases: Record<string, string> = {
-    Space: "SPACE",
-    Enter: "ENTER",
-    Tab: "TAB",
-  };
-
-  return aliases[trimmed] ?? undefined;
+  return undefined;
 }
 
 function normalizeSlotHotkeys(slotHotkeys: string[] | null | undefined): string[] {
@@ -67,14 +53,6 @@ function readStoredSlotHotkeys(): string[] {
   }
 }
 
-/**
- * GameHUD is the top-level composition of all HUD layer components.
- * Layout:
- * - ResourceRibbon: top of screen (z-40, horizontal ribbon)
- * - ObjectivePanel: left side (z-30, card stack)
- * - ZoneUnlockPanel: bottom-right (z-35, unlock dialog)
- * - InteractionFeed: center-bottom (z-20, alerts)
- */
 export const GameHUD = ({
   playerProgress,
   lastInteraction,
@@ -186,9 +164,12 @@ export const GameHUD = ({
     };
   }, [gameSessionController, isEditingSkills, isShopOpen, playerProgress?.equippedSkills, recordingHotkeySlot, slotHotkeys]);
 
+  const handleContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+  };
+
   return (
-    <>
-      {/* Top Ribbon with Resources */}
+    <div className={styles.root} onContextMenu={handleContextMenu}>
       <div className={styles.topRibbon}>
         <ResourceRibbon
           playerProgress={playerProgress}
@@ -197,7 +178,6 @@ export const GameHUD = ({
         />
       </div>
 
-      {/* Left Panel with Objectives */}
       <div className={styles.leftPanel}>
         <ObjectivePanel
           gameSessionController={gameSessionController}
@@ -226,17 +206,15 @@ export const GameHUD = ({
         />
       </div>
 
-      {/* Zone Unlock Panel (bottom-right) */}
       <ZoneUnlockPanel
         playerProgress={playerProgress}
         gameSessionController={gameSessionController}
         lockedZoneId={lockedZoneId}
       />
 
-      {/* Center-Bottom Interaction Feed */}
       <div className={styles.bottomFeed}>
         <InteractionFeed lastInteraction={lastInteraction} />
       </div>
-    </>
+    </div>
   );
 };
