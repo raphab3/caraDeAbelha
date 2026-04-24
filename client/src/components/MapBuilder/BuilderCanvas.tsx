@@ -1,6 +1,6 @@
 import { OrbitControls } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { Canvas, useFrame, type ThreeEvent } from "@react-three/fiber";
+import { useEffect, useMemo, useRef } from "react";
 import { DoubleSide, MOUSE, type Mesh } from "three";
 
 import { useMapBuilderStore } from "./useMapBuilderStore";
@@ -26,6 +26,21 @@ interface PaintStrokeState {
   active: boolean;
   lastCellKey: string | null;
   visitedCellKeys: Set<string>;
+}
+
+interface DragState {
+  active: boolean;
+  itemId: string | null;
+  pointerId: number | null;
+}
+
+interface ClipboardItem {
+  prefabId: string;
+  rotationY: number;
+  scale: number;
+  tag?: string;
+  zoneId?: string;
+  meta: Record<string, unknown>;
 }
 
 function buildPlacedItemKey(x: number, y: number, z: number): string {
@@ -82,7 +97,7 @@ function SceneContent({
   interactionPlaneSize: number;
   mapSize: number;
   onHoverCell: (pointX: number, pointZ: number) => void;
-  onItemPointerDown: (itemId: string) => void;
+  onItemPointerDown: (event: ThreeEvent<PointerEvent>, itemId: string) => void;
   onPaintCell: (pointX: number, pointZ: number) => void;
   onPointerEnd: (eventTarget: EventTarget | null, pointerId: number) => void;
   onPointerStart: (eventTarget: EventTarget | null, pointerId: number, pointX: number, pointZ: number) => void;
@@ -109,21 +124,32 @@ function SceneContent({
       <mesh
         onPointerCancel={(event) => onPointerEnd(event.target, event.pointerId)}
         onPointerDown={(event) => {
+          if (event.button !== 0) {
+            return;
+          }
           event.stopPropagation();
           onPointerStart(event.target, event.pointerId, event.point.x, event.point.z);
         }}
         onPointerMove={(event) => {
+          if ((event.buttons & 1) !== 1) {
+            onHoverCell(event.point.x, event.point.z);
+            return;
+          }
           event.stopPropagation();
           onHoverCell(event.point.x, event.point.z);
           onPaintCell(event.point.x, event.point.z);
         }}
         onPointerOut={() => onHoverCell(Number.NaN, Number.NaN)}
         onPointerOver={(event) => {
-          event.stopPropagation();
           onHoverCell(event.point.x, event.point.z);
           onPaintCell(event.point.x, event.point.z);
         }}
-        onPointerUp={(event) => onPointerEnd(event.target, event.pointerId)}
+        onPointerUp={(event) => {
+          if (event.button !== 0) {
+            return;
+          }
+          onPointerEnd(event.target, event.pointerId);
+        }}
         position={[0, GROUND_HEIGHT, 0]}
         receiveShadow
         rotation={[-Math.PI / 2, 0, 0]}
@@ -151,9 +177,9 @@ function SceneContent({
         minDistance={CAMERA_MIN_DISTANCE}
         minPolarAngle={0.32}
         mouseButtons={{
-          LEFT: MOUSE.ROTATE,
+          LEFT: MOUSE.PAN,
           MIDDLE: MOUSE.DOLLY,
-          RIGHT: MOUSE.PAN,
+          RIGHT: MOUSE.ROTATE,
         }}
         rotateSpeed={CAMERA_ROTATE_SPEED}
         target={[0, toTerrainSurfaceY(0), 0]}
@@ -170,6 +196,7 @@ export function BuilderCanvas() {
   const editorState = useMapBuilderStore((state) => state.editorState);
   const placeItem = useMapBuilderStore((state) => state.placeItem);
   const removeItem = useMapBuilderStore((state) => state.removeItem);
+  const updateItem = useMapBuilderStore((state) => state.updateItem);
   const setHoveredCell = useMapBuilderStore((state) => state.setHoveredCell);
   const setIsPainting = useMapBuilderStore((state) => state.setIsPainting);
   const setSelectedItemId = useMapBuilderStore((state) => state.setSelectedItemId);
@@ -185,6 +212,8 @@ export function BuilderCanvas() {
     [proceduralBase.tiles],
   );
   const paintStrokeRef = useRef<PaintStrokeState>({ active: false, lastCellKey: null, visitedCellKeys: new Set() });
+  const dragStateRef = useRef<DragState>({ active: false, itemId: null, pointerId: null });
+  const clipboardRef = useRef<ClipboardItem | null>(null);
 
   const updateHoveredCell = (sceneX: number, sceneZ: number) => {
     if (!Number.isFinite(sceneX) || !Number.isFinite(sceneZ)) {
@@ -200,6 +229,9 @@ export function BuilderCanvas() {
   };
 
   const tryPaintCell = (sceneX: number, sceneZ: number) => {
+    if (dragStateRef.current.active) {
+      return;
+    }
     if (!paintStrokeRef.current.active || editorState.currentTool !== "paint" || !editorState.selectedAssetType) {
       return;
     }
@@ -229,6 +261,29 @@ export function BuilderCanvas() {
     });
   };
 
+  const moveDraggedItem = (sceneX: number, sceneZ: number) => {
+    if (!dragStateRef.current.active || !dragStateRef.current.itemId) {
+      return;
+    }
+
+    const draggedItem = placedItems.find((item) => item.id === dragStateRef.current.itemId);
+    if (!draggedItem) {
+      return;
+    }
+
+    const x = Math.round(toWorldAxis(sceneX));
+    const z = Math.round(toWorldAxis(sceneZ));
+    const cellKey = buildPlacedItemKey(x, draggedItem.y, z);
+    const hasCollision = placedItems.some(
+      (item) => item.id !== draggedItem.id && buildPlacedItemKey(item.x, item.y, item.z) === cellKey,
+    );
+    if (hasCollision) {
+      return;
+    }
+
+    updateItem(draggedItem.id, { x, z });
+  };
+
   const handlePointerStart = (eventTarget: EventTarget | null, pointerId: number, sceneX: number, sceneZ: number) => {
     const isPaintTool = editorState.currentTool === "paint";
 
@@ -249,6 +304,7 @@ export function BuilderCanvas() {
       setSelectedItemId(null);
     }
     tryPaintCell(sceneX, sceneZ);
+    moveDraggedItem(sceneX, sceneZ);
   };
 
   const handlePointerEnd = (eventTarget: EventTarget | null, pointerId: number) => {
@@ -261,18 +317,89 @@ export function BuilderCanvas() {
       releasePointerCapture?: (nextPointerId: number) => void;
     };
     pointerTarget.releasePointerCapture?.(pointerId);
+    dragStateRef.current.active = false;
+    dragStateRef.current.itemId = null;
+    dragStateRef.current.pointerId = null;
   };
 
-  const handleItemPointerDown = (itemId: string) => {
+  const handleItemPointerDown = (event: ThreeEvent<PointerEvent>, itemId: string) => {
+    if (event.button !== 0) {
+      return;
+    }
+
     if (editorState.currentTool === "delete") {
       removeItem(itemId);
       return;
     }
 
-    if (editorState.currentTool === "select") {
-      setSelectedItemId(itemId);
+    setSelectedItemId(itemId);
+    if (editorState.currentTool !== "select") {
+      return;
     }
+
+    dragStateRef.current.active = true;
+    dragStateRef.current.itemId = itemId;
+    dragStateRef.current.pointerId = event.pointerId;
+
+    const pointerTarget = event.target as Element & {
+      setPointerCapture?: (nextPointerId: number) => void;
+    };
+    pointerTarget.setPointerCapture?.(event.pointerId);
   };
+
+  useEffect(() => {
+    const handleKeyboard = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) {
+        return;
+      }
+
+      const selectedItem = placedItems.find((item) => item.id === editorState.selectedItemId);
+      if ((event.key === "c" || event.key === "C") && selectedItem) {
+        event.preventDefault();
+        clipboardRef.current = {
+          prefabId: selectedItem.prefabId,
+          rotationY: selectedItem.rotationY,
+          scale: selectedItem.scale,
+          tag: selectedItem.tag,
+          zoneId: selectedItem.zoneId,
+          meta: selectedItem.meta,
+        };
+      }
+
+      if (event.key === "v" || event.key === "V") {
+        const copy = clipboardRef.current;
+        if (!copy) {
+          return;
+        }
+        event.preventDefault();
+
+        const fallbackX = selectedItem ? selectedItem.x + 1 : 0;
+        const fallbackY = selectedItem ? selectedItem.y : mapInfo.defaultY;
+        const fallbackZ = selectedItem ? selectedItem.z + 1 : 0;
+
+        placeItem({
+          prefabId: copy.prefabId,
+          rotationY: copy.rotationY,
+          scale: copy.scale,
+          tag: copy.tag,
+          zoneId: copy.zoneId,
+          meta: copy.meta,
+          x: editorState.hoveredCell?.x ?? fallbackX,
+          y: editorState.hoveredCell?.y ?? fallbackY,
+          z: editorState.hoveredCell?.z ?? fallbackZ,
+        });
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyboard);
+    return () => window.removeEventListener("keydown", handleKeyboard);
+  }, [editorState.hoveredCell, editorState.selectedItemId, mapInfo.defaultY, placeItem, placedItems]);
+
+  useEffect(() => {
+    const handleContextMenu = (event: MouseEvent) => event.preventDefault();
+    window.addEventListener("contextmenu", handleContextMenu);
+    return () => window.removeEventListener("contextmenu", handleContextMenu);
+  }, []);
 
   return (
     <div className="relative h-full min-h-[72vh] overflow-hidden lg:min-h-[calc(100vh-3.5rem)]">
