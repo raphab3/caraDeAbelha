@@ -4,7 +4,6 @@ interface FooterToolbarProps {
   currentTool: MapBuilderTool;
   hasSelection: boolean;
   onCopySelected: () => void;
-  onDeleteSelected: () => void;
   onNewItem: () => void;
   onPaste: () => void;
   onToolChange: (tool: MapBuilderTool) => void;
@@ -23,7 +22,6 @@ export function FooterToolbar({
   currentTool,
   hasSelection,
   onCopySelected,
-  onDeleteSelected,
   onNewItem,
   onPaste,
   onToolChange,
@@ -49,7 +47,7 @@ export function FooterToolbar({
       <button className={buttonClassName()} onClick={onPaste} type="button">
         Colar
       </button>
-      <button className={buttonClassName()} disabled={!hasSelection} onClick={onDeleteSelected} type="button">
+      <button className={buttonClassName(currentTool === "delete")} onClick={() => onToolChange("delete")} type="button">
         Remover
       </button>
     </div>
