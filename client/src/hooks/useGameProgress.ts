@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { DEFAULT_SKILL_CATALOG, SKILL_SLOT_COUNT } from "../game/skillCatalog";
 import type { InteractionResult, PlayerProgressState, PlayerStatusMessage } from "../types/game";
 
 /**
@@ -25,6 +26,9 @@ export function useGameProgress() {
         skillPoints: message.skillPoints,
         currentZoneId: message.currentZoneId,
         unlockedZoneIds: message.unlockedZoneIds,
+        ownedSkillIds: message.ownedSkillIds,
+        equippedSkills: message.equippedSkills,
+        skillCatalog: message.skillCatalog,
       });
       return;
     }
@@ -51,7 +55,19 @@ export function useGameProgress() {
   }, [lastInteraction]);
 
   return {
-    progress,
+    progress: progress ?? {
+      pollenCarried: 0,
+      pollenCapacity: 40,
+      honey: 0,
+      level: 1,
+      xp: 0,
+      skillPoints: 0,
+      currentZoneId: "zone:starter_meadow",
+      unlockedZoneIds: ["zone:starter_meadow"],
+      ownedSkillIds: [],
+      equippedSkills: Array.from({ length: SKILL_SLOT_COUNT }, () => ""),
+      skillCatalog: DEFAULT_SKILL_CATALOG,
+    },
     lastInteraction,
     updateFromMessage,
   };

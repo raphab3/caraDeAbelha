@@ -262,7 +262,34 @@ export interface UnlockZoneAction {
   zoneId: string;
 }
 
-export type ClientMessage = MoveAction | MoveToAction | RespawnAction | CollectFlowerAction | DepositAction | UnlockZoneAction;
+export interface BuySkillAction {
+  type: "buy_skill";
+  skillId: string;
+}
+
+export interface EquipSkillAction {
+  type: "equip_skill";
+  skillId: string;
+  slot: number;
+}
+
+export type ClientMessage =
+  | MoveAction
+  | MoveToAction
+  | RespawnAction
+  | CollectFlowerAction
+  | DepositAction
+  | UnlockZoneAction
+  | BuySkillAction
+  | EquipSkillAction;
+
+export interface SkillCatalogEntry {
+  id: string;
+  name: string;
+  role: string;
+  summary: string;
+  costHoney: number;
+}
 
 // Player progression state: economy, levels, zones
 export interface PlayerProgressState {
@@ -274,6 +301,9 @@ export interface PlayerProgressState {
   skillPoints: number;
   currentZoneId: string;
   unlockedZoneIds: string[];
+  ownedSkillIds: string[];
+  equippedSkills: string[];
+  skillCatalog: SkillCatalogEntry[];
 }
 
 // Result of a player interaction (collect, deposit, etc.)
@@ -313,6 +343,9 @@ export interface PlayerStatusMessage {
   skillPoints: number;
   currentZoneId: string;
   unlockedZoneIds: string[];
+  ownedSkillIds: string[];
+  equippedSkills: string[];
+  skillCatalog: SkillCatalogEntry[];
 }
 
 // Zone info within zone state - metadata about a zone including unlock cost and boundaries

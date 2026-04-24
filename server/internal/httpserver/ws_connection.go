@@ -136,6 +136,24 @@ func (hub *gameHub) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			}
 			shouldBroadcast = hub.unlockZone(client.id, zoneID)
 
+		case "buy_skill":
+			skillID, ok := raw["skillId"].(string)
+			if !ok {
+				continue
+			}
+			shouldBroadcast = hub.buySkill(client.id, skillID)
+
+		case "equip_skill":
+			skillID, ok := raw["skillId"].(string)
+			if !ok {
+				continue
+			}
+			slotValue, ok := raw["slot"].(float64)
+			if !ok {
+				continue
+			}
+			shouldBroadcast = hub.equipSkill(client.id, skillID, int(slotValue))
+
 		default:
 			continue
 		}
@@ -233,6 +251,16 @@ func shouldSendInitialProgress(progress *loopbase.PlayerProgress) bool {
 
 	if progress.PollenCapacity != 40 || progress.CurrentZoneID != zones.DefaultCurrentZoneID() {
 		return true
+	}
+
+	if len(progress.OwnedSkillIDs) > 0 {
+		return true
+	}
+
+	for _, skillID := range progress.EquippedSkills {
+		if skillID != "" {
+			return true
+		}
 	}
 
 	return len(progress.UnlockedZoneIDs) != 1 || progress.UnlockedZoneIDs[0] != zones.DefaultCurrentZoneID()

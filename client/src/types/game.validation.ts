@@ -11,6 +11,7 @@ import type {
   GameSessionState,
   ServerMessage,
 } from "../types/game";
+import { DEFAULT_SKILL_CATALOG } from "../game/skillCatalog";
 
 /**
  * Validates that all required type structures are correctly defined.
@@ -27,6 +28,9 @@ export const validateGameTypes = () => {
     skillPoints: 3,
     currentZoneId: "zone_1",
     unlockedZoneIds: ["zone_1", "zone_2"],
+    ownedSkillIds: ["skill:impulso"],
+    equippedSkills: ["skill:impulso", "", "", ""],
+    skillCatalog: DEFAULT_SKILL_CATALOG,
   };
 
   console.assert(testProgress.pollenCarried === 50, "PlayerProgressState: pollenCarried mismatch");
@@ -59,6 +63,9 @@ export const validateGameTypes = () => {
     skillPoints: 5,
     currentZoneId: "zone_2",
     unlockedZoneIds: ["zone_1", "zone_2", "zone_3"],
+    ownedSkillIds: ["skill:impulso", "skill:flor-de-nectar"],
+    equippedSkills: ["skill:impulso", "", "skill:flor-de-nectar", ""],
+    skillCatalog: DEFAULT_SKILL_CATALOG,
   };
 
   console.assert(testStatusMsg.type === "player_status", "PlayerStatusMessage: type mismatch");

@@ -22,6 +22,8 @@ func (hub *gameHub) ensurePlayerProgressLocked(playerID string) *loopbase.Player
 		SkillPoints:     1,
 		CurrentZoneID:   zones.DefaultCurrentZoneID(),
 		UnlockedZoneIDs: zones.DefaultUnlockedZoneIDs(),
+		OwnedSkillIDs:   []string{},
+		EquippedSkills:  make([]string, skillSlotCount),
 	}
 
 	hub.playerProgress[playerID] = progress
@@ -576,5 +578,94 @@ func (hub *gameHub) depositHoney(clientID string) bool {
 	}
 	hub.sendInteractionResult(client, "deposit_honey", false, 0, "Entre em contato com a colmeia para converter polen em mel")
 
+	return false
+}
+
+func (hub *gameHub) buySkill(clientID string, skillID string) bool {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	client, ok := hub.clients[clientID]
+	if !ok || client == nil {
+		return false
+	}
+
+	skill, ok := findBeeSkillDefinition(skillID)
+	if !ok {
+		hub.sendInteractionResult(client, "buy_skill", false, 0, "Skill invalida")
+		return false
+	}
+
+	progress := hub.ensurePlayerProgressLocked(clientID)
+	progress.OwnedSkillIDs = normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
+	progress.EquippedSkills = normalizeEquippedSkills(progress.EquippedSkills, progress.OwnedSkillIDs)
+
+	for _, ownedSkillID := range progress.OwnedSkillIDs {
+		if ownedSkillID == skillID {
+			hub.sendInteractionResult(client, "buy_skill", false, 0, "Skill ja comprada")
+			return false
+		}
+	}
+
+	if progress.Honey < skill.CostHoney {
+		hub.sendInteractionResult(client, "buy_skill", false, 0, "Mel insuficiente")
+		return false
+	}
+
+	progress.Honey -= skill.CostHoney
+	progress.OwnedSkillIDs = append(progress.OwnedSkillIDs, skillID)
+	progress.OwnedSkillIDs = normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
+	progress.UpdatedAt = hub.now()
+
+	hub.sendInteractionResult(client, "buy_skill", true, skill.CostHoney, "Skill comprada")
+	hub.sendPlayerStatus(client, progress)
+	return false
+}
+
+func (hub *gameHub) equipSkill(clientID string, skillID string, slot int) bool {
+	hub.mu.Lock()
+	defer hub.mu.Unlock()
+
+	client, ok := hub.clients[clientID]
+	if !ok || client == nil {
+		return false
+	}
+
+	if slot < 0 || slot >= skillSlotCount {
+		hub.sendInteractionResult(client, "equip_skill", false, 0, "Slot invalido")
+		return false
+	}
+
+	if _, ok := findBeeSkillDefinition(skillID); !ok {
+		hub.sendInteractionResult(client, "equip_skill", false, 0, "Skill invalida")
+		return false
+	}
+
+	progress := hub.ensurePlayerProgressLocked(clientID)
+	progress.OwnedSkillIDs = normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
+
+	owned := false
+	for _, ownedSkillID := range progress.OwnedSkillIDs {
+		if ownedSkillID == skillID {
+			owned = true
+			break
+		}
+	}
+	if !owned {
+		hub.sendInteractionResult(client, "equip_skill", false, 0, "Compre a skill antes de equipar")
+		return false
+	}
+
+	progress.EquippedSkills = normalizeEquippedSkills(progress.EquippedSkills, progress.OwnedSkillIDs)
+	for index, equippedSkillID := range progress.EquippedSkills {
+		if equippedSkillID == skillID {
+			progress.EquippedSkills[index] = ""
+		}
+	}
+	progress.EquippedSkills[slot] = skillID
+	progress.UpdatedAt = hub.now()
+
+	hub.sendInteractionResult(client, "equip_skill", true, slot + 1, "Skill equipada")
+	hub.sendPlayerStatus(client, progress)
 	return false
 }

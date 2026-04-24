@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { WS_URL } from "../game/env";
+import { DEFAULT_SKILL_CATALOG, SKILL_SLOT_COUNT } from "../game/skillCatalog";
 import { WSClient } from "../game/WSClient";
 import type {
   ClientMessage,
@@ -38,6 +39,9 @@ function createDefaultPlayerProgress() {
     skillPoints: 0,
     currentZoneId: "zone:starter_meadow",
     unlockedZoneIds: ["zone:starter_meadow"],
+    ownedSkillIds: [],
+    equippedSkills: Array.from({ length: SKILL_SLOT_COUNT }, () => ""),
+    skillCatalog: DEFAULT_SKILL_CATALOG,
   };
 }
 
@@ -317,6 +321,9 @@ export function useGameSession(username?: string, reconnectKey = 0): GameSession
               skillPoints: message.skillPoints,
               currentZoneId: message.currentZoneId,
               unlockedZoneIds: message.unlockedZoneIds,
+              ownedSkillIds: message.ownedSkillIds,
+              equippedSkills: message.equippedSkills,
+              skillCatalog: message.skillCatalog,
             },
           }));
           return;

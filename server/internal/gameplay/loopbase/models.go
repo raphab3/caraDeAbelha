@@ -15,6 +15,8 @@ type PlayerProgress struct {
 	SkillPoints     int       `json:"skillPoints"`
 	CurrentZoneID   string    `json:"currentZoneId"`
 	UnlockedZoneIDs []string  `json:"unlockedZoneIds"`
+	OwnedSkillIDs   []string  `json:"ownedSkillIds"`
+	EquippedSkills  []string  `json:"equippedSkills"`
 	UpdatedAt       time.Time `json:"-"`
 }
 

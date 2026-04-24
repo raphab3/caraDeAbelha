@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
-import type { PlayerProgressState } from "../../types/game";
+import type { GameSessionController, PlayerProgressState } from "../../types/game";
 import { PlayerStatusPanel } from "./PlayerStatusPanel";
+import { SkillShopPanel } from "./SkillShopPanel";
 
 export interface ObjectivePanelProps {
+  gameSessionController: GameSessionController | undefined;
+  onSelectSkill: (skillId: string | undefined) => void;
   playerProgress: PlayerProgressState | undefined;
+  selectedSkillId: string | undefined;
 }
 
 /**
@@ -12,7 +16,7 @@ export interface ObjectivePanelProps {
  * - Available Skill Points (SP) when relevant
  * - Completely dropped redundant level/xp bars (now in ribbon) and bulky unlocked lists
  */
-export const ObjectivePanel = ({ playerProgress }: ObjectivePanelProps) => {
+export const ObjectivePanel = ({ gameSessionController, onSelectSkill, playerProgress, selectedSkillId }: ObjectivePanelProps) => {
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(() => window.matchMedia("(max-width: 767px)").matches);
 
@@ -145,6 +149,15 @@ export const ObjectivePanel = ({ playerProgress }: ObjectivePanelProps) => {
             setIsStatusOpen(false);
           }}
           playerProgress={playerProgress}
+        />
+      </div>
+
+      <div className="pointer-events-auto self-start">
+        <SkillShopPanel
+          gameSessionController={gameSessionController}
+          onSelectSkill={onSelectSkill}
+          playerProgress={playerProgress}
+          selectedSkillId={selectedSkillId}
         />
       </div>
     </div>

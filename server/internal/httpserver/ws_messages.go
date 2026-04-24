@@ -29,6 +29,17 @@ type unlockZoneAction struct {
 	ZoneID string `json:"zoneId"`
 }
 
+type buySkillAction struct {
+	Type    string `json:"type"`
+	SkillID string `json:"skillId"`
+}
+
+type equipSkillAction struct {
+	Type    string `json:"type"`
+	SkillID string `json:"skillId"`
+	Slot    int    `json:"slot"`
+}
+
 type playerState struct {
 	ID           string             `json:"id"`
 	Username     string             `json:"username"`
@@ -137,6 +148,14 @@ type worldChunkState struct {
 	Hives   []worldHiveState   `json:"hives"`
 }
 
+type skillCatalogEntryMessage struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Role      string `json:"role"`
+	Summary   string `json:"summary"`
+	CostHoney int    `json:"costHoney"`
+}
+
 // playerStatusMessage contains the player's progression state: pollen, capacity, honey, level, XP, skill points,
 // current zone and unlocked zones. Sent to the player whenever their progress changes.
 // This is the server-authoritative source of truth for player economy stats on the client.
@@ -151,6 +170,9 @@ type playerStatusMessage struct {
 	SkillPoints     int      `json:"skillPoints"`
 	CurrentZoneID   string   `json:"currentZoneId"`
 	UnlockedZoneIDs []string `json:"unlockedZoneIds"`
+	OwnedSkillIDs   []string `json:"ownedSkillIds"`
+	EquippedSkills  []string `json:"equippedSkills"`
+	SkillCatalog    []skillCatalogEntryMessage `json:"skillCatalog"`
 }
 
 // interactionResultMessage provides feedback on player actions like collecting flowers or depositing pollen.
@@ -198,9 +220,15 @@ type clientSnapshot struct {
 func newPlayerStatusMessage(progress *loopbase.PlayerProgress) playerStatusMessage {
 	if progress == nil {
 		return playerStatusMessage{
-			Type: "player_status",
+			Type:         "player_status",
+			OwnedSkillIDs: []string{},
+			EquippedSkills: make([]string, skillSlotCount),
+			SkillCatalog: buildSkillCatalogMessage(),
 		}
 	}
+
+	ownedSkillIDs := normalizeOwnedSkillIDs(progress.OwnedSkillIDs)
+	equippedSkills := normalizeEquippedSkills(progress.EquippedSkills, ownedSkillIDs)
 
 	return playerStatusMessage{
 		Type:            "player_status",
@@ -213,7 +241,26 @@ func newPlayerStatusMessage(progress *loopbase.PlayerProgress) playerStatusMessa
 		SkillPoints:     progress.SkillPoints,
 		CurrentZoneID:   progress.CurrentZoneID,
 		UnlockedZoneIDs: progress.UnlockedZoneIDs,
+		OwnedSkillIDs:   ownedSkillIDs,
+		EquippedSkills:  equippedSkills,
+		SkillCatalog:    buildSkillCatalogMessage(),
 	}
+}
+
+func buildSkillCatalogMessage() []skillCatalogEntryMessage {
+	catalog := listBeeSkillCatalog()
+	message := make([]skillCatalogEntryMessage, 0, len(catalog))
+	for _, entry := range catalog {
+		message = append(message, skillCatalogEntryMessage{
+			ID:        entry.ID,
+			Name:      entry.Name,
+			Role:      entry.Role,
+			Summary:   entry.Summary,
+			CostHoney: entry.CostHoney,
+		})
+	}
+
+	return message
 }
 
 // newInteractionResultMessage creates an interactionResultMessage for feedback.

@@ -1,7 +1,9 @@
+import { useState } from "react";
 import type { FlowerInteractionState, GameSessionController, InteractionResult, PlayerProgressState } from "../../types/game";
 import { ResourceRibbon } from "./ResourceRibbon";
 import { ObjectivePanel } from "./ObjectivePanel";
 import { InteractionFeed } from "./InteractionFeed";
+import { SkillLoadoutBar } from "./SkillLoadoutBar";
 import { ZoneUnlockPanel } from "./ZoneUnlockPanel";
 import styles from "./GameHUD.module.css";
 
@@ -28,6 +30,8 @@ export const GameHUD = ({
   gameSessionController,
   lockedZoneId,
 }: GameHUDProps) => {
+  const [selectedSkillId, setSelectedSkillId] = useState<string | undefined>(undefined);
+
   return (
     <>
       {/* Top Ribbon with Resources */}
@@ -41,7 +45,21 @@ export const GameHUD = ({
 
       {/* Left Panel with Objectives */}
       <div className={styles.leftPanel}>
-        <ObjectivePanel playerProgress={playerProgress} />
+        <ObjectivePanel
+          gameSessionController={gameSessionController}
+          onSelectSkill={setSelectedSkillId}
+          playerProgress={playerProgress}
+          selectedSkillId={selectedSkillId}
+        />
+      </div>
+
+      <div className={styles.bottomLoadout}>
+        <SkillLoadoutBar
+          gameSessionController={gameSessionController}
+          onSelectSkill={setSelectedSkillId}
+          playerProgress={playerProgress}
+          selectedSkillId={selectedSkillId}
+        />
       </div>
 
       {/* Zone Unlock Panel (bottom-right) */}

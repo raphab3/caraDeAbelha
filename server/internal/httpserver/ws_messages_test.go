@@ -21,6 +21,8 @@ func TestPlayerStatusMessageStructure(t *testing.T) {
 		SkillPoints:     1,
 		CurrentZoneID:   "zone-forest",
 		UnlockedZoneIDs: []string{"zone-forest", "zone-meadow"},
+		OwnedSkillIDs:   []string{"skill:impulso", "skill:flor-de-nectar"},
+		EquippedSkills:  []string{"skill:impulso", "", "skill:flor-de-nectar", ""},
 		UpdatedAt:       time.Now(),
 	}
 
@@ -58,6 +60,15 @@ func TestPlayerStatusMessageStructure(t *testing.T) {
 	}
 	if len(msg.UnlockedZoneIDs) != len(progress.UnlockedZoneIDs) {
 		t.Errorf("expected %d unlocked zones, got %d", len(progress.UnlockedZoneIDs), len(msg.UnlockedZoneIDs))
+	}
+	if len(msg.OwnedSkillIDs) != len(progress.OwnedSkillIDs) {
+		t.Errorf("expected %d owned skills, got %d", len(progress.OwnedSkillIDs), len(msg.OwnedSkillIDs))
+	}
+	if len(msg.EquippedSkills) != skillSlotCount {
+		t.Errorf("expected %d equipped skill slots, got %d", skillSlotCount, len(msg.EquippedSkills))
+	}
+	if len(msg.SkillCatalog) != len(beeSkillCatalog) {
+		t.Errorf("expected %d skill catalog entries, got %d", len(beeSkillCatalog), len(msg.SkillCatalog))
 	}
 }
 
@@ -99,6 +110,9 @@ func TestPlayerStatusMessageJSON(t *testing.T) {
 		"skillPoints":     true,
 		"currentZoneId":   true,
 		"unlockedZoneIds": true,
+		"ownedSkillIds":   true,
+		"equippedSkills":  true,
+		"skillCatalog":    true,
 	}
 
 	for expectedField := range expectedFields {
@@ -120,6 +134,9 @@ func TestPlayerStatusMessageJSON(t *testing.T) {
 	if parsed["honey"] != float64(3) {
 		t.Errorf("expected honey 3 in JSON, got %v", parsed["honey"])
 	}
+	if parsed["skillCatalog"] == nil {
+		t.Fatalf("expected skillCatalog in JSON payload")
+	}
 }
 
 // TestPlayerStatusMessageWithNilProgress handles nil input gracefully.
@@ -137,6 +154,9 @@ func TestPlayerStatusMessageWithNilProgress(t *testing.T) {
 	}
 	if msg.PollenCarried != 0 {
 		t.Errorf("expected zero PollenCarried with nil progress, got %d", msg.PollenCarried)
+	}
+	if len(msg.SkillCatalog) != len(beeSkillCatalog) {
+		t.Errorf("expected default skill catalog with %d entries, got %d", len(beeSkillCatalog), len(msg.SkillCatalog))
 	}
 }
 
@@ -250,6 +270,8 @@ func TestPlayerStatusMessageRoundTrip(t *testing.T) {
 		SkillPoints:     2,
 		CurrentZoneID:   "zone-meadow",
 		UnlockedZoneIDs: []string{"zone-start", "zone-forest", "zone-meadow"},
+		OwnedSkillIDs:   []string{"skill:impulso", "skill:slime-de-mel"},
+		EquippedSkills:  []string{"skill:impulso", "", "skill:slime-de-mel", ""},
 	}
 
 	original := newPlayerStatusMessage(progress)
@@ -277,6 +299,9 @@ func TestPlayerStatusMessageRoundTrip(t *testing.T) {
 	}
 	if len(restored.UnlockedZoneIDs) != len(original.UnlockedZoneIDs) {
 		t.Errorf("UnlockedZoneIDs length mismatch: %d vs %d", len(original.UnlockedZoneIDs), len(restored.UnlockedZoneIDs))
+	}
+	if len(restored.EquippedSkills) != skillSlotCount {
+		t.Errorf("expected %d equipped skill slots after round-trip, got %d", skillSlotCount, len(restored.EquippedSkills))
 	}
 }
 
