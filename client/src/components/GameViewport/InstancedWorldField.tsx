@@ -62,6 +62,22 @@ interface InstancedModelMeshSource {
 	material: Material;
 }
 
+function addElevatedSupport(
+	instances: InstanceConfig[],
+	baseX: number,
+	baseZ: number,
+	elevation: number,
+): void {
+	const stackedLevels = Math.max(0, Math.ceil(elevation - 0.001));
+
+	for (let level = 0; level < stackedLevels; level += 1) {
+		instances.push({
+			position: [baseX, toTerrainBlockCenterY(level), baseZ],
+			scale: TERRAIN_BLOCK_SCALE,
+		});
+	}
+}
+
 function buildWorldField(chunks: WorldChunkState[]): WorldFieldBuild {
 	const grassTerrainInstances: InstanceConfig[] = [];
 	const elevatedTerrainInstances: InstanceConfig[] = [];
@@ -75,6 +91,10 @@ function buildWorldField(chunks: WorldChunkState[]): WorldFieldBuild {
 			const terrainCenterY = toTerrainBlockCenterY(tile.y);
 
 			if (tile.type === "grass") {
+				if (tile.y > 0) {
+					addElevatedSupport(elevatedTerrainInstances, baseX, baseZ, tile.y);
+				}
+
 				grassTerrainInstances.push({
 					position: [baseX, terrainCenterY, baseZ],
 					scale: TERRAIN_BLOCK_SCALE,
@@ -83,14 +103,7 @@ function buildWorldField(chunks: WorldChunkState[]): WorldFieldBuild {
 			}
 
 			if (tile.type === "stone") {
-				const stackedLevels = Math.max(0, Math.ceil(tile.y - 0.001));
-
-				for (let level = 0; level < stackedLevels; level += 1) {
-					elevatedTerrainInstances.push({
-						position: [baseX, toTerrainBlockCenterY(level), baseZ],
-						scale: TERRAIN_BLOCK_SCALE,
-					});
-				}
+				addElevatedSupport(elevatedTerrainInstances, baseX, baseZ, tile.y);
 
 				elevatedTerrainInstances.push({
 					position: [baseX, terrainCenterY, baseZ],

@@ -77,6 +77,8 @@ export interface AdminStageVersionDTO {
   stageId: string;
   version: number;
   checksum: string;
+  storagePath?: string;
+  sourceSizeBytes: number;
   validationStatus: "valid" | "invalid" | string;
   validationErrors: string[];
   createdAt: string;

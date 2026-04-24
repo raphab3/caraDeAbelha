@@ -32,6 +32,8 @@ type adminStageVersion struct {
 	StageID          string     `json:"stageId"`
 	Version          int        `json:"version"`
 	Checksum         string     `json:"checksum"`
+	StoragePath      string     `json:"storagePath,omitempty"`
+	SourceSizeBytes  int64      `json:"sourceSizeBytes"`
 	ValidationStatus string     `json:"validationStatus"`
 	ValidationErrors []string   `json:"validationErrors"`
 	CreatedAt        time.Time  `json:"createdAt"`

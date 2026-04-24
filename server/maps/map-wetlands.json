@@ -3342,35 +3342,35 @@
     "x": 2,
     "y": 1,
     "z": -16,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
     "x": 3,
     "y": 1,
     "z": -16,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
     "x": 4,
     "y": 1,
     "z": -16,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
     "x": 5,
     "y": 1,
     "z": -16,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
     "x": 6,
     "y": 1,
     "z": -16,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
@@ -3503,7 +3503,7 @@
     "x": -25,
     "y": 1,
     "z": -15,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
@@ -3853,7 +3853,7 @@
     "x": -25,
     "y": 1,
     "z": -14,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
@@ -4196,14 +4196,14 @@
     "x": 24,
     "y": 1,
     "z": -14,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
     "x": -25,
     "y": 1,
     "z": -13,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
@@ -4525,28 +4525,28 @@
     "x": 21,
     "y": 1,
     "z": -13,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
     "x": 22,
     "y": 1,
     "z": -13,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
     "x": 23,
     "y": 1,
     "z": -13,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
     "x": 24,
     "y": 1,
     "z": -13,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
@@ -16096,7 +16096,7 @@
     "x": 24,
     "y": 1,
     "z": 20,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
@@ -16446,7 +16446,7 @@
     "x": 24,
     "y": 1,
     "z": 21,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
@@ -16796,7 +16796,7 @@
     "x": 24,
     "y": 1,
     "z": 22,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
@@ -17146,7 +17146,7 @@
     "x": 24,
     "y": 1,
     "z": 23,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
@@ -17349,35 +17349,35 @@
     "x": 3,
     "y": 1,
     "z": 24,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
     "x": 4,
     "y": 1,
     "z": 24,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
     "x": 5,
     "y": 1,
     "z": 24,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
     "x": 6,
     "y": 1,
     "z": 24,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
     "x": 7,
     "y": 1,
     "z": 24,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   },
   {
@@ -17496,7 +17496,7 @@
     "x": 24,
     "y": 1,
     "z": 24,
-    "type": "stone",
+    "type": "grass",
     "prop": null
   }
 ]

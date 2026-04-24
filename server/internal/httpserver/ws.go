@@ -62,6 +62,7 @@ func newGameHub() *gameHub {
 	loopbaseService := loopbase.NewLoopBaseService()
 	zonesService := zones.NewZoneService()
 	stageStore := newStageStoreFromEnv()
+	seedBundledStages(stageStore)
 	stageRegistry := newStageRegistry(stageStore)
 
 	// Connect zones service to loopbase for zone access validation

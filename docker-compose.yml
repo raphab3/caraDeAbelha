@@ -33,8 +33,12 @@ services:
       SERVER_IDLE_TIMEOUT_SECONDS: ${SERVER_IDLE_TIMEOUT_SECONDS:-60}
       SERVER_SHUTDOWN_TIMEOUT_SECONDS: ${SERVER_SHUTDOWN_TIMEOUT_SECONDS:-10}
       DATABASE_URL: ${DATABASE_URL:-postgres://bee:bee@db:5432/cara_de_abelha?sslmode=disable}
+      STAGE_STORAGE_DIR: ${STAGE_STORAGE_DIR:-/app/data/stages}
+      STAGE_SEED_MAPS_DIR: ${STAGE_SEED_MAPS_DIR:-/app/maps}
     ports:
       - "8080:8080"
+    volumes:
+      - stage-data:/app/data
 
   client:
     build:
@@ -56,4 +60,5 @@ services:
 
 volumes:
   postgres-data:
+  stage-data:
   client-node-modules:

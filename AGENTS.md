@@ -47,4 +47,4 @@ Do not commit local secrets. Copy environment files from documented examples whe
 
 ## Stage Management
 
-Do not require redeploy for authored maps. New Map Builder output should go through `/admin/stages`, where JSON is validated, versioned, published, and cached as a `worldLayout`. Keep `server/maps/map.json` as fallback only, and avoid parsing stage JSON inside the gameplay loop.
+Do not require redeploy for authored maps. New Map Builder output should go through `/admin/stages`, where JSON is validated, versioned, stored under `STAGE_STORAGE_DIR`, published, and cached as a `worldLayout`. Keep Postgres focused on stage metadata. Bundled `server/maps/*.json` files are seeded automatically on server startup for build/deploy maps, with `server/maps/map.json` still acting as fallback.

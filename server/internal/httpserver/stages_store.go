@@ -29,7 +29,8 @@ type stageStore interface {
 }
 
 type sqlStageStore struct {
-	db *sql.DB
+	db      *sql.DB
+	storage *stageSourceStorage
 }
 
 type memoryStageStore struct {
@@ -72,7 +73,23 @@ func newStageStoreFromEnv() stageStore {
 		return newMemoryStageStore()
 	}
 
-	return &sqlStageStore{db: db}
+	storage, err := newStageSourceStorageFromEnv()
+	if err != nil {
+		_ = db.Close()
+		log.Printf("stage management using in-memory store: stage source storage: %v", err)
+		return newMemoryStageStore()
+	}
+
+	store := &sqlStageStore{db: db, storage: storage}
+	migrateCtx, migrateCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer migrateCancel()
+	if err := store.migrateLegacySourceJSON(migrateCtx); err != nil {
+		_ = db.Close()
+		log.Printf("stage management using in-memory store: migrate legacy stage JSON: %v", err)
+		return newMemoryStageStore()
+	}
+
+	return store
 }
 
 func newMemoryStageStore() *memoryStageStore {
@@ -137,7 +154,7 @@ func (store *sqlStageStore) GetStage(ctx context.Context, stageID string) (admin
 	}
 
 	rows, err := store.db.QueryContext(ctx, `
-		SELECT id, stage_id, version, checksum, validation_status, validation_errors,
+		SELECT id, stage_id, version, checksum, storage_path, source_size_bytes, validation_status, validation_errors,
 		       created_at, published_at, activated_at
 		  FROM stage_versions
 		 WHERE stage_id = $1
@@ -149,7 +166,7 @@ func (store *sqlStageStore) GetStage(ctx context.Context, stageID string) (admin
 
 	versions := []adminStageVersion{}
 	for rows.Next() {
-		version, err := scanStageVersion(rows, false)
+		version, err := scanStageVersion(rows)
 		if err != nil {
 			return adminStageDetail{}, err
 		}
@@ -189,18 +206,43 @@ func (store *sqlStageStore) ImportVersion(ctx context.Context, input stageImport
 		return adminStageSummary{}, adminStageVersion{}, err
 	}
 
+	var existingVersionID string
+	var existingStoragePath string
+	if err = tx.QueryRowContext(ctx, `SELECT id, COALESCE(storage_path, '') FROM stage_versions WHERE stage_id = $1 AND checksum = $2`, input.StageID, input.Checksum).Scan(&existingVersionID, &existingStoragePath); err == nil {
+		if existingStoragePath == "" {
+			storagePath, sourceSizeBytes, writeErr := store.storage.Write(input.StageID, existingVersionID, input.Checksum, input.SourceJSON)
+			if writeErr != nil {
+				return adminStageSummary{}, adminStageVersion{}, writeErr
+			}
+			if _, err = tx.ExecContext(ctx, `UPDATE stage_versions SET storage_path = $2, source_size_bytes = $3 WHERE id = $1`, existingVersionID, storagePath, sourceSizeBytes); err != nil {
+				return adminStageSummary{}, adminStageVersion{}, err
+			}
+		}
+		if err = tx.Commit(); err != nil {
+			return adminStageSummary{}, adminStageVersion{}, err
+		}
+		return store.findStageAndVersionByChecksum(ctx, input.StageID, input.Checksum)
+	} else if err != sql.ErrNoRows {
+		return adminStageSummary{}, adminStageVersion{}, err
+	}
+
 	var nextVersion int
 	if err = tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(version), 0) + 1 FROM stage_versions WHERE stage_id = $1`, input.StageID).Scan(&nextVersion); err != nil {
 		return adminStageSummary{}, adminStageVersion{}, err
 	}
 
 	versionID := fmt.Sprintf("%s:v%d", input.StageID, nextVersion)
+	storagePath, sourceSizeBytes, err := store.storage.Write(input.StageID, versionID, input.Checksum, input.SourceJSON)
+	if err != nil {
+		return adminStageSummary{}, adminStageVersion{}, err
+	}
+
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO stage_versions (
-		    id, stage_id, version, source_json, checksum, validation_status, validation_errors, created_at
-		) VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7, $8)
+		    id, stage_id, version, storage_path, source_size_bytes, checksum, validation_status, validation_errors, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (stage_id, checksum) DO NOTHING`,
-		versionID, input.StageID, nextVersion, string(input.SourceJSON), input.Checksum, validationStatus, pq.Array(validationErrors), now)
+		versionID, input.StageID, nextVersion, storagePath, sourceSizeBytes, input.Checksum, validationStatus, pq.Array(validationErrors), now)
 	if err != nil {
 		return adminStageSummary{}, adminStageVersion{}, err
 	}
@@ -228,16 +270,23 @@ func (store *sqlStageStore) findStageAndVersionByChecksum(ctx context.Context, s
 }
 
 func (store *sqlStageStore) GetVersion(ctx context.Context, versionID string, includeSource bool) (adminStageVersion, error) {
-	query := `
-		SELECT id, stage_id, version, checksum, validation_status, validation_errors,
-		       created_at, published_at, activated_at`
-	if includeSource {
-		query += `, source_json::text`
+	row := store.db.QueryRowContext(ctx, `
+		SELECT id, stage_id, version, checksum, storage_path, source_size_bytes, validation_status, validation_errors,
+		       created_at, published_at, activated_at
+		  FROM stage_versions
+		 WHERE id = $1`, versionID)
+	version, err := scanStageVersion(row)
+	if err != nil {
+		return adminStageVersion{}, err
 	}
-	query += ` FROM stage_versions WHERE id = $1`
-
-	row := store.db.QueryRowContext(ctx, query, versionID)
-	return scanStageVersion(row, includeSource)
+	if includeSource {
+		source, readErr := store.storage.Read(version.StoragePath)
+		if readErr != nil {
+			return adminStageVersion{}, readErr
+		}
+		version.SourceJSON = string(source)
+	}
+	return version, nil
 }
 
 func (store *sqlStageStore) PublishVersion(ctx context.Context, versionID string, actor string) (adminStageSummary, adminStageVersion, error) {
@@ -346,23 +395,78 @@ func (store *sqlStageStore) Close() error {
 	return store.db.Close()
 }
 
+func (store *sqlStageStore) migrateLegacySourceJSON(ctx context.Context) error {
+	var hasSourceJSON bool
+	if err := store.db.QueryRowContext(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			  FROM information_schema.columns
+			 WHERE table_name = 'stage_versions'
+			   AND column_name = 'source_json'
+		)`).Scan(&hasSourceJSON); err != nil {
+		return err
+	}
+	if !hasSourceJSON {
+		_, err := store.db.ExecContext(ctx, `ALTER TABLE stage_versions ALTER COLUMN storage_path SET NOT NULL`)
+		return err
+	}
+
+	rows, err := store.db.QueryContext(ctx, `
+		SELECT id, stage_id, checksum, source_json::text
+		  FROM stage_versions
+		 WHERE COALESCE(storage_path, '') = ''`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	type legacySource struct {
+		versionID string
+		stageID   string
+		checksum  string
+		source    []byte
+	}
+	legacySources := []legacySource{}
+	for rows.Next() {
+		var item legacySource
+		var source string
+		if err := rows.Scan(&item.versionID, &item.stageID, &item.checksum, &source); err != nil {
+			return err
+		}
+		item.source = []byte(source)
+		legacySources = append(legacySources, item)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, item := range legacySources {
+		storagePath, sourceSizeBytes, err := store.storage.Write(item.stageID, item.versionID, item.checksum, item.source)
+		if err != nil {
+			return err
+		}
+		if _, err := store.db.ExecContext(ctx, `UPDATE stage_versions SET storage_path = $2, source_size_bytes = $3 WHERE id = $1`, item.versionID, storagePath, sourceSizeBytes); err != nil {
+			return err
+		}
+	}
+
+	_, err = store.db.ExecContext(ctx, `
+		ALTER TABLE stage_versions ALTER COLUMN storage_path SET NOT NULL;
+		ALTER TABLE stage_versions DROP COLUMN source_json;`)
+	return err
+}
+
 type stageVersionScanner interface {
 	Scan(dest ...any) error
 }
 
-func scanStageVersion(scanner stageVersionScanner, includeSource bool) (adminStageVersion, error) {
+func scanStageVersion(scanner stageVersionScanner) (adminStageVersion, error) {
 	var version adminStageVersion
 	var validationErrors pq.StringArray
 	var publishedAt sql.NullTime
 	var activatedAt sql.NullTime
-	if includeSource {
-		if err := scanner.Scan(&version.ID, &version.StageID, &version.Version, &version.Checksum, &version.ValidationStatus, &validationErrors, &version.CreatedAt, &publishedAt, &activatedAt, &version.SourceJSON); err != nil {
-			return adminStageVersion{}, err
-		}
-	} else {
-		if err := scanner.Scan(&version.ID, &version.StageID, &version.Version, &version.Checksum, &version.ValidationStatus, &validationErrors, &version.CreatedAt, &publishedAt, &activatedAt); err != nil {
-			return adminStageVersion{}, err
-		}
+	if err := scanner.Scan(&version.ID, &version.StageID, &version.Version, &version.Checksum, &version.StoragePath, &version.SourceSizeBytes, &version.ValidationStatus, &validationErrors, &version.CreatedAt, &publishedAt, &activatedAt); err != nil {
+		return adminStageVersion{}, err
 	}
 	version.ValidationErrors = append([]string{}, validationErrors...)
 	if publishedAt.Valid {
@@ -439,7 +543,9 @@ func (store *memoryStageStore) ImportVersion(_ context.Context, input stageImpor
 	}
 	for _, id := range stage.versions {
 		if existing := store.versions[id]; existing != nil && existing.Checksum == input.Checksum {
-			return stage.summary, *existing, nil
+			clone := *existing
+			clone.SourceJSON = ""
+			return stage.summary, clone, nil
 		}
 	}
 	nextVersion := len(stage.versions) + 1
@@ -448,6 +554,8 @@ func (store *memoryStageStore) ImportVersion(_ context.Context, input stageImpor
 		StageID:          input.StageID,
 		Version:          nextVersion,
 		Checksum:         input.Checksum,
+		StoragePath:      "memory",
+		SourceSizeBytes:  int64(len(input.SourceJSON)),
 		ValidationStatus: stageValidationInvalid,
 		ValidationErrors: append([]string{}, validationErrors...),
 		CreatedAt:        now,
@@ -464,7 +572,9 @@ func (store *memoryStageStore) ImportVersion(_ context.Context, input stageImpor
 	stage.summary.LatestVersion = version.Version
 	stage.summary.Checksum = version.Checksum
 	stage.summary.UpdatedAt = now
-	return stage.summary, version, nil
+	responseVersion := version
+	responseVersion.SourceJSON = ""
+	return stage.summary, responseVersion, nil
 }
 
 func (store *memoryStageStore) GetVersion(_ context.Context, versionID string, includeSource bool) (adminStageVersion, error) {
