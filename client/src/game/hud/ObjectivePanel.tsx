@@ -99,7 +99,7 @@ export const ObjectivePanel = ({
   const currentZoneName = getZoneName(playerProgress.currentZoneId);
 
   return (
-    <div className="flex flex-col gap-3 pointer-events-none pl-4 pt-2">
+    <div className="flex max-h-[calc(100vh-6rem)] flex-col gap-3 overflow-y-auto overscroll-contain pl-4 pr-2 pt-2 pb-28 pointer-events-none [scrollbar-width:thin] [scrollbar-color:rgba(148,163,184,0.45)_transparent]">
       {/* Current Zone Widget */}
       <div className="bg-slate-900/70 backdrop-blur-md rounded-2xl border border-slate-700/60 shadow-xl p-2.5 pr-6 flex items-center gap-3.5 pointer-events-auto self-start">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-white flex items-center justify-center shadow-inner border border-emerald-300/50">

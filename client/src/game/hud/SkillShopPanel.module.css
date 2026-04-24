@@ -1,16 +1,23 @@
 .root {
+  position: fixed;
+  z-index: 48;
+  width: min(33rem, calc(100vw - 1.5rem));
+  pointer-events: auto;
+}
+
+.panelChrome {
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
-  align-self: stretch;
-  width: min(24rem, calc(100vw - 2rem));
-  max-height: min(72vh, calc(100vh - 9rem));
+  gap: 0.85rem;
+  max-height: min(70vh, 38rem);
   padding: 1rem;
-  border: 1px solid rgba(148, 163, 184, 0.26);
-  border-radius: 1.5rem;
-  background: rgba(15, 23, 42, 0.78);
-  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.32);
-  backdrop-filter: blur(14px);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 1.45rem;
+  background:
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.94) 0%, rgba(15, 23, 42, 0.88) 100%);
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.38);
+  backdrop-filter: blur(18px);
   overflow: hidden;
 }
 
@@ -19,6 +26,12 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.headerActions {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
 }
 
 .eyebrow {
@@ -44,12 +57,37 @@
 }
 
 .honey {
-  min-width: 5rem;
-  padding: 0.65rem 0.85rem;
+  min-width: 4.7rem;
+  padding: 0.6rem 0.8rem;
   border-radius: 1rem;
   border: 1px solid rgba(251, 191, 36, 0.3);
   background: rgba(120, 53, 15, 0.28);
   text-align: center;
+}
+
+.dragHandle {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 2.8rem;
+  min-height: 3.55rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.6);
+  cursor: grab;
+}
+
+.dragHandle span {
+  width: 1rem;
+  height: 0.16rem;
+  margin: 0 auto;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.9);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
 }
 
 .honeyLabel {
@@ -72,12 +110,110 @@
 .list {
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
+  gap: 0.55rem;
   min-height: 0;
   overflow-y: auto;
   padding-right: 0.25rem;
   scrollbar-width: thin;
   scrollbar-color: rgba(125, 211, 252, 0.42) transparent;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
+  gap: 1rem;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.skillRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
+  width: 100%;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid rgba(71, 85, 105, 0.62);
+  border-radius: 1rem;
+  background: rgba(15, 23, 42, 0.54);
+  text-align: left;
+  transition: border-color 180ms ease, transform 180ms ease, background 180ms ease;
+}
+
+.skillRow:hover,
+.skillRow:focus-visible {
+  border-color: rgba(125, 211, 252, 0.58);
+  background: rgba(15, 23, 42, 0.7);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.skillRowActive {
+  border-color: rgba(250, 204, 21, 0.7);
+  box-shadow: 0 18px 36px rgba(217, 119, 6, 0.16);
+}
+
+.skillRowEquipped {
+  border-color: rgba(45, 212, 191, 0.42);
+}
+
+.skillRowMain,
+.skillRowMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+}
+
+.skillRowTitle {
+  font-size: 0.83rem;
+  font-weight: 900;
+  color: #f8fafc;
+}
+
+.skillRowTag {
+  padding: 0.14rem 0.42rem;
+  border-radius: 999px;
+  background: rgba(8, 145, 178, 0.18);
+  color: #a5f3fc;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.skillRowPrice,
+.skillRowState {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.skillRowPrice {
+  color: #fde68a;
+}
+
+.skillRowState {
+  color: rgba(148, 163, 184, 0.88);
+}
+
+.detailCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  min-height: 0;
+  padding: 0.95rem;
+  border: 1px solid rgba(71, 85, 105, 0.68);
+  border-radius: 1.15rem;
+  background: rgba(15, 23, 42, 0.68);
+  overflow-y: auto;
+}
+
+.detailHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .list::-webkit-scrollbar {
@@ -94,13 +230,7 @@
 }
 
 .card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.85rem;
-  padding: 0.9rem;
-  border: 1px solid rgba(71, 85, 105, 0.7);
-  border-radius: 1.1rem;
-  background: rgba(15, 23, 42, 0.68);
+  display: none;
 }
 
 .cardSelected {
@@ -154,9 +284,8 @@
 
 .actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: space-between;
+  align-items: stretch;
+  justify-content: stretch;
   gap: 0.65rem;
 }
 
@@ -262,20 +391,30 @@
 
 @media (max-width: 767px) {
   .root {
-    width: calc(100vw - 2rem);
+    inset: auto 0.75rem 5.75rem 0.75rem;
+    width: auto;
+    left: 0.75rem !important;
+    top: auto !important;
   }
 
-  .card {
-    grid-template-columns: 1fr;
+  .panelChrome {
+    max-height: min(68vh, 34rem);
   }
 
-  .actions {
-    align-items: stretch;
-  }
-
+  .header,
+  .headerActions,
+  .layout,
   .toolbar,
   .bindingRow {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .layout {
+    display: flex;
+  }
+
+  .dragHandle {
+    display: none;
   }
 }

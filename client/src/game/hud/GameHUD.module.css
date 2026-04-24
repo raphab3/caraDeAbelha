@@ -13,6 +13,8 @@
   top: 5rem;
   z-index: 30;
   pointer-events: auto;
+  max-height: calc(100vh - 6rem);
+  overflow: hidden;
 }
 
 .bottomFeed {
