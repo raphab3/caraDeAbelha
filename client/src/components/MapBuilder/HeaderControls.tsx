@@ -51,7 +51,7 @@ export function HeaderControls({
   onToolChange,
 }: HeaderControlsProps) {
   return (
-    <section className="max-w-[980px] rounded-[26px] border border-white/10 bg-[linear-gradient(145deg,rgba(15,23,42,0.92),rgba(15,23,42,0.76))] p-3 shadow-[0_18px_44px_rgba(2,6,23,0.34)] backdrop-blur-xl md:p-4">
+    <section className="max-w-[920px] rounded-[24px] border border-white/10 bg-[linear-gradient(145deg,rgba(15,23,42,0.92),rgba(15,23,42,0.76))] p-2.5 shadow-[0_14px_34px_rgba(2,6,23,0.32)] backdrop-blur-xl md:p-3">
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/72">Editor</p>
@@ -86,9 +86,9 @@ export function HeaderControls({
         </div>
       </div>
 
-      <div className="mt-3 grid gap-2 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,0.95fr)]">
-        <div className="grid gap-2 md:grid-cols-[minmax(0,1.2fr)_minmax(190px,0.9fr)_112px_112px]">
-          <label className="flex min-w-0 flex-col gap-1 rounded-[20px] border border-white/10 bg-black/20 p-3">
+      <div className="mt-2 grid gap-2 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,0.95fr)]">
+        <div className="grid gap-2 md:grid-cols-[minmax(0,1.2fr)_minmax(170px,0.9fr)_100px_100px]">
+          <label className="flex min-w-0 flex-col gap-1 rounded-[18px] border border-white/10 bg-black/20 p-2.5">
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">Nome</span>
             <input
               className="min-h-10 rounded-2xl border border-white/10 bg-slate-950/80 px-3 text-sm text-white outline-none transition focus:border-amber-300/55 focus:ring-2 focus:ring-amber-300/20"
@@ -98,7 +98,7 @@ export function HeaderControls({
             />
           </label>
 
-          <label className="flex min-w-0 flex-col gap-1 rounded-[20px] border border-white/10 bg-black/20 p-3">
+          <label className="flex min-w-0 flex-col gap-1 rounded-[18px] border border-white/10 bg-black/20 p-2.5">
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">Seed</span>
             <input
               className="min-h-10 rounded-2xl border border-white/10 bg-slate-950/80 px-3 text-sm text-white outline-none transition focus:border-amber-300/55 focus:ring-2 focus:ring-amber-300/20"
@@ -108,7 +108,7 @@ export function HeaderControls({
             />
           </label>
 
-          <label className="flex flex-col gap-1 rounded-[20px] border border-white/10 bg-black/20 p-3">
+          <label className="flex flex-col gap-1 rounded-[18px] border border-white/10 bg-black/20 p-2.5">
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">Grid</span>
             <input
               className="min-h-10 rounded-2xl border border-white/10 bg-slate-950/80 px-3 text-sm text-white outline-none transition focus:border-amber-300/55 focus:ring-2 focus:ring-amber-300/20"
@@ -120,7 +120,7 @@ export function HeaderControls({
             />
           </label>
 
-          <label className="flex flex-col gap-1 rounded-[20px] border border-white/10 bg-black/20 p-3">
+          <label className="flex flex-col gap-1 rounded-[18px] border border-white/10 bg-black/20 p-2.5">
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">Altura Y</span>
             <input
               className="min-h-10 rounded-2xl border border-white/10 bg-slate-950/80 px-3 text-sm text-white outline-none transition focus:border-amber-300/55 focus:ring-2 focus:ring-amber-300/20"
@@ -132,7 +132,7 @@ export function HeaderControls({
           </label>
         </div>
 
-        <div className="rounded-[22px] border border-white/10 bg-black/20 p-3">
+        <div className="rounded-[18px] border border-white/10 bg-black/20 p-2.5">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">Ferramenta</p>
             {TOOL_OPTIONS.map((toolOption) => (

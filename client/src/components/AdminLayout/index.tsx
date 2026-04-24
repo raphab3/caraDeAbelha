@@ -59,13 +59,13 @@ function resolveNavBadgeClassName(isActive: boolean): string {
 export function AdminLayout({ children, title, description, headerMode = "default" }: AdminLayoutProps) {
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(251,191,36,0.18),_transparent_26%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] text-slate-100">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1600px] flex-col gap-6 px-4 py-4 md:px-6 lg:flex-row lg:px-8 lg:py-6">
-        <aside className="w-full rounded-[28px] border border-white/10 bg-slate-950/65 p-6 shadow-[0_28px_80px_rgba(2,6,23,0.45)] backdrop-blur lg:max-w-xs">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1720px] flex-col gap-4 px-2 py-2 md:px-4 lg:flex-row lg:px-4 lg:py-3">
+        <aside className="w-full rounded-[22px] border border-white/10 bg-slate-950/70 p-4 shadow-[0_20px_50px_rgba(2,6,23,0.45)] backdrop-blur lg:max-w-[268px] lg:self-stretch">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-200/70">Admin</p>
-          <h1 className="mt-4 text-3xl font-semibold text-white">Ferramentas internas</h1>
-          <p className="mt-3 text-sm leading-7 text-slate-300">Monitoramento e operacao sem misturar com a rota do jogador.</p>
+          <h1 className="mt-3 text-2xl font-semibold text-white">Ferramentas internas</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-300">Monitoramento e operacao sem misturar com a rota do jogador.</p>
 
-          <nav aria-label="Ferramentas administrativas" className="mt-8 space-y-3">
+          <nav aria-label="Ferramentas administrativas" className="mt-6 space-y-2.5">
             {ADMIN_NAV_ITEMS.map((item) => (
               <NavLink
                 key={item.to}
@@ -86,7 +86,7 @@ export function AdminLayout({ children, title, description, headerMode = "defaul
             ))}
           </nav>
 
-          <div className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-5">
+          <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Acesso rapido</p>
             <Link
               className="mt-4 inline-flex min-h-11 items-center rounded-full border border-white/10 bg-white/10 px-4 text-sm font-semibold text-white transition-colors hover:border-amber-200/30 hover:bg-white/15"
@@ -97,7 +97,7 @@ export function AdminLayout({ children, title, description, headerMode = "defaul
           </div>
         </aside>
 
-        <main className="min-w-0 flex flex-1 flex-col rounded-[32px] border border-white/10 bg-slate-900/60 p-4 shadow-[0_28px_80px_rgba(2,6,23,0.38)] backdrop-blur md:p-6">
+        <main className="min-w-0 flex flex-1 flex-col rounded-[24px] border border-white/10 bg-slate-900/60 p-3 shadow-[0_24px_60px_rgba(2,6,23,0.38)] backdrop-blur md:p-4">
           {headerMode === "default" ? (
             <header className="rounded-[28px] border border-white/8 bg-black/20 px-5 py-5 md:px-6">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-200/70">Painel operacional</p>
