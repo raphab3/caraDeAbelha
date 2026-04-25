@@ -287,6 +287,18 @@ func (hub *gameHub) swapActiveStage(versionID string, layout worldLayout) {
 	if hub.stageRegistry != nil {
 		hub.stageRegistry.setActiveLayout(versionID, layout)
 	}
+	for _, player := range hub.players {
+		if player == nil {
+			continue
+		}
+		player.StageID = layout.stageID
+	}
+	for _, profile := range hub.profiles {
+		if profile == nil {
+			continue
+		}
+		profile.StageID = layout.stageID
+	}
 	hub.initializeWorldEntities()
 	hub.mu.Unlock()
 	hub.broadcast()

@@ -324,6 +324,7 @@ interface BeeActorProps {
   drift: number;
   accentColor: string;
   isLocal: boolean;
+  showNameplate?: boolean;
   inputPreviewTargetRef?: MutableRefObject<Vector3 | null>;
   surfaceIndex: WorldSurfaceIndex;
   trackedPositionRef?: MutableRefObject<Vector3>;
@@ -362,6 +363,7 @@ function BeeActor({
   drift,
   accentColor,
   isLocal,
+  showNameplate = true,
   inputPreviewTargetRef,
   surfaceIndex,
   trackedPositionRef,
@@ -372,9 +374,8 @@ function BeeActor({
   const rightWingRef = useRef<Mesh>(null);
   const authoritativePositionRef = useRef(new Vector3());
   const desiredTargetPositionRef = useRef(new Vector3());
-  const initialPosition = useMemo(
-    () => [toSceneAxis(player.x), resolveBeeSceneHeight(surfaceIndex, player.x, player.y, 0, drift), toSceneAxis(player.y)] as const,
-    [drift, player.id, player.x, player.y, surfaceIndex],
+  const initialPositionRef = useRef(
+    [toSceneAxis(player.x), resolveBeeSceneHeight(surfaceIndex, player.x, player.y, 0, drift), toSceneAxis(player.y)] as const,
   );
   const beeBodyMaterial = useMemo(() => getBeeBodyMaterial(accentColor, isLocal), [accentColor, isLocal]);
 
@@ -383,13 +384,23 @@ function BeeActor({
       return;
     }
 
+    const syncedHeight = resolveBeeSceneHeight(surfaceIndex, player.x, player.y, 0, drift);
+    const syncedX = toSceneAxis(player.x);
+    const syncedZ = toSceneAxis(player.y);
+
     groupRef.current.position.set(
-      toSceneAxis(player.x),
-      resolveBeeSceneHeight(surfaceIndex, player.x, player.y, 0, drift),
-      toSceneAxis(player.y),
+      syncedX,
+      syncedHeight,
+      syncedZ,
     );
+    authoritativePositionRef.current.set(syncedX, syncedHeight, syncedZ);
+    if (hasMoveTarget(player)) {
+      desiredTargetPositionRef.current.set(toSceneAxis(player.targetX), syncedHeight, toSceneAxis(player.targetY));
+    } else {
+      desiredTargetPositionRef.current.copy(authoritativePositionRef.current);
+    }
     trackedPositionRef?.current.copy(groupRef.current.position);
-  }, [drift, player.id, player.x, player.y, surfaceIndex, trackedPositionRef]);
+  }, [drift, player.id, surfaceIndex, trackedPositionRef]);
 
   useFrame((state, delta) => {
     if (!groupRef.current || !leftWingRef.current || !rightWingRef.current) {
@@ -460,7 +471,7 @@ function BeeActor({
   });
 
   return (
-    <group ref={groupRef} position={initialPosition} rotation={[0, BEE_IDLE_YAW, 0]}>
+    <group ref={groupRef} position={initialPositionRef.current} rotation={[0, BEE_IDLE_YAW, 0]}>
       {isLocal ? (
         <mesh position={[0, -0.56, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <primitive attach="geometry" object={localMarkerGeometry} />
@@ -494,8 +505,43 @@ function BeeActor({
         rotation={[-0.2, 0, -0.15]}
       />
 
-      <Html center distanceFactor={8} position={[0, 1.42, 0]} sprite transform>
-        <PlayerNameplate player={player} isLocal={isLocal} />
+      {showNameplate ? (
+        <Html center distanceFactor={8} position={[0, 1.42, 0]} sprite transform>
+          <PlayerNameplate player={player} isLocal={isLocal} />
+        </Html>
+      ) : null}
+    </group>
+  );
+}
+
+function LocalBeeNameplate({
+  player,
+  surfaceIndex,
+  trackedPositionRef,
+}: {
+  player: WorldPlayerState;
+  surfaceIndex: WorldSurfaceIndex;
+  trackedPositionRef: MutableRefObject<Vector3>;
+}) {
+  const groupRef = useRef<Group>(null);
+
+  useFrame(() => {
+    if (!groupRef.current) {
+      return;
+    }
+
+    const trackedPosition = trackedPositionRef.current;
+    const sceneX = Number.isFinite(trackedPosition.x) ? trackedPosition.x : toSceneAxis(player.x);
+    const sceneZ = Number.isFinite(trackedPosition.z) ? trackedPosition.z : toSceneAxis(player.y);
+    const sceneY = resolveBeeSceneHeight(surfaceIndex, player.x, player.y, 0, 0) + 1.42;
+
+    groupRef.current.position.set(sceneX, sceneY, sceneZ);
+  });
+
+  return (
+    <group ref={groupRef}>
+      <Html center>
+        <PlayerNameplate player={player} isLocal />
       </Html>
     </group>
   );
@@ -1211,7 +1257,11 @@ function CameraRig({
     const desiredTarget = cameraFollowDeltaRef.current.set(anchor.x, 0.42, anchor.z);
     const controls = controlsRef.current;
 
-    smoothedTargetRef.current.lerp(desiredTarget, 1 - Math.exp(-delta * 6));
+    if (focusPlayer) {
+      smoothedTargetRef.current.copy(desiredTarget);
+    } else {
+      smoothedTargetRef.current.lerp(desiredTarget, 1 - Math.exp(-delta * 6));
+    }
 
     if (!controls) {
       return;
@@ -1545,16 +1595,26 @@ function HiveCore({
       />
 
       {localPlayer ? (
-        <BeeActor
-          accentColor="#f8c537"
-          drift={0}
-          isCollecting={flowerInteraction?.phase === "collecting"}
-          isLocal
-          inputPreviewTargetRef={localInputPreviewTargetRef}
-          player={localPlayer}
-          surfaceIndex={surfaceIndex}
-          trackedPositionRef={localPlayerPositionRef}
-        />
+        <>
+          <BeeActor
+            accentColor="#f8c537"
+            drift={0}
+            isCollecting={flowerInteraction?.phase === "collecting"}
+            isLocal
+            inputPreviewTargetRef={localInputPreviewTargetRef}
+            key={localPlayer.id}
+            player={localPlayer}
+            showNameplate={false}
+            surfaceIndex={surfaceIndex}
+            trackedPositionRef={localPlayerPositionRef}
+          />
+          <LocalBeeNameplate
+            key={`${localPlayer.id}:nameplate`}
+            player={localPlayer}
+            surfaceIndex={surfaceIndex}
+            trackedPositionRef={localPlayerPositionRef}
+          />
+        </>
       ) : null}
 
       <RemoteBeesInstanced players={remotePlayers} surfaceIndex={surfaceIndex} />
@@ -1720,6 +1780,7 @@ export function GameViewport({
         hiveInteraction={hiveInteraction}
         hives={visibleHives}
         localPlayerId={localPlayerId}
+        mobs={nearbyMobs}
         onClearTargets={onClearTargets}
         onCollectorClick={onHiveClick}
         players={players}

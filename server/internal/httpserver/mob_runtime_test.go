@@ -96,3 +96,39 @@ func TestRangedMobAttacksNearbyPlayer(t *testing.T) {
 		t.Fatalf("expected ranged mob to lock on nearby player")
 	}
 }
+
+func TestSwapActiveStageUpdatesConnectedPlayerStageForMobAggro(t *testing.T) {
+	now := time.Date(2026, time.April, 24, 15, 20, 0, 0, time.UTC)
+	hub := newRuntimeTestHub(now)
+	player := addCombatTestPlayer(hub, "player:target", 0.5, 0.5, now)
+	player.StageID = "stage:old"
+	hub.profiles["target"] = player
+
+	layout := hub.world
+	layout.stageID = "stage:new"
+	layout.mobs = worldMobConfig{
+		RangedCount:  1,
+		MoveRadius:   4,
+		PursuitLevel: 5,
+		MinLevel:     2,
+		MaxLevel:     2,
+	}
+
+	hub.swapActiveStage("version:test", layout)
+
+	if player.StageID != layout.stageID {
+		t.Fatalf("expected connected player stage to sync to %s, got %s", layout.stageID, player.StageID)
+	}
+	mob := firstActiveMob(t, hub)
+	player.X = mob.State.X + 2.2
+	player.Y = mob.State.Y
+	progress := hub.ensurePlayerProgressLocked(player.ID)
+	startingLife := progress.CurrentLife
+
+	if !hub.processMobRuntimeLocked(now) {
+		t.Fatalf("expected mob runtime to process attack after stage swap")
+	}
+	if progress.CurrentLife >= startingLife {
+		t.Fatalf("expected mob attack after stage swap, got %d from %d", progress.CurrentLife, startingLife)
+	}
+}

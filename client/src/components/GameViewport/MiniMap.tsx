@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 
 import styles from "./MiniMap.module.css";
-import type { FlowerInteractionState, HiveInteractionState, WorldHiveState, WorldPlayerState } from "../../types/game";
+import type { FlowerInteractionState, HiveInteractionState, WorldHiveState, WorldMobState, WorldPlayerState } from "../../types/game";
 
 const RADAR_RADIUS = 50;
 const REMOTE_PLAYER_MARGIN = 8;
 
 interface MiniMapProps {
 	players: WorldPlayerState[];
+	mobs: WorldMobState[];
 	hives: WorldHiveState[];
 	flowerInteraction?: FlowerInteractionState;
 	hiveInteraction?: HiveInteractionState;
@@ -41,6 +42,11 @@ interface CoordinateReadout {
 interface MiniMapPoi {
 	id: string;
 	label: string;
+	left: number;
+	top: number;
+}
+
+interface MiniMapMobMarker extends WorldMobState {
 	left: number;
 	top: number;
 }
@@ -85,6 +91,7 @@ function formatLongitude(value: number): string {
 
 function resolveBounds(
 	players: WorldPlayerState[],
+	mobs: WorldMobState[],
 	collectorHive: WorldHiveState | undefined,
 	localPlayer?: WorldPlayerState,
 ): MiniMapBounds {
@@ -107,6 +114,13 @@ function resolveBounds(
 		maxY = Math.max(maxY, player.y + REMOTE_PLAYER_MARGIN);
 	}
 
+	for (const mob of mobs) {
+		minX = Math.min(minX, mob.x - REMOTE_PLAYER_MARGIN);
+		maxX = Math.max(maxX, mob.x + REMOTE_PLAYER_MARGIN);
+		minY = Math.min(minY, mob.y - REMOTE_PLAYER_MARGIN);
+		maxY = Math.max(maxY, mob.y + REMOTE_PLAYER_MARGIN);
+	}
+
 	if (collectorHive) {
 		minX = Math.min(minX, collectorHive.x - REMOTE_PLAYER_MARGIN);
 		maxX = Math.max(maxX, collectorHive.x + REMOTE_PLAYER_MARGIN);
@@ -124,9 +138,10 @@ function resolveBounds(
 	};
 }
 
-export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, localPlayerId, onClearTargets, onCollectorClick, onPlayerClick, onRespawn }: MiniMapProps) {
+export function MiniMap({ players, mobs, hives, flowerInteraction, hiveInteraction, localPlayerId, onClearTargets, onCollectorClick, onPlayerClick, onRespawn }: MiniMapProps) {
 	const [collapsed, setCollapsed] = useState(true);
 	const [hoveredPlayerId, setHoveredPlayerId] = useState<string | null>(null);
+	const [hoveredMobId, setHoveredMobId] = useState<string | null>(null);
 	const collectorHive = useMemo(() => hives.find((hive) => hive.id === COLLECTOR_HIVE_ID) ?? COLLECTOR_HIVE_FALLBACK, [hives]);
 
 	useEffect(() => {
@@ -162,8 +177,8 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 	);
 
 	const bounds = useMemo(
-		() => resolveBounds(players, collectorHive, localPlayer),
-		[collectorHive, localPlayer, players],
+		() => resolveBounds(players, mobs, collectorHive, localPlayer),
+		[collectorHive, localPlayer, mobs, players],
 	);
 
 	const markers = useMemo<MiniMapMarker[]>(() => {
@@ -189,6 +204,13 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 
 	const localMarker = markers.find((player) => player.isLocal);
 	const nearbyPlayers = markers.filter((player) => !player.isLocal);
+	const mobMarkers = useMemo<MiniMapMobMarker[]>(() => {
+		return mobs.map((mob) => ({
+			...mob,
+			left: clampPercent(((mob.x - bounds.minX) / bounds.width) * 100),
+			top: clampPercent((1 - (mob.y - bounds.minY) / bounds.height) * 100),
+		}));
+	}, [bounds.height, bounds.minX, bounds.minY, bounds.width, mobs]);
 	const targetPlayer = nearbyPlayers[0];
 
 	const localCoordinates = useMemo<CoordinateReadout>(() => {
@@ -313,6 +335,30 @@ export function MiniMap({ players, hives, flowerInteraction, hiveInteraction, lo
 								</button>
 							),
 						)}
+
+						{mobMarkers.map((mob) => (
+							<button
+								key={mob.id}
+								type="button"
+								className={cx(styles.marker, styles.markerRemote, hoveredMobId === mob.id && styles.markerHovered)}
+								style={{ left: `${mob.left}%`, top: `${mob.top}%` }}
+								aria-label={`Mob ${mob.kind} nivel ${mob.level} em lat ${formatLatitude(mob.y)} e long ${formatLongitude(mob.x)}`}
+								onClick={() => onPlayerClick?.(mob.x, mob.y)}
+								onMouseEnter={() => setHoveredMobId(mob.id)}
+								onMouseLeave={() => setHoveredMobId(null)}
+							>
+								<span
+									className={styles.dot}
+									style={{ backgroundColor: mob.kind === "ranged" ? "#5eead4" : "#fb7185", boxShadow: mob.kind === "ranged" ? "0 0 0 4px rgba(45,212,191,0.16)" : "0 0 0 4px rgba(251,113,133,0.16)" }}
+								/>
+								{hoveredMobId === mob.id ? (
+									<span className={styles.tooltip}>
+										<strong>{mob.kind === "ranged" ? "Mob ranged" : "Mob melee"}</strong>
+										<span className={styles.tooltipId}>Nivel {mob.level}</span>
+									</span>
+								) : null}
+							</button>
+						))}
 
 						{localMarker && targetPlayer ? (
 							<svg className={styles.lines} aria-hidden="true">
